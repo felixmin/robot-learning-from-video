@@ -21,13 +21,12 @@ For performance reasons over the course of the project we switched from Open X E
 │   ├── common/           # Shared utilities, logging, data interfaces
 │   ├── laq/              # Stage 1: Latent action quantization (VQ-VAE)
 │   ├── foundation/       # Stage 2: Vision-Language-Action model
-│   └── low_level/        # Stage 3: Action decoding
 ├── config/               # Hydra configurations (modular, composable)
 │   ├── experiment/       # Complete experiment setups
 │   ├── model/, data/, training/, cluster/  # Config components
 ├── scripts/              # Training entry points (numbered by stage)
 ├── tests/                # Unit and integration tests
-├── slurm/                # LRZ job submission templates
+├── lerobot_policy_hlrp / # Definition of the installable lerobot policy to be used with the lerobot library
 ├── docs/                 # Documentation (LRZ workflow guide)
 └── containers/           # Enroot/Docker definitions for LRZ
 ```
