@@ -18,7 +18,7 @@ from torch.optim.lr_scheduler import CosineAnnealingLR, LinearLR, SequentialLR
 import lightning.pytorch as pl
 from omegaconf import DictConfig, ListConfig, OmegaConf
 
-from laq.models.latent_action_quantization import LatentActionQuantization
+from laq.models.latent_action_quantization import LatentActionQuantization, DinoConfig
 from laq.models.flow import FlowConfig
 
 
@@ -118,6 +118,24 @@ class LAQTask(pl.LightningModule):
                         "    summary_loss_weight: <float, optional>\n"
                         "    summary_static_eps: <float, optional>\n"
                     ) from exc
+        dino_config = None
+        if "dino" in model_config and model_config.dino is not None:
+            dino_cfg = model_config.dino
+            dino_enabled = bool(dino_cfg.get("enabled", True))
+            if dino_enabled:
+                try:
+                    dino_config = DinoConfig(
+                        loss_weight=float(dino_cfg.get("loss_weight", 1.0)),
+                        warmup_steps=int(dino_cfg.get("warmup_steps", 0)),
+                    )
+                except Exception as exc:
+                    raise ValueError(
+                        "Invalid dino config. Expected:\n"
+                        "  model.dino:\n"
+                        "    enabled: true|false\n"
+                        "    loss_weight: <float, optional>\n"
+                        "    warmup_steps: <int, optional>\n"
+                    ) from exc
 
         # Build codebook replacement schedule if specified
         codebook_replace_schedule = None
@@ -125,6 +143,14 @@ class LAQTask(pl.LightningModule):
             # Convert from list of lists to list of tuples
             codebook_replace_schedule = [
                 tuple(entry) for entry in model_config.codebook_replace_schedule
+            ]
+        vq_discarding_threshold_schedule = None
+        if (
+            "vq_discarding_threshold_schedule" in model_config
+            and model_config.vq_discarding_threshold_schedule is not None
+        ):
+            vq_discarding_threshold_schedule = [
+                tuple(entry) for entry in model_config.vq_discarding_threshold_schedule
             ]
 
         metrics_cfg = training_config.get("metrics")
@@ -150,6 +176,7 @@ class LAQTask(pl.LightningModule):
             heads=model_config.heads,
             code_seq_len=model_config.code_seq_len,
             vq_discarding_threshold=model_config.get("vq_discarding_threshold", 0.1),
+            vq_discarding_threshold_schedule=vq_discarding_threshold_schedule,
             channels=model_config.get("channels", 3),
             attn_dropout=model_config.get("attn_dropout", 0.0),
             ff_dropout=model_config.get("ff_dropout", 0.0),
@@ -158,8 +185,8 @@ class LAQTask(pl.LightningModule):
             dinov3_model_name=model_config.get("dinov3_model_name", "facebook/dinov3-vits16-pretrain-lvd1689m"),
             dinov3_pool_to_grid=model_config.get("dinov3_pool_to_grid", None),
             metrics_num_unique_codes_every_n_steps=int(metrics_cfg.num_unique_codes_every_n_steps),
+            dino_config=dino_config,
             # Training decoder flags
-            use_dino_decoder=model_config.get("use_dino_decoder", True),
             use_pixel_decoder=model_config.get("use_pixel_decoder", False),
             # Interpretability decoder flag
             use_aux_decoder=model_config.get("use_aux_decoder", True),

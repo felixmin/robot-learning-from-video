@@ -1,7 +1,7 @@
 """Shared OpenX dataset registry + small access helpers."""
 
 from dataclasses import dataclass
-from typing import Optional, Tuple
+from typing import Dict, Optional, Tuple
 
 
 # ---------------------------------------------------------------------------
@@ -501,6 +501,47 @@ OXE_DATASETS = {
 }
 
 
+def _normalize_dataset_name(name: str) -> str:
+    return "".join(ch for ch in str(name).lower() if ch.isalnum())
+
+
+def _gcs_dataset_segment(gcs_path: str) -> str:
+    parts = [p for p in str(gcs_path).split("/") if p]
+    if len(parts) < 2:
+        return ""
+    return parts[-2]
+
+
+def _build_oxe_dataset_aliases() -> Dict[str, str]:
+    aliases: Dict[str, str] = {}
+    for key, cfg in OXE_DATASETS.items():
+        for candidate in (key, cfg.name, _gcs_dataset_segment(cfg.gcs_path)):
+            if not candidate:
+                continue
+            aliases.setdefault(candidate, key)
+            aliases.setdefault(_normalize_dataset_name(candidate), key)
+    return aliases
+
+
+OXE_DATASET_ALIASES = _build_oxe_dataset_aliases()
+
+
+def resolve_oxe_dataset_key(dataset_name: str) -> Optional[str]:
+    if dataset_name in OXE_DATASETS:
+        return dataset_name
+    aliased = OXE_DATASET_ALIASES.get(dataset_name)
+    if aliased is not None:
+        return aliased
+    return OXE_DATASET_ALIASES.get(_normalize_dataset_name(dataset_name))
+
+
+def resolve_oxe_dataset_config(dataset_name: str) -> Optional[OXEDatasetConfig]:
+    key = resolve_oxe_dataset_key(dataset_name)
+    if key is None:
+        return None
+    return OXE_DATASETS.get(key)
+
+
 def resolve_nested_key(container, keypath: str):
     """Navigate a nested dict/tensor structure via slash-separated key path.
 
@@ -516,4 +557,3 @@ def resolve_nested_key(container, keypath: str):
     for part in keypath.split("/"):
         cur = cur[part]
     return cur
-

@@ -211,11 +211,11 @@ class TestLAQWithDINO:
             loss, metrics = laq_with_dino(x, step=0)
 
         assert loss.item() >= 0
-        assert metrics["num_unique_codes"] > 0
+        assert metrics["unique_codes_in_batch"] > 0
         assert "dino_loss" in metrics
         assert "aux_loss" in metrics
 
-        print(f"✓ LAQ+DINO forward: loss={loss.item():.4f}, unique={metrics['num_unique_codes']}")
+        print(f"✓ LAQ+DINO forward: loss={loss.item():.4f}, unique={metrics['unique_codes_in_batch']}")
 
     def test_laq_dino_reconstruction(self, laq_with_dino, device):
         """Test LAQ+DINO reconstruction output."""

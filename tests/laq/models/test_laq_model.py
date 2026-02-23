@@ -6,7 +6,7 @@ Tests the complete LAQ model that combines transformers + NSVQ.
 
 import pytest
 import torch
-from laq.models.latent_action_quantization import LatentActionQuantization
+from laq.models.latent_action_quantization import DinoConfig, LatentActionQuantization
 
 
 @pytest.fixture
@@ -82,12 +82,12 @@ class TestLAQForward:
         assert isinstance(loss.item(), float)
         assert loss.item() >= 0
         assert isinstance(metrics, dict)
-        assert "num_unique_codes" in metrics
-        assert metrics["num_unique_codes"] > 0
+        assert "unique_codes_in_batch" in metrics
+        assert metrics["unique_codes_in_batch"] > 0
 
         print(f"✓ Forward pass successful")
         print(f"  - Loss: {loss.item():.6f}")
-        print(f"  - Unique codes used: {metrics['num_unique_codes']}")
+        print(f"  - Unique codes used: {metrics['unique_codes_in_batch']}")
 
     def test_forward_returns_reconstruction_only(self, laq_model, device):
         """Test forward pass with return_recons_only=True."""
@@ -247,6 +247,48 @@ class TestLAQCodebookManagement:
         loss, metrics = laq_model(video, step=10)
 
         print(f"✓ Codebook replacement triggered at step 10")
+
+    def test_vq_discarding_threshold_schedule(self, laq_model_config, device):
+        """Test step-based replacement threshold schedule."""
+        laq_model_config.pop('device')
+        laq_model_config['vq_discarding_threshold'] = 0.02
+        laq_model_config['vq_discarding_threshold_schedule'] = [
+            (0.1, 100),
+            (0.01, 1000),
+        ]
+        model = LatentActionQuantization(**laq_model_config).to(device)
+
+        assert model._get_vq_discarding_threshold(0) == pytest.approx(0.1)
+        assert model._get_vq_discarding_threshold(99) == pytest.approx(0.1)
+        assert model._get_vq_discarding_threshold(100) == pytest.approx(0.01)
+        assert model._get_vq_discarding_threshold(10000) == pytest.approx(0.01)
+
+    def test_vq_discarding_threshold_schedule_must_increase_until_step(self, laq_model_config, device):
+        """Test threshold schedule validation fails on non-monotonic ranges."""
+        laq_model_config.pop('device')
+        laq_model_config['vq_discarding_threshold_schedule'] = [
+            (0.1, 200),
+            (0.01, 100),
+        ]
+
+        with pytest.raises(ValueError, match="strictly increasing"):
+            LatentActionQuantization(**laq_model_config).to(device)
+
+    def test_dino_warmup_weight(self, laq_model_config, device):
+        """Test DINO warmup weight follows configured schedule."""
+        laq_model_config.pop('device')
+        laq_model_config['dino_config'] = DinoConfig(loss_weight=2.0, warmup_steps=100)
+        model = LatentActionQuantization(**laq_model_config).to(device)
+
+        video = torch.randn(2, 3, 2, 256, 256, device=device)
+        _, metrics_step0 = model(video, step=0)
+        _, metrics_step50 = model(video, step=50)
+        _, metrics_step100 = model(video, step=100)
+
+        assert metrics_step0["dino_weight"] == pytest.approx(0.0)
+        assert "dino_loss" not in metrics_step0
+        assert metrics_step50["dino_weight"] == pytest.approx(1.0)
+        assert metrics_step100["dino_weight"] == pytest.approx(2.0)
 
 
 class TestLAQStateDict:

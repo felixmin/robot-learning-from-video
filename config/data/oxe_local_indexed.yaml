@@ -10,7 +10,7 @@ dataset:
     datasets: []
 
 loader:
-  batch_size: 16
+  batch_size: 64
   # Local indexed_full uses PyTorch workers (not tf.data streaming workers).
   num_workers: 12
   pin_memory: true
@@ -32,7 +32,7 @@ adapter:
     # <=0 means "all available shards"
     max_shards_per_dataset: 0
     # <=0 means "all valid pairs per episode"
-    pairs_per_episode: 0
+    pairs_per_episode: 1
     # <=0 means auto (all CPUs)
     index_workers: 0
     # Persistent shard index cache (can be reused across runs)

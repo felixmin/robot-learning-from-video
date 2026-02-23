@@ -12,6 +12,7 @@ from laq.validation import (
     BasicVisualizationStrategy,
     FlowVisualizationStrategy,
     LatentTransferStrategy,
+    AllSequencesHistogramStrategy,
     CodebookEmbeddingStrategy,
     SequenceExamplesStrategy,
     create_validation_strategies,
@@ -403,6 +404,49 @@ class TestSequenceExamplesStrategy:
 
         metrics = strategy.run(cache, pl_module, trainer)
         assert metrics == {}
+
+    def test_run_forwards_metric_suffix_to_visualizer(self):
+        """Test metric suffix is forwarded to _visualize_sequences."""
+        strategy = SequenceExamplesStrategy(min_samples=2)
+        strategy._visualize_sequences = MagicMock()
+
+        cache = ValidationCache()
+        cache.codes.append(torch.tensor([[1, 2], [1, 2]]))
+        cache.frames.append(torch.randn(2, 3, 2, 16, 16))
+
+        pl_module = MagicMock()
+        trainer = MagicMock()
+        trainer.global_step = 42
+
+        strategy._get_wandb_logger = lambda _trainer: MagicMock()
+
+        strategy.run(cache, pl_module, trainer, metric_suffix="_bridge_holdout")
+
+        strategy._visualize_sequences.assert_called_once()
+        assert strategy._visualize_sequences.call_args.kwargs["metric_suffix"] == "_bridge_holdout"
+
+
+class TestAllSequencesHistogramStrategy:
+    """Test AllSequencesHistogramStrategy."""
+
+    def test_run_forwards_metric_suffix_to_plotter(self):
+        """Test metric suffix is forwarded to _create_plot."""
+        strategy = AllSequencesHistogramStrategy()
+        strategy._create_plot = MagicMock()
+
+        cache = ValidationCache()
+        cache.all_codes.append(torch.tensor([[1, 2], [1, 2], [3, 4]]))
+
+        pl_module = MagicMock()
+        trainer = MagicMock()
+        trainer.global_step = 7
+
+        strategy._get_wandb_logger = lambda _trainer: MagicMock()
+
+        strategy.run(cache, pl_module, trainer, metric_suffix="_bridge_holdout")
+
+        strategy._create_plot.assert_called_once()
+        assert strategy._create_plot.call_args.kwargs["metric_suffix"] == "_bridge_holdout"
 
 
 class TestMetadataPruning:

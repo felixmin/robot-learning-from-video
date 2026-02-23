@@ -28,7 +28,12 @@ import torch
 from numpy.lib.format import open_memmap
 from torch.utils.data import Dataset, Sampler
 
-from common.adapters.oxe_shared import OXE_DATASETS, OXEDatasetConfig
+from common.adapters.oxe_shared import (
+    OXE_DATASETS,
+    OXEDatasetConfig,
+    resolve_oxe_dataset_config,
+    resolve_oxe_dataset_key,
+)
 
 from .openx_local import (
     _decode_image_to_tensor,
@@ -526,9 +531,16 @@ def load_openx_local_episode_index(index_root: str) -> OpenXLocalEpisodeIndexBun
     datasets = [str(x) for x in meta.get("datasets", [])]
     dataset_weights = np.asarray(meta.get("dataset_weights", []), dtype=np.float64)
     dataset_offsets = np.asarray(meta.get("dataset_offsets", []), dtype=np.int64)
-    dataset_configs = [
-        OXE_DATASETS.get(name) or _fallback_dataset_config(name) for name in datasets
-    ]
+    dataset_configs = []
+    for name in datasets:
+        resolved_cfg = resolve_oxe_dataset_config(name)
+        if resolved_cfg is not None:
+            dataset_configs.append(resolved_cfg)
+            resolved_key = resolve_oxe_dataset_key(name)
+            if resolved_key is not None and resolved_key != name:
+                logger.info("Resolved dataset alias: %s -> %s", name, resolved_key)
+        else:
+            dataset_configs.append(_fallback_dataset_config(name))
 
     return OpenXLocalEpisodeIndexBundle(
         index_path=str(root),
@@ -784,7 +796,7 @@ class OpenXLocalIndexedPairMapDataset(Dataset):
             "frames": frames,
             "episode_id": episode_ref,
             "frame_idx": int(t),
-            "dataset_name": self.index.datasets[dataset_id],
+            "dataset_name": cfg.name,
             "dataset_type": self.index.datasets[dataset_id],
             "language": language,
             "offset": int(offset),

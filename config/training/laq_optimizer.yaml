@@ -2,7 +2,7 @@
 # Optimizer and scheduler settings for LAQ training
 
 epochs: 100
-max_steps: null  # If set, overrides epochs
+max_steps: 200000  # If set, overrides epochs
 
 # --- Logging / UI ---
 # How often Lightning emits scalar logs (to wandb + any configured logger).

@@ -293,10 +293,9 @@ class CodebookHistogramStrategy(ValidationStrategy):
         counts = torch.bincount(codes_flat.long(), minlength=codebook_size)
 
         # Compute metrics with suffix
-        total_codes = counts.sum().item()
         used_codes = (counts > 0).sum().item()
-        metrics[f"val/codebook_utilization{metric_suffix}"] = used_codes / codebook_size
-        metrics[f"val/codebook_entropy{metric_suffix}"] = compute_entropy(counts.float())
+        metrics[f"val/codebook_entry_utilization_val_cache_all{metric_suffix}"] = used_codes / codebook_size
+        metrics[f"val/codebook_usage_entropy_val_cache_all{metric_suffix}"] = compute_entropy(counts.float())
 
         # Log to trainer
         pl_module.log_dict(metrics, sync_dist=True)
@@ -411,9 +410,9 @@ class LatentSequenceHistogramStrategy(ValidationStrategy):
 
         # Calculate entropy of sequence distribution
         counts = torch.tensor(list(counter.values()), dtype=torch.float)
-        metrics[f"val/sequence_entropy{metric_suffix}"] = compute_entropy(counts)
-        metrics[f"val/unique_sequences{metric_suffix}"] = unique_seqs
-        metrics[f"val/total_val_samples{metric_suffix}"] = total_samples
+        metrics[f"val/latent_sequence_entropy_val_cache_all{metric_suffix}"] = compute_entropy(counts)
+        metrics[f"val/latent_sequence_unique_count_val_cache_all{metric_suffix}"] = unique_seqs
+        metrics[f"val/latent_sequence_sample_count_val_cache_all{metric_suffix}"] = total_samples
 
         pl_module.log_dict(metrics, sync_dist=True)
 
@@ -528,7 +527,12 @@ class AllSequencesHistogramStrategy(ValidationStrategy):
         # Visualize
         wandb_logger = self._get_wandb_logger(trainer)
         if wandb_logger is not None:
-            self._create_plot(sorted_counts, wandb_logger, trainer.global_step)
+            self._create_plot(
+                sorted_counts,
+                wandb_logger,
+                trainer.global_step,
+                metric_suffix=metric_suffix,
+            )
 
         return metrics
 
@@ -537,6 +541,7 @@ class AllSequencesHistogramStrategy(ValidationStrategy):
         counts: List[int],
         wandb_logger,
         global_step: int,
+        metric_suffix: str = "",
     ):
         """Create and log plot of all sequence counts."""
         try:
@@ -878,6 +883,7 @@ class SequenceExamplesStrategy(ValidationStrategy):
                 top_sequences,
                 wandb_logger,
                 trainer.global_step,
+                metric_suffix=metric_suffix,
             )
 
         return metrics
@@ -889,6 +895,7 @@ class SequenceExamplesStrategy(ValidationStrategy):
         top_sequences: List[tuple],
         wandb_logger,
         global_step: int,
+        metric_suffix: str = "",
     ):
         """Create visualization grid for top sequences."""
         grids = []

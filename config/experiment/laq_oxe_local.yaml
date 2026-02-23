@@ -19,4 +19,4 @@ experiment:
 
 data:
   loader:
-    batch_size: 48
+    batch_size: 64

@@ -14,6 +14,7 @@ Decoder Types:
 import logging
 import math
 import os
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, List, Optional
 
@@ -39,6 +40,26 @@ def pair(val):
     if len(ret) != 2:
         raise ValueError(f"Expected pair, got {ret}")
     return ret
+
+
+@dataclass
+class DinoConfig:
+    """Configuration for DINO supervision."""
+
+    loss_weight: float = 1.0
+    warmup_steps: int = 0
+
+    def __post_init__(self):
+        if self.loss_weight <= 0:
+            raise ValueError(f"dino.loss_weight must be positive, got {self.loss_weight}")
+        if self.warmup_steps < 0:
+            raise ValueError(f"dino.warmup_steps must be non-negative, got {self.warmup_steps}")
+
+    def get_weight(self, step: int) -> float:
+        if self.warmup_steps == 0:
+            return self.loss_weight
+        warmup_factor = min(1.0, step / self.warmup_steps)
+        return self.loss_weight * warmup_factor
 
 
 class LatentActionQuantization(nn.Module):
@@ -87,11 +108,14 @@ class LatentActionQuantization(nn.Module):
         ff_dropout = 0.,
         code_seq_len = 1,
         vq_discarding_threshold: float = 0.1,
+        vq_discarding_threshold_schedule: Optional[list] = None,
         latent_ablation: str = "none",
         use_dinov3_encoder = False,
         dinov3_model_name = "facebook/dinov3-vits16-pretrain-lvd1689m",
         dinov3_pool_to_grid = None,  # Pool DINO features to this grid size (e.g., 8 for 8x8)
         metrics_num_unique_codes_every_n_steps: int,
+        # DINO supervision config (optional - set to enable DINO loss)
+        dino_config: Optional["DinoConfig"] = None,
         # Training decoder flags (at least one must be True, or flow_config must be set)
         use_dino_decoder = True,
         use_pixel_decoder = False,
@@ -122,9 +146,14 @@ class LatentActionQuantization(nn.Module):
         self.metrics_num_unique_codes_every_n_steps = int(metrics_num_unique_codes_every_n_steps)
         if self.metrics_num_unique_codes_every_n_steps <= 0:
             raise ValueError("metrics_num_unique_codes_every_n_steps must be a positive integer")
+        if float(vq_discarding_threshold) < 0.0:
+            raise ValueError("vq_discarding_threshold must be >= 0")
 
         # Store decoder flags
-        self.use_dino_decoder = use_dino_decoder
+        if dino_config is None and bool(use_dino_decoder):
+            dino_config = DinoConfig(loss_weight=1.0, warmup_steps=0)
+        self.dino_config = dino_config
+        self.use_dino_decoder = self.dino_config is not None
         self.use_pixel_decoder = use_pixel_decoder
         self.use_aux_decoder = use_aux_decoder
         self.flow_config = flow_config
@@ -134,9 +163,15 @@ class LatentActionQuantization(nn.Module):
         if not training_decoders:
             raise ValueError(
                 "At least one training decoder must be enabled. "
-                "Set use_dino_decoder=True, use_pixel_decoder=True, or provide flow_config."
+                "Set dino.enabled=true, use_pixel_decoder=true, or provide flow_config."
             )
         logger.info(f"Enabled training decoders: {training_decoders}")
+        if self.dino_config is not None:
+            logger.info(
+                "DINO supervision enabled (weight=%s, warmup_steps=%s)",
+                self.dino_config.loss_weight,
+                self.dino_config.warmup_steps,
+            )
         if use_aux_decoder:
             logger.info("Aux decoder enabled for interpretability")
 
@@ -144,6 +179,10 @@ class LatentActionQuantization(nn.Module):
             codebook_replace_schedule
             if codebook_replace_schedule is not None
             else self.DEFAULT_CODEBOOK_REPLACE_SCHEDULE
+        )
+        self.vq_discarding_threshold = float(vq_discarding_threshold)
+        self.vq_discarding_threshold_schedule = self._validate_vq_discarding_threshold_schedule(
+            vq_discarding_threshold_schedule
         )
         self.code_seq_len = code_seq_len
         self.image_size = pair(image_size)
@@ -242,7 +281,7 @@ class LatentActionQuantization(nn.Module):
 
         # --- DINO Decoder (Training) ---
         # Predicts next frame's DINO embeddings
-        if use_dino_decoder:
+        if self.use_dino_decoder:
             self.dino_decoder = Transformer(depth=spatial_depth, **transformer_with_action_kwargs)
         else:
             self.dino_decoder = None
@@ -341,6 +380,50 @@ class LatentActionQuantization(nn.Module):
             if step < until_step and step % interval == 0:
                 return True
         return False
+
+    def _validate_vq_discarding_threshold_schedule(
+        self,
+        schedule: Optional[list],
+    ) -> Optional[list[tuple[float, int]]]:
+        if schedule is None:
+            return None
+        if len(schedule) == 0:
+            raise ValueError("vq_discarding_threshold_schedule must not be empty")
+
+        parsed: list[tuple[float, int]] = []
+        previous_until_step = -1
+        for i, entry in enumerate(schedule):
+            if not isinstance(entry, (list, tuple)) or len(entry) != 2:
+                raise ValueError(
+                    f"vq_discarding_threshold_schedule[{i}] must be [threshold, until_step], got {entry!r}"
+                )
+            threshold, until_step = entry
+            threshold = float(threshold)
+            until_step = int(until_step)
+            if threshold < 0.0:
+                raise ValueError(
+                    f"vq_discarding_threshold_schedule[{i}] threshold must be >= 0, got {threshold}"
+                )
+            if until_step <= 0:
+                raise ValueError(
+                    f"vq_discarding_threshold_schedule[{i}] until_step must be > 0, got {until_step}"
+                )
+            if until_step <= previous_until_step:
+                raise ValueError(
+                    "vq_discarding_threshold_schedule until_step values must be strictly increasing"
+                )
+            parsed.append((threshold, until_step))
+            previous_until_step = until_step
+
+        return parsed
+
+    def _get_vq_discarding_threshold(self, step: int) -> float:
+        if self.vq_discarding_threshold_schedule is None:
+            return self.vq_discarding_threshold
+        for threshold, until_step in self.vq_discarding_threshold_schedule:
+            if step < until_step:
+                return threshold
+        return self.vq_discarding_threshold_schedule[-1][0]
 
     def load(self, path):
         path = Path(path)
@@ -518,8 +601,11 @@ class LatentActionQuantization(nn.Module):
         # Codebook usage stats (windowed by `self.vq.codebooks_used`, which is reset
         # after a replacement). These are useful diagnostics even when we are not
         # performing a replacement on this exact step.
+        current_vq_discarding_threshold = self._get_vq_discarding_threshold(int(step))
         window_total = self.vq.codebooks_used.sum().detach()
-        unused_indices, used_indices, min_count_val = self.vq._get_replacement_indices()
+        unused_indices, used_indices, min_count_val = self.vq._get_replacement_indices(
+            discarding_threshold=current_vq_discarding_threshold
+        )
 
         codebook_replaced = 0.0
         replaced_count = float(unused_indices.shape[0])
@@ -529,7 +615,9 @@ class LatentActionQuantization(nn.Module):
         if step != 0 and self._should_replace_codebook(step):
             logger.debug(f"Replacing unused codebook entries at step {step}")
             codebook_replaced = 1.0
-            unused_c, used_c, total_c, min_c = self.vq.replace_unused_codebooks()
+            unused_c, used_c, total_c, min_c = self.vq.replace_unused_codebooks(
+                discarding_threshold=current_vq_discarding_threshold
+            )
             # Ensure logged stats match the actual replacement decision.
             replaced_count = float(unused_c)
             used_count = float(used_c)
@@ -538,7 +626,8 @@ class LatentActionQuantization(nn.Module):
             if int(os.environ.get("RANK", "0")) == 0:
                 print(
                     f"[Codebook] step={int(step)} replaced={int(replaced_count)} "
-                    f"used={int(used_count)} total={int(total_c)} min_count={min_count:.4f}"
+                    f"used={int(used_count)} total={int(total_c)} min_count={min_count:.4f} "
+                    f"threshold={current_vq_discarding_threshold:.6f}"
                 )
 
         if return_only_codebook_ids:
@@ -555,17 +644,18 @@ class LatentActionQuantization(nn.Module):
         # Avoid `torch.tensor(0.0, device=...)` which can introduce CPU->GPU sync.
         total_loss = rest_frames.new_zeros((), requires_grad=True)
         metrics: dict[str, Any] = {
-            "vq_perplexity": perplexity.detach(),
-            "codebook_replaced": codebook_replaced,
-            "codebook_replaced_count": replaced_count,
-            "codebook_used_count": used_count,
-            "codebook_min_count": min_count,
+            "code_usage_perplexity_in_batch": perplexity.detach(),
+            "replacement_applied_this_step": codebook_replaced,
+            "entries_below_usage_threshold_count_in_window": replaced_count,
+            "entries_at_or_above_usage_threshold_count_in_window": used_count,
+            "usage_count_threshold_in_window": min_count,
+            "discarding_threshold_fraction_of_expected_usage": current_vq_discarding_threshold,
         }
         if self.metrics_num_unique_codes_every_n_steps > 0 and int(step) % int(self.metrics_num_unique_codes_every_n_steps) == 0:
-            metrics["num_unique_codes"] = int(indices.unique().size(0))
+            metrics["unique_codes_in_batch"] = int(indices.unique().size(0))
         # Avoid per-step GPU sync: keep this as a tensor and log it only at a configured interval.
         # Log the window total *before* any replacement (replacement resets the counter).
-        metrics["codebook_window_total"] = window_total
+        metrics["code_assignments_in_window"] = window_total
 
         # Precompute shared values for decoders
         h_dec, w_dec = self.patch_height_width
@@ -580,32 +670,37 @@ class LatentActionQuantization(nn.Module):
         # --- 1. DINO Decoder Path (Training) ---
         # Predict DINO/encoder tokens of next frame from encoder context + action
         if self.dino_decoder is not None:
-            dino_context = enc_first_frame_tokens  # [B, 1, h, w, d]
-            video_shape = tuple(dino_context.shape[:-1])
+            dino_weight = self.dino_config.get_weight(step)
+            metrics["dino_weight"] = dino_weight
+            if dino_weight == 0.0:
+                pass
+            else:
+                dino_context = enc_first_frame_tokens  # [B, 1, h, w, d]
+                video_shape = tuple(dino_context.shape[:-1])
 
-            # Flatten for transformer
-            dino_context_flat = rearrange(dino_context, 'b t h w d -> (b t) (h w) d')
-            dino_action_flat = rearrange(tokens, 'b t h w d -> (b t) (h w) d')
+                # Flatten for transformer
+                dino_context_flat = rearrange(dino_context, 'b t h w d -> (b t) (h w) d')
+                dino_action_flat = rearrange(tokens, 'b t h w d -> (b t) (h w) d')
 
-            # Run DINO decoder
-            pred_dino_tokens = self.dino_decoder(
-                dino_context_flat,
-                attn_bias=attn_bias,
-                video_shape=video_shape,
-                context=dino_action_flat
-            )
+                # Run DINO decoder
+                pred_dino_tokens = self.dino_decoder(
+                    dino_context_flat,
+                    attn_bias=attn_bias,
+                    video_shape=video_shape,
+                    context=dino_action_flat
+                )
 
-            # Reshape back
-            pred_dino_tokens = rearrange(
-                pred_dino_tokens, '(b t) (h w) d -> b t h w d',
-                b=b, h=h_dec, w=w_dec
-            )
+                # Reshape back
+                pred_dino_tokens = rearrange(
+                    pred_dino_tokens, '(b t) (h w) d -> b t h w d',
+                    b=b, h=h_dec, w=w_dec
+                )
 
-            # DINO loss: MSE to target encoder tokens
-            target_dino_tokens = enc_rest_frames_tokens.detach()
-            dino_loss = F.mse_loss(pred_dino_tokens, target_dino_tokens)
-            total_loss = total_loss + dino_loss
-            metrics["dino_loss"] = dino_loss.detach()
+                # DINO loss: MSE to target encoder tokens
+                target_dino_tokens = enc_rest_frames_tokens.detach()
+                dino_loss = F.mse_loss(pred_dino_tokens, target_dino_tokens)
+                total_loss = total_loss + dino_weight * dino_loss
+                metrics["dino_loss"] = dino_loss.detach()
 
         # --- 2. Pixel Decoder Path (Training) ---
         # Predict pixels of next frame with gradients flowing to encoder

@@ -53,6 +53,16 @@ class TestNSVQReplacementIndices:
         assert set(used.tolist()) == {0, 1, 2}
         assert 3 in set(unused.tolist())
 
+    def test_override_threshold_is_used_for_index_split(self):
+        vq = _make_nsvq(num_embeddings=10, discarding_threshold=0.5)
+        vq.codebooks_used[:] = torch.tensor([20, 2, 2, 1, 0, 0, 0, 0, 0, 0], dtype=torch.int32)
+
+        _, used_default, _ = vq._get_replacement_indices()
+        _, used_override, _ = vq._get_replacement_indices(discarding_threshold=0.05)
+
+        assert set(used_default.tolist()) == {0, 1, 2}
+        assert set(used_override.tolist()) == {0, 1, 2, 3}
+
 
 class TestNSVQReplacement:
     def test_replace_unused_codebooks_resets_usage(self):
@@ -88,3 +98,17 @@ class TestNSVQReplacement:
 
         # Used entries should be bitwise identical; only unused are overwritten.
         assert torch.equal(after[used], before[used])
+
+    def test_replace_unused_codebooks_honors_override_threshold(self):
+        vq = _make_nsvq(num_embeddings=8, discarding_threshold=0.5)
+        vq.codebooks_used[:] = torch.tensor([3, 2, 1, 0, 0, 0, 0, 0], dtype=torch.int32)
+
+        # With lower threshold, index 2 should remain used (not replaced).
+        unused, used, _ = vq._get_replacement_indices(discarding_threshold=0.1)
+        before = vq.codebooks.detach().clone()
+        vq.replace_unused_codebooks(discarding_threshold=0.1)
+        after = vq.codebooks.detach().clone()
+
+        assert torch.equal(after[used], before[used])
+        if len(unused) > 0:
+            assert not torch.equal(after[unused], before[unused])

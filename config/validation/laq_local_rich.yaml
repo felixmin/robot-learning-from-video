@@ -2,7 +2,7 @@
 
 # Rich validation preset for local LAQ OXE runs.
 
-check_interval: 5000
+check_interval: 1000
 limit_batches: 50
 max_cached_samples: 100
 num_fixed_samples: 4
@@ -11,16 +11,16 @@ num_random_samples: 4
 buckets:
   language_table:
     filters: {dataset_name: "language_table"}
-    max_samples: 10
+    max_samples: 20
   bridge:
     filters: {dataset_name: "bridge"}
-    max_samples: 10
+    max_samples: 20
   rt1:
     filters: {dataset_name: "rt1"}
-    max_samples: 10
+    max_samples: 20
   robonet:
     filters: {dataset_name: "robonet"}
-    max_samples: 10
+    max_samples: 20
 
 strategies:
   basic:
@@ -39,17 +39,22 @@ strategies:
 
   codebook_histogram:
     enabled: true
-    every_n_validations: 4
+    every_n_validations: 1
+  codebook_embedding:
+    enabled: true
+    every_n_validations: 1
+    method: umap
+    pca_components: 50
   sequence_histogram:
     enabled: true
-    every_n_validations: 4
+    every_n_validations: 1
     num_top_sequences: 50
   all_sequences_histogram:
     enabled: true
-    every_n_validations: 4
+    every_n_validations: 1
   sequence_examples:
     enabled: true
-    every_n_validations: 4
+    every_n_validations: 1
     top_k_sequences: 16
     examples_per_sequence: 4
 
@@ -57,78 +62,78 @@ strategies:
     type: action_token_scatter
     buckets: ["language_table"]
     enabled: false
-    every_n_validations: 4
+    every_n_validations: 1
     num_samples: 128
   action_scatter_bridge:
     type: action_token_scatter
     buckets: ["bridge"]
     enabled: false
-    every_n_validations: 4
+    every_n_validations: 1
     num_samples: 128
   action_scatter_rt1:
     type: action_token_scatter
     buckets: ["rt1"]
     enabled: false
-    every_n_validations: 4
+    every_n_validations: 1
     num_samples: 128
   action_scatter_robonet:
     type: action_token_scatter
     buckets: ["robonet"]
     enabled: false
-    every_n_validations: 4
+    every_n_validations: 1
     num_samples: 128
 
   action_seq_language_table:
     type: action_sequence_scatter
     buckets: ["language_table"]
     enabled: false
-    every_n_validations: 4
+    every_n_validations: 1
     num_samples: 128
   action_seq_bridge:
     type: action_sequence_scatter
     buckets: ["bridge"]
     enabled: false
-    every_n_validations: 4
+    every_n_validations: 1
     num_samples: 128
   action_seq_rt1:
     type: action_sequence_scatter
     buckets: ["rt1"]
     enabled: false
-    every_n_validations: 4
+    every_n_validations: 1
     num_samples: 128
   action_seq_robonet:
     type: action_sequence_scatter
     buckets: ["robonet"]
     enabled: false
-    every_n_validations: 4
+    every_n_validations: 1
     num_samples: 128
 
   top_seq_language_table:
     type: top_sequences_scatter
     buckets: ["language_table"]
     enabled: false
-    every_n_validations: 4
+    every_n_validations: 1
     num_samples: 128
     num_top_sequences: 5
   top_seq_bridge:
     type: top_sequences_scatter
     buckets: ["bridge"]
     enabled: false
-    every_n_validations: 4
+    every_n_validations: 1
     num_samples: 128
     num_top_sequences: 5
   top_seq_rt1:
     type: top_sequences_scatter
     buckets: ["rt1"]
     enabled: false
-    every_n_validations: 4
+    every_n_validations: 1
     num_samples: 128
     num_top_sequences: 5
   top_seq_robonet:
     type: top_sequences_scatter
     buckets: ["robonet"]
     enabled: false
-    every_n_validations: 4
+    every_n_validations: 1
     num_samples: 128
     num_top_sequences: 5
 
@@ -136,23 +141,23 @@ strategies:
     type: state_sequence_scatter
     buckets: ["language_table"]
     enabled: false
-    every_n_validations: 4
+    every_n_validations: 1
     num_samples: 128
   state_scatter_bridge:
     type: state_sequence_scatter
     buckets: ["bridge"]
     enabled: false
-    every_n_validations: 4
+    every_n_validations: 1
     num_samples: 128
   state_scatter_rt1:
     type: state_sequence_scatter
     buckets: ["rt1"]
     enabled: false
-    every_n_validations: 4
+    every_n_validations: 1
     num_samples: 128
   state_scatter_robonet:
     type: state_sequence_scatter
     buckets: ["robonet"]
     enabled: false
-    every_n_validations: 4
+    every_n_validations: 1
     num_samples: 128

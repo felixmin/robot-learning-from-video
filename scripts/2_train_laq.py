@@ -13,6 +13,7 @@ Usage:
 """
 
 import sys
+import inspect
 from pathlib import Path
 
 # Add packages to path
@@ -47,7 +48,12 @@ class TrustedFullCheckpointIO(TorchCheckpointIO):
     """Compatibility for trusted Lightning checkpoints under PyTorch>=2.6."""
 
     def load_checkpoint(self, path, map_location=None, weights_only=False):
-        return super().load_checkpoint(path, map_location=map_location, weights_only=False)
+        load_kwargs = {}
+        if map_location is not None:
+            load_kwargs["map_location"] = map_location
+        if "weights_only" in inspect.signature(torch.load).parameters:
+            load_kwargs["weights_only"] = False
+        return torch.load(path, **load_kwargs)
 
 
 @hydra.main(version_base=None, config_path="../config", config_name="config")

@@ -137,6 +137,44 @@ class TestLAQTaskInitialization:
 
         print("✓ LAQTask with EMA initialized")
 
+    def test_task_passes_vq_discarding_threshold_schedule(self, model_config, training_config):
+        """Test task forwards threshold schedule to LAQ model."""
+        model_config.vq_discarding_threshold_schedule = [[0.1, 100], [0.01, 1000]]
+        task = LAQTask(
+            model_config=model_config,
+            training_config=training_config,
+            use_ema=False,
+        )
+
+        assert task.model.vq_discarding_threshold_schedule == [(0.1, 100), (0.01, 1000)]
+
+    def test_task_builds_dino_config(self, model_config, training_config):
+        """Test task parses dino block into model dino config."""
+        model_config.dino = {"enabled": True, "loss_weight": 2.0, "warmup_steps": 123}
+        task = LAQTask(
+            model_config=model_config,
+            training_config=training_config,
+            use_ema=False,
+        )
+
+        assert task.model.dino_config is not None
+        assert task.model.dino_config.loss_weight == 2.0
+        assert task.model.dino_config.warmup_steps == 123
+
+    def test_task_disables_dino_when_configured(self, model_config, training_config):
+        """Test dino decoder is disabled with dino.enabled=false."""
+        model_config.dino = {"enabled": False}
+        model_config.use_pixel_decoder = True
+        model_config.flow = None
+        task = LAQTask(
+            model_config=model_config,
+            training_config=training_config,
+            use_ema=False,
+        )
+
+        assert task.model.dino_config is None
+        assert task.model.dino_decoder is None
+
 
 class TestLAQTaskForward:
     """Test LAQTask forward pass."""
@@ -157,12 +195,12 @@ class TestLAQTaskForward:
         assert loss.ndim == 0  # Scalar
         assert loss.item() >= 0
         assert isinstance(metrics, dict)
-        assert metrics["num_unique_codes"] > 0
-        assert metrics["codebook_used_count"] > 0
-        assert metrics["codebook_min_count"] >= 0
-        assert float(metrics["codebook_window_total"].item()) > 0
+        assert metrics["unique_codes_in_batch"] > 0
+        assert metrics["entries_at_or_above_usage_threshold_count_in_window"] > 0
+        assert metrics["usage_count_threshold_in_window"] >= 0
+        assert float(metrics["code_assignments_in_window"].item()) > 0
 
-        print(f"✓ Forward pass: loss={loss.item():.4f}, num_unique={metrics['num_unique_codes']}")
+        print(f"✓ Forward pass: loss={loss.item():.4f}, num_unique={metrics['unique_codes_in_batch']}")
 
     def test_forward_with_recons_only(self, model_config, training_config, synthetic_batch, device):
         """Test forward pass returning reconstructions only."""

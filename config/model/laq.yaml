@@ -8,7 +8,12 @@ dim: 1024                # Transformer embedding dimension
 quant_dim: 32           # Quantization dimension
 codebook_size: 2048        # Number of codebook entries
 code_seq_len: 1         # Length of quantized action sequence
-vq_discarding_threshold: 0.1  # Replacement cutoff as fraction of average usage (see NSVQ.replace_unused_codebooks)
+vq_discarding_threshold: 0.02  # Replacement cutoff as fraction of average usage (see NSVQ.replace_unused_codebooks)
+vq_discarding_threshold_schedule:
+  - [0.05, 1000]        # Early: aggressively refresh low-usage entries
+  - [0.01, 5000]      # Mid-early: keep replacing under-utilized entries
+  - [0.005, 50000]     # Mid: only replace clearly under-used entries
+  - [0.0002, 500000]   # Late: effectively only zero-use entries get replaced
 image_size: 256         # Input image size
 patch_size: 32          # Patch size for ViT
 spatial_depth: 8        # Number of spatial transformer layers
@@ -29,22 +34,25 @@ dinov3_pool_to_grid: 8
 latent_ablation: none
 
 # Training decoder flags (at least one must be enabled, or flow must be configured)
-use_dino_decoder: true  # Predict next frame's encoder tokens (DINO or pixel-projected)
+dino:
+  enabled: true
+  loss_weight: 1.0
+  warmup_steps: 0
 use_pixel_decoder: false # Predict next frame's pixels with gradients to encoder
 
 flow:
   enabled: true
   model: raft_large    # "raft_small" or "raft_large"
-  loss_weight: 5.0     # Weight for flow loss in total loss
-  decoder_depth: 8     # Transformer depth for flow decoder
-  warmup_steps: 0
+  loss_weight: 10.0     # Weight for flow loss in total loss
+  decoder_depth: 4     # Transformer depth for flow decoder
+  warmup_steps: 200000
   teacher_num_flow_updates: 4
   teacher_chunk_size: 64
-  summary_loss_weight: 1.0  # Optional global mean-flow auxiliary loss (off by default)
+  summary_loss_weight: 0.01  # Optional global mean-flow auxiliary loss (off by default)
   summary_static_eps: 1e-6  # Static fallback threshold for summary flow statistics
 
 # Interpretability decoder (optional, for visualization only)
-use_aux_decoder: true   # Predict pixels for visualization (gradients detached from encoder)
+use_aux_decoder: false   # Predict pixels for visualization (gradients detached from encoder)
 
 # Codebook replacement schedule
 # Replace unused codebook entries at diminishing frequency to improve utilization
@@ -58,9 +66,9 @@ codebook_replace_schedule:
   - [10, 100]      # Every 10 steps for first 100 steps
   - [100, 1000]    # Every 100 steps for steps 100-1000
   - [500, 5000]    # Every 500 steps for steps 1000-5000
-  - [1000, 10000]  # Every 1000 steps for steps 10000-100000
-  - [5000, 50000]  # Every 5000 steps for steps 100000-500000
-  - [10000, 100000] # Every 10000 steps for steps 100000-1000000
+  - [1000, 10000]  # Every 1000 steps for steps 5000-10000
+  - [5000, 100000] # Every 5000 steps for steps 10000-100000
+  - [10000, 500000] # Every 10000 steps for steps 100000-500000
 
 # Optional: Flow supervision config
 # Enriches latent space with motion information via RAFT knowledge distillation

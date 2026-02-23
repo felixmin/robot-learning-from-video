@@ -234,7 +234,11 @@ class NSVQ(torch.nn.Module):
             return False
         return dist.is_available() and dist.is_initialized()
 
-    def _get_replacement_indices_from_counts(self, counts: torch.Tensor):
+    def _get_replacement_indices_from_counts(
+        self,
+        counts: torch.Tensor,
+        discarding_threshold: float | None = None,
+    ):
         """
         Compute which codebook entries are considered unused/used for replacement.
 
@@ -260,7 +264,8 @@ class NSVQ(torch.nn.Module):
             return all_idx, empty, 0.0
 
         expected = total / float(self.num_embeddings)
-        min_count = float(self.discarding_threshold) * expected
+        threshold = float(self.discarding_threshold) if discarding_threshold is None else float(discarding_threshold)
+        min_count = threshold * expected
 
         counts_f = counts.to(dtype=torch.float32)
         used_indices = torch.where(counts_f >= min_count)[0].to(dtype=torch.long)
@@ -268,10 +273,13 @@ class NSVQ(torch.nn.Module):
 
         return unused_indices, used_indices, min_count
 
-    def _get_replacement_indices(self):
-        return self._get_replacement_indices_from_counts(self.codebooks_used)
+    def _get_replacement_indices(self, discarding_threshold: float | None = None):
+        return self._get_replacement_indices_from_counts(
+            self.codebooks_used,
+            discarding_threshold=discarding_threshold,
+        )
 
-    def replace_unused_codebooks(self):
+    def replace_unused_codebooks(self, discarding_threshold: float | None = None):
 
         """
         Replace inactive codebook entries with (noisy) copies of active ones.
@@ -293,7 +301,11 @@ class NSVQ(torch.nn.Module):
                 dist.all_reduce(counts, op=dist.ReduceOp.SUM)
 
             total_assignments = int(counts.sum().item())
-            unused_indices, used_indices, min_count = self._get_replacement_indices_from_counts(counts)
+            threshold = float(self.discarding_threshold) if discarding_threshold is None else float(discarding_threshold)
+            unused_indices, used_indices, min_count = self._get_replacement_indices_from_counts(
+                counts,
+                discarding_threshold=threshold,
+            )
 
             unused_count = unused_indices.shape[0]
             used_count = used_indices.shape[0]
@@ -344,11 +356,12 @@ class NSVQ(torch.nn.Module):
                 dist.broadcast(self.codebooks.data, src=0)
 
             logger.info(
-                "Replaced %d codebooks (used=%d, total=%d, min_count=%.4f)",
+                "Replaced %d codebooks (used=%d, total=%d, min_count=%.4f, threshold=%.6f)",
                 unused_count,
                 used_count,
                 total_assignments,
                 min_count,
+                threshold,
             )
             self.codebooks_used.zero_()
             return int(unused_count), int(used_count), int(total_assignments), float(min_count)

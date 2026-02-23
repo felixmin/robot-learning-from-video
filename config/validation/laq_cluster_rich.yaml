@@ -55,6 +55,11 @@ strategies:
   codebook_histogram:
     enabled: true
     every_n_validations: 2
+  codebook_embedding:
+    enabled: true
+    every_n_validations: 2
+    method: umap
+    pca_components: 50
   sequence_histogram:
     enabled: true
     every_n_validations: 2

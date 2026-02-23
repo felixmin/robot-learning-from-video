@@ -21,7 +21,10 @@ model:
   dinov3_pool_to_grid: 8
   code_seq_len: 4
   codebook_size: 8
-  use_dino_decoder: true
+  dino:
+    enabled: true
+    loss_weight: 1.0
+    warmup_steps: 0
   use_pixel_decoder: false
   use_aux_decoder: true
   codebook_replace_schedule: []
