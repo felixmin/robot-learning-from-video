@@ -7,6 +7,13 @@ A three-stage robot learning system that learns policies from videos without act
 2. **Stage 2 (Foundation)**: Vision-Language model predicting latent actions from images + text
 3. **Stage 3 (Finetuning)**: Adapting the foundation model to output continuous robot commands
 
+## Performance and resource efficiency
+For performance reasons over the course of the project we switched from Open X Embodiment in rlds format to a preprocessed version that allows direct index based access. With the current setup we achieve full GPU utilization.
+
+<p align="center">
+  <img src="docs/assets/lam_gpu_utilization.png" alt="LAM training GPU utilization" width="700">
+</p>
+
 ## Repository Structure
 
 ```

@@ -1,0 +1,73 @@
+# @package data
+
+# Minimal explicit OXE mixture with 4 datasets:
+# - language_table
+# - bridge
+# - robonet (local folder: robo_net)
+# - rt1 (local folder: fractal20220817_data)
+
+backend: oxe_local_indexed
+
+dataset:
+  oxe:
+    datasets:
+      - name: language_table
+        train_split: "train[:90%]"
+        val_split: "train[90%:]"
+        pair_offset_steps: 5
+        weight: 1.0
+        approx_num_pairs: null
+
+      - name: bridge
+        train_split: "train[:90%]"
+        val_split: "train[90%:]"
+        pair_offset_steps: 5
+        weight: 1.0
+        approx_num_pairs: null
+
+      # Canonical OXE alias: robonet
+      - name: robo_net
+        train_split: "train[:90%]"
+        val_split: "train[90%:]"
+        pair_offset_steps: 5
+        weight: 1.0
+        approx_num_pairs: null
+
+      # Canonical OXE alias: rt1
+      - name: fractal20220817_data
+        train_split: "train[:90%]"
+        val_split: "train[90%:]"
+        pair_offset_steps: 5
+        weight: 1.0
+        approx_num_pairs: null
+
+loader:
+  batch_size: 64
+  num_workers: 12
+  pin_memory: true
+  prefetch_factor: null
+
+preprocess:
+  image_size: 256
+  return_metadata: true
+
+adapter:
+  openx_local:
+    root: /mnt/data/oxe
+    mode: indexed_full
+    max_shards_per_dataset: 0
+    pairs_per_episode: 1
+    index_workers: 0
+    index_cache_dir: cache/openx_local_index
+    index_rebuild: false
+    index_max_open_shards: 16
+    weights_by_size: false
+    auto_discover: false
+    auto_train_split: "train[:90%]"
+    auto_val_split: "train[90%:]"
+    auto_pair_offset_steps: 5
+    auto_weight: 1.0
+    max_pairs: null
+    seed: 42
+    resample_each_epoch: true
+    stopping_strategy: all_exhausted
