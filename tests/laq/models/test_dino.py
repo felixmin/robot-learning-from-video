@@ -174,7 +174,7 @@ class TestLAQWithDINO:
     @pytest.fixture
     def laq_with_dino(self, device, dino_model_name):
         """Create LAQ model with DINO encoder."""
-        from laq.models.latent_action_quantization import LatentActionQuantization
+        from laq.models.latent_action_quantization import LatentActionQuantization, DinoConfig
         
         model = LatentActionQuantization(
             dim=512,
@@ -187,9 +187,22 @@ class TestLAQWithDINO:
             heads=4,
             dim_head=32,
             code_seq_len=4,
+            channels=3,
+            attn_dropout=0.0,
+            ff_dropout=0.0,
+            vq_discarding_threshold=0.1,
+            vq_discarding_threshold_schedule=None,
+            latent_ablation="none",
             metrics_num_unique_codes_every_n_steps=1,
+            dino_config=DinoConfig(loss_weight=1.0, warmup_steps=0),
+            use_dino_decoder=True,
+            use_pixel_decoder=False,
+            use_aux_decoder=True,
+            flow_config=None,
+            codebook_replace_schedule=[(10, 100)],
             use_dinov3_encoder=True,
             dinov3_model_name=dino_model_name,
+            dinov3_pool_to_grid=None,
         ).to(device)
         return model
 

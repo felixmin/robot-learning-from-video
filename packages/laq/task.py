@@ -85,57 +85,43 @@ class LAQTask(pl.LightningModule):
         self.training_config = training_config
         self.use_ema = use_ema
 
-        # Build flow config if specified
+        flow_cfg = model_config.flow
+        if flow_cfg is None:
+            raise ValueError("Missing `model.flow` config.")
+        if flow_cfg.get("enabled") is None:
+            raise ValueError("Missing `model.flow.enabled` config.")
+        flow_enabled = bool(flow_cfg.enabled)
         flow_config = None
-        if "flow" in model_config and model_config.flow is not None:
-            flow_cfg = model_config.flow
-            flow_enabled = bool(flow_cfg.get("enabled", True))
-            if flow_enabled:
-                try:
-                    flow_config = FlowConfig(
-                        model=flow_cfg.model,
-                        loss_weight=flow_cfg.loss_weight,
-                        decoder_depth=flow_cfg.decoder_depth,
-                        warmup_steps=flow_cfg.get("warmup_steps", 0),
-                        teacher_num_flow_updates=flow_cfg.get("teacher_num_flow_updates", 12),
-                        teacher_chunk_size=flow_cfg.get("teacher_chunk_size", 64),
-                        summary_loss_weight=flow_cfg.get("summary_loss_weight", 0.0),
-                        summary_static_eps=flow_cfg.get("summary_static_eps", 1e-6),
-                    )
-                except Exception as exc:
-                    raise ValueError(
-                        "Invalid flow config. Expected:\n"
-                        "  model.flow: null  # to disable\n"
-                        "  # or\n"
-                        "  model.flow:\n"
-                        "    enabled: true\n"
-                        "    model: raft_small|raft_large\n"
-                        "    loss_weight: <float>\n"
-                        "    decoder_depth: <int>\n"
-                        "    warmup_steps: <int, optional>\n"
-                        "    teacher_num_flow_updates: <int, optional>\n"
-                        "    teacher_chunk_size: <int, optional>\n"
-                        "    summary_loss_weight: <float, optional>\n"
-                        "    summary_static_eps: <float, optional>\n"
-                    ) from exc
+        if flow_enabled:
+            try:
+                flow_config = FlowConfig(
+                    model=flow_cfg.model,
+                    loss_weight=flow_cfg.loss_weight,
+                    decoder_depth=flow_cfg.decoder_depth,
+                    warmup_steps=flow_cfg.warmup_steps,
+                    teacher_num_flow_updates=flow_cfg.teacher_num_flow_updates,
+                    teacher_chunk_size=flow_cfg.teacher_chunk_size,
+                    summary_loss_weight=flow_cfg.summary_loss_weight,
+                    summary_static_eps=flow_cfg.summary_static_eps,
+                )
+            except Exception as exc:
+                raise ValueError("Invalid flow config") from exc
+
+        dino_cfg = model_config.dino
+        if dino_cfg is None:
+            raise ValueError("Missing `model.dino` config.")
+        if dino_cfg.get("enabled") is None:
+            raise ValueError("Missing `model.dino.enabled` config.")
+        dino_enabled = bool(dino_cfg.enabled)
         dino_config = None
-        if "dino" in model_config and model_config.dino is not None:
-            dino_cfg = model_config.dino
-            dino_enabled = bool(dino_cfg.get("enabled", True))
-            if dino_enabled:
-                try:
-                    dino_config = DinoConfig(
-                        loss_weight=float(dino_cfg.get("loss_weight", 1.0)),
-                        warmup_steps=int(dino_cfg.get("warmup_steps", 0)),
-                    )
-                except Exception as exc:
-                    raise ValueError(
-                        "Invalid dino config. Expected:\n"
-                        "  model.dino:\n"
-                        "    enabled: true|false\n"
-                        "    loss_weight: <float, optional>\n"
-                        "    warmup_steps: <int, optional>\n"
-                    ) from exc
+        if dino_enabled:
+            try:
+                dino_config = DinoConfig(
+                    loss_weight=float(dino_cfg.loss_weight),
+                    warmup_steps=int(dino_cfg.warmup_steps),
+                )
+            except Exception as exc:
+                raise ValueError("Invalid dino config") from exc
 
         # Build codebook replacement schedule if specified
         codebook_replace_schedule = None
@@ -155,13 +141,7 @@ class LAQTask(pl.LightningModule):
 
         metrics_cfg = training_config.get("metrics")
         if metrics_cfg is None or metrics_cfg.get("num_unique_codes_every_n_steps") is None:
-            raise ValueError(
-                "Missing `training.metrics.num_unique_codes_every_n_steps` config. Expected:\n"
-                "training:\n"
-                "  metrics:\n"
-                "    log_every_n_steps: <int>\n"
-                "    num_unique_codes_every_n_steps: <int>\n"
-            )
+            raise ValueError("Missing `training.metrics.num_unique_codes_every_n_steps` config.")
 
         # Initialize LAQ model
         self.model = LatentActionQuantization(
@@ -175,21 +155,22 @@ class LAQTask(pl.LightningModule):
             dim_head=model_config.dim_head,
             heads=model_config.heads,
             code_seq_len=model_config.code_seq_len,
-            vq_discarding_threshold=model_config.get("vq_discarding_threshold", 0.1),
+            vq_discarding_threshold=model_config.vq_discarding_threshold,
             vq_discarding_threshold_schedule=vq_discarding_threshold_schedule,
-            channels=model_config.get("channels", 3),
-            attn_dropout=model_config.get("attn_dropout", 0.0),
-            ff_dropout=model_config.get("ff_dropout", 0.0),
-            latent_ablation=model_config.get("latent_ablation", "none"),
-            use_dinov3_encoder=model_config.get("use_dinov3_encoder", False),
-            dinov3_model_name=model_config.get("dinov3_model_name", "facebook/dinov3-vits16-pretrain-lvd1689m"),
-            dinov3_pool_to_grid=model_config.get("dinov3_pool_to_grid", None),
+            channels=model_config.channels,
+            attn_dropout=model_config.attn_dropout,
+            ff_dropout=model_config.ff_dropout,
+            latent_ablation=model_config.latent_ablation,
+            use_dinov3_encoder=model_config.use_dinov3_encoder,
+            dinov3_model_name=model_config.dinov3_model_name,
+            dinov3_pool_to_grid=model_config.dinov3_pool_to_grid,
             metrics_num_unique_codes_every_n_steps=int(metrics_cfg.num_unique_codes_every_n_steps),
             dino_config=dino_config,
+            use_dino_decoder=dino_enabled,
             # Training decoder flags
-            use_pixel_decoder=model_config.get("use_pixel_decoder", False),
+            use_pixel_decoder=model_config.use_pixel_decoder,
             # Interpretability decoder flag
-            use_aux_decoder=model_config.get("use_aux_decoder", True),
+            use_aux_decoder=model_config.use_aux_decoder,
             flow_config=flow_config,
             codebook_replace_schedule=codebook_replace_schedule,
         )

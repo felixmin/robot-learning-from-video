@@ -54,5 +54,6 @@ adapter:
     max_pairs: null
     seed: 42
     resample_each_epoch: true
+    steps_per_epoch: 5000
     # all_exhausted consumes full split; first_exhausted stops when one source ends
-    stopping_strategy: all_exhausted
+    stopping_strategy: first_exhausted

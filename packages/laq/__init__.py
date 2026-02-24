@@ -16,6 +16,7 @@ __all__ = [
     "LAQTask",
     "separate_weight_decayable_params",
     "EMACallback",
+    "TrainPreviewBufferCallback",
     "ValidationStrategyCallback",
     "LatentActionQuantization",
     "NSVQ",
@@ -35,6 +36,7 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     "LAQTask": ("laq.task", "LAQTask"),
     "separate_weight_decayable_params": ("laq.task", "separate_weight_decayable_params"),
     "EMACallback": ("laq.callbacks", "EMACallback"),
+    "TrainPreviewBufferCallback": ("laq.callbacks", "TrainPreviewBufferCallback"),
     "ValidationStrategyCallback": ("laq.callbacks", "ValidationStrategyCallback"),
     "LatentActionQuantization": ("laq.models.latent_action_quantization", "LatentActionQuantization"),
     "NSVQ": ("laq.models.nsvq", "NSVQ"),
@@ -63,4 +65,3 @@ def __getattr__(name: str) -> Any:
 
 def __dir__() -> list[str]:
     return sorted(list(globals().keys()) + list(_LAZY_IMPORTS.keys()))
-

@@ -20,7 +20,7 @@ from laq.validation import (
     ESSENTIAL_METADATA_KEYS,
     STRATEGY_REGISTRY,
 )
-from laq.callbacks import ValidationStrategyCallback
+from laq.callbacks import ValidationStrategyCallback, TrainPreviewBufferCallback
 
 
 class TestValidationCache:
@@ -194,6 +194,99 @@ class TestBasicVisualizationStrategy:
 
         metrics = strategy.run(cache, pl_module, trainer)
         assert metrics == {}
+
+    def test_train_visualization_uses_preview_buffer_callback(self):
+        strategy = BasicVisualizationStrategy(
+            visualize_train=True,
+            visualize_val=False,
+            num_train_samples=2,
+        )
+        cache = ValidationCache()
+        pl_module = MagicMock()
+        wandb_logger = MagicMock()
+        strategy._get_wandb_logger = lambda _trainer: wandb_logger
+        strategy._create_recon_grid = MagicMock(return_value=torch.zeros(3, 16, 16))
+
+        cb = TrainPreviewBufferCallback(
+            enabled=True,
+            max_samples=16,
+            samples_per_batch=2,
+        )
+        batch = {
+            "frames": torch.rand(4, 3, 2, 8, 8),
+            "dataset_name": ["bridge", "kuka", "rt1", "bridge"],
+            "dataset_type": ["bridge", "kuka", "rt1", "bridge"],
+        }
+        cb.on_train_batch_end(MagicMock(), pl_module, None, batch, 0)
+
+        trainer = MagicMock()
+        trainer.global_step = 10
+        trainer.callbacks = [cb]
+
+        strategy.run(cache, pl_module, trainer)
+
+        logged_keys = [call.kwargs["key"] for call in wandb_logger.log_image.call_args_list]
+        assert "train/fixed_reconstructions" in logged_keys
+        assert "train/random_reconstructions" in logged_keys
+
+    def test_train_visualization_does_not_touch_train_dataloader(self):
+        strategy = BasicVisualizationStrategy(
+            visualize_train=True,
+            visualize_val=False,
+            num_train_samples=2,
+        )
+        cache = ValidationCache()
+        pl_module = MagicMock()
+        wandb_logger = MagicMock()
+        strategy._create_recon_grid = MagicMock(return_value=torch.zeros(3, 16, 16))
+
+        cb = TrainPreviewBufferCallback(
+            enabled=True,
+            max_samples=8,
+            samples_per_batch=2,
+        )
+        batch = {
+            "frames": torch.rand(4, 3, 2, 8, 8),
+            "dataset_name": ["bridge", "kuka", "rt1", "bridge"],
+        }
+        cb.on_train_batch_end(MagicMock(), pl_module, None, batch, 0)
+
+        class _Trainer:
+            def __init__(self):
+                self.global_step = 10
+                self.callbacks = [cb]
+
+            @property
+            def train_dataloader(self):
+                raise AssertionError("train_dataloader should not be accessed")
+
+        trainer = _Trainer()
+        strategy._visualize_training_samples(cache, pl_module, trainer, wandb_logger)
+
+
+class TestTrainPreviewBufferCallback:
+    def test_collect_and_sample(self):
+        cb = TrainPreviewBufferCallback(
+            enabled=True,
+            max_samples=3,
+            samples_per_batch=2,
+        )
+        batch = {
+            "frames": torch.rand(4, 3, 2, 8, 8),
+            "dataset_name": ["a", "b", "c", "d"],
+            "dataset_type": ["x", "y", "z", "w"],
+            "language": ["l1", "l2", "l3", "l4"],
+        }
+
+        cb.on_train_batch_end(MagicMock(), MagicMock(), None, batch, 0)
+        cb.on_train_batch_end(MagicMock(), MagicMock(), None, batch, 1)
+
+        frames, metadata = cb.sample(3)
+        assert frames is not None
+        assert metadata is not None
+        assert frames.shape[0] == 3
+        assert len(metadata) == 3
+        assert all("dataset_name" in m for m in metadata)
 
 
 class TestFlowVisualizationStrategy:

@@ -48,7 +48,7 @@ flow:
   warmup_steps: 100000
   teacher_num_flow_updates: 4
   teacher_chunk_size: 64
-  summary_loss_weight: 0.3  # Optional global mean-flow auxiliary loss (off by default)
+  summary_loss_weight: 0.05  # Optional global mean-flow auxiliary loss (off by default)
   summary_static_eps: 1e-6  # Static fallback threshold for summary flow statistics
 
 # Interpretability decoder (optional, for visualization only)

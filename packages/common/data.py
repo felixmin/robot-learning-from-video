@@ -136,6 +136,17 @@ class OpenXLocalDataModule(pl.LightningDataModule):
         auto_weight = float(local_cfg.get("auto_weight", 1.0))
         seed = int(local_cfg["seed"])
         resample_each_epoch = bool(local_cfg["resample_each_epoch"])
+        stopping_strategy = str(local_cfg.get("stopping_strategy", "all_exhausted"))
+        steps_per_epoch = local_cfg.get("steps_per_epoch")
+        if steps_per_epoch is not None and int(steps_per_epoch) <= 0:
+            raise ValueError(
+                "data.adapter.openx_local.steps_per_epoch must be > 0 when set"
+            )
+        train_num_samples = (
+            int(steps_per_epoch) * int(self.loader["batch_size"])
+            if steps_per_epoch is not None
+            else None
+        )
 
         max_shards_opt = (
             int(max_shards_per_dataset)
@@ -221,10 +232,11 @@ class OpenXLocalDataModule(pl.LightningDataModule):
             index=train_index,
             pairs_per_episode=pairs_per_episode_opt,
             weights_by_size=weights_by_size,
-            num_samples=None,
+            num_samples=train_num_samples,
             seed=seed,
             epoch=0,
             resample_each_epoch=resample_each_epoch,
+            stopping_strategy=stopping_strategy,
         )
         self.val_sampler = OpenXLocalIndexedEpisodePairSampler(
             index=val_index,
@@ -234,6 +246,7 @@ class OpenXLocalDataModule(pl.LightningDataModule):
             seed=seed + 1,
             epoch=0,
             resample_each_epoch=False,
+            stopping_strategy=stopping_strategy,
         )
 
         dataset_names = [d["name"] for d in self._resolved_datasets]
@@ -242,6 +255,12 @@ class OpenXLocalDataModule(pl.LightningDataModule):
             mode,
             ", ".join(dataset_names),
         )
+        if steps_per_epoch is not None:
+            logger.info(
+                "✓ OpenX local train epoch size fixed to %d steps (%d samples)",
+                int(steps_per_epoch),
+                int(train_num_samples),
+            )
 
     def train_dataloader(self):
         collate_fn = oxe_collate_fn if bool(self.preprocess["return_metadata"]) else None

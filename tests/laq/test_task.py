@@ -28,6 +28,23 @@ def model_config():
         "channels": 3,
         "attn_dropout": 0.0,
         "ff_dropout": 0.0,
+        "vq_discarding_threshold": 0.1,
+        "vq_discarding_threshold_schedule": None,
+        "latent_ablation": "none",
+        "use_dinov3_encoder": False,
+        "dinov3_model_name": "facebook/dinov3-vits16-pretrain-lvd1689m",
+        "dinov3_pool_to_grid": None,
+        "dino": {
+            "enabled": True,
+            "loss_weight": 1.0,
+            "warmup_steps": 0,
+        },
+        "use_pixel_decoder": False,
+        "use_aux_decoder": True,
+        "flow": {
+            "enabled": False,
+        },
+        "codebook_replace_schedule": [[10, 100]],
     })
 
 
@@ -165,7 +182,7 @@ class TestLAQTaskInitialization:
         """Test dino decoder is disabled with dino.enabled=false."""
         model_config.dino = {"enabled": False}
         model_config.use_pixel_decoder = True
-        model_config.flow = None
+        model_config.flow = {"enabled": False}
         task = LAQTask(
             model_config=model_config,
             training_config=training_config,

@@ -2,7 +2,7 @@
 Visualization strategies for LAQ validation.
 """
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 import torch
 from torchvision.utils import make_grid
@@ -55,6 +55,7 @@ class BasicVisualizationStrategy(ValidationStrategy):
         self.visualize_per_bucket = visualize_per_bucket
         self.samples_per_bucket = samples_per_bucket
         self.bucket_filters = bucket_filters
+        self._warned_missing_train_preview_buffer = False
 
     def needs_caching(self) -> bool:
         return True  # Need frames for visualization
@@ -91,12 +92,11 @@ class BasicVisualizationStrategy(ValidationStrategy):
         trainer: pl.Trainer,
         wandb_logger,
     ) -> None:
-        """Visualize training samples by sampling from train dataloader."""
+        """Visualize training samples from non-intrusive train preview buffer."""
         if wandb_logger is None:
             return
 
-        # Sample fresh batch from train dataloader
-        train_frames, train_metadata = self._sample_from_train_dataloader(
+        train_frames, train_metadata = self._sample_from_train_preview_buffer(
             trainer, self.num_train_samples * 2  # Sample extra for both fixed and random
         )
 
@@ -255,62 +255,32 @@ class BasicVisualizationStrategy(ValidationStrategy):
                             caption=[f"Step {trainer.global_step} ({bucket_name})"],
                         )
 
-    def _sample_from_train_dataloader(
+    def _sample_from_train_preview_buffer(
         self,
         trainer: pl.Trainer,
         num_samples: int,
-    ) -> Tuple[Optional[torch.Tensor], Optional[List[Dict[str, Any]]]]:
-        """Sample frames from training dataloader."""
+    ) -> tuple[Optional[torch.Tensor], Optional[List[Dict[str, Any]]]]:
+        """Sample frames from TrainPreviewBufferCallback without touching train dataloader."""
         try:
-            train_dataloader = trainer.train_dataloader
-            if train_dataloader is None:
-                return None, None
-
-            # Get a batch from train dataloader
-            frames_list = []
-            metadata_list = []
-            samples_collected = 0
-
-            for batch in train_dataloader:
-                if isinstance(batch, dict):
-                    frames = batch["frames"]
-                    # Extract metadata for each sample
-                    batch_size = frames.shape[0]
-                    for i in range(batch_size):
-                        meta = {}
-                        for key in batch.keys():
-                            if key == "frames":
-                                continue
-                            val = batch[key]
-                            if isinstance(val, (list, tuple)) and i < len(val):
-                                meta[key] = val[i]
-                            elif isinstance(val, torch.Tensor) and val.ndim > 0 and i < len(val):
-                                meta[key] = val[i].item() if val[i].ndim == 0 else val[i]
-                        metadata_list.append(meta)
-                else:
-                    frames = batch
-                    batch_size = frames.shape[0]
-                    metadata_list.extend([{} for _ in range(batch_size)])
-
-                frames_list.append(frames.detach().cpu())
-                samples_collected += frames.shape[0]
-
-                if samples_collected >= num_samples:
-                    break
-
-            if not frames_list:
-                return None, None
-
-            all_frames = torch.cat(frames_list, dim=0)[:num_samples]
-            if all_frames.dtype == torch.uint8:
-                all_frames = all_frames.to(dtype=torch.float32).div_(255.0)
-            all_metadata = metadata_list[:num_samples]
-
-            return all_frames, all_metadata
-
+            from laq.callbacks import TrainPreviewBufferCallback
         except Exception as e:
-            print(f"Warning: Could not sample from train dataloader: {e}")
+            if not self._warned_missing_train_preview_buffer:
+                print(f"Warning: could not import TrainPreviewBufferCallback: {e}")
+                self._warned_missing_train_preview_buffer = True
             return None, None
+
+        callbacks = list(getattr(trainer, "callbacks", []))
+        for callback in callbacks:
+            if isinstance(callback, TrainPreviewBufferCallback):
+                return callback.sample(num_samples)
+
+        if not self._warned_missing_train_preview_buffer:
+            print(
+                "Warning: visualize_train is enabled but TrainPreviewBufferCallback "
+                "is not registered; skipping train visualizations."
+            )
+            self._warned_missing_train_preview_buffer = True
+        return None, None
 
     def _create_recon_grid(
         self,

@@ -82,15 +82,6 @@ class LatentActionQuantization(nn.Module):
     Returns:
         (loss, metrics_dict) where metrics_dict contains diagnostic values
     """
-    # Default codebook replacement schedule: Replace unused codebook entries at diminishing frequency
-    # This helps codebook utilization early in training without overhead later
-    # Format: (interval, until_step) - replace every `interval` steps until `until_step`
-    DEFAULT_CODEBOOK_REPLACE_SCHEDULE = [
-        (10, 100),    # Every 10 steps for first 100 steps
-        (100, 1000),  # Every 100 steps for steps 100-1000
-        (500, 5000),  # Every 500 steps for steps 1000-5000
-    ]
-
     def __init__(
         self,
         *,
@@ -101,30 +92,30 @@ class LatentActionQuantization(nn.Module):
         patch_size,
         spatial_depth,
         temporal_depth,
-        dim_head = 64,
-        heads = 8,
-        channels = 3,
-        attn_dropout = 0.,
-        ff_dropout = 0.,
-        code_seq_len = 1,
-        vq_discarding_threshold: float = 0.1,
-        vq_discarding_threshold_schedule: Optional[list] = None,
-        latent_ablation: str = "none",
-        use_dinov3_encoder = False,
-        dinov3_model_name = "facebook/dinov3-vits16-pretrain-lvd1689m",
-        dinov3_pool_to_grid = None,  # Pool DINO features to this grid size (e.g., 8 for 8x8)
+        dim_head,
+        heads,
+        channels,
+        attn_dropout,
+        ff_dropout,
+        code_seq_len,
+        vq_discarding_threshold: float,
+        vq_discarding_threshold_schedule,
+        latent_ablation,
+        use_dinov3_encoder,
+        dinov3_model_name,
+        dinov3_pool_to_grid,  # Pool DINO features to this grid size (e.g., 8 for 8x8)
         metrics_num_unique_codes_every_n_steps: int,
-        # DINO supervision config (optional - set to enable DINO loss)
-        dino_config: Optional["DinoConfig"] = None,
+        # DINO supervision config (required when use_dino_decoder=True)
+        dino_config,
         # Training decoder flags (at least one must be True, or flow_config must be set)
-        use_dino_decoder = True,
-        use_pixel_decoder = False,
+        use_dino_decoder,
+        use_pixel_decoder,
         # Interpretability decoder flag (optional, for visualization only)
-        use_aux_decoder = True,
+        use_aux_decoder,
         # Flow supervision config (optional - set to enable flow loss)
-        flow_config: Optional["FlowConfig"] = None,
-        # Codebook replacement schedule (optional - uses default if not provided)
-        codebook_replace_schedule: Optional[list] = None,
+        flow_config,
+        # Codebook replacement schedule (optional)
+        codebook_replace_schedule,
     ):
         """
         einstein notations:
@@ -149,13 +140,15 @@ class LatentActionQuantization(nn.Module):
         if float(vq_discarding_threshold) < 0.0:
             raise ValueError("vq_discarding_threshold must be >= 0")
 
-        # Store decoder flags
-        if dino_config is None and bool(use_dino_decoder):
-            dino_config = DinoConfig(loss_weight=1.0, warmup_steps=0)
+        # Store decoder flags and validate consistency.
+        self.use_dino_decoder = bool(use_dino_decoder)
+        if self.use_dino_decoder and dino_config is None:
+            raise ValueError("dino_config is required when use_dino_decoder=true")
+        if (not self.use_dino_decoder) and dino_config is not None:
+            raise ValueError("dino_config must be null when use_dino_decoder=false")
         self.dino_config = dino_config
-        self.use_dino_decoder = self.dino_config is not None
-        self.use_pixel_decoder = use_pixel_decoder
-        self.use_aux_decoder = use_aux_decoder
+        self.use_pixel_decoder = bool(use_pixel_decoder)
+        self.use_aux_decoder = bool(use_aux_decoder)
         self.flow_config = flow_config
 
         # Validate at least one training decoder is enabled
@@ -175,11 +168,7 @@ class LatentActionQuantization(nn.Module):
         if use_aux_decoder:
             logger.info("Aux decoder enabled for interpretability")
 
-        self.codebook_replace_schedule = (
-            codebook_replace_schedule
-            if codebook_replace_schedule is not None
-            else self.DEFAULT_CODEBOOK_REPLACE_SCHEDULE
-        )
+        self.codebook_replace_schedule = list(codebook_replace_schedule or [])
         self.vq_discarding_threshold = float(vq_discarding_threshold)
         self.vq_discarding_threshold_schedule = self._validate_vq_discarding_threshold_schedule(
             vq_discarding_threshold_schedule
@@ -376,6 +365,8 @@ class LatentActionQuantization(nn.Module):
         - More frequent early in training to ensure good codebook utilization
         - Less frequent later to reduce overhead
         """
+        if not self.codebook_replace_schedule:
+            return False
         for interval, until_step in self.codebook_replace_schedule:
             if step < until_step and step % interval == 0:
                 return True

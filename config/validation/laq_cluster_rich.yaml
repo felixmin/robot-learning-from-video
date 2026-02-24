@@ -5,6 +5,7 @@
 
 check_interval: 1000
 limit_batches: 250
+check_val_every_n_epoch: null
 max_cached_samples: 512
 num_fixed_samples: 8
 num_random_samples: 8

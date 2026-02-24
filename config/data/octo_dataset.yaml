@@ -237,4 +237,5 @@ adapter:
     max_pairs: null
     seed: 42
     resample_each_epoch: true
-    stopping_strategy: all_exhausted
+    steps_per_epoch: 5000
+    stopping_strategy: first_exhausted

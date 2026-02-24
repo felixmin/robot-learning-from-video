@@ -877,7 +877,7 @@ class OpenXLocalIndexedPairMapDataset(Dataset):
 
 
 class OpenXLocalIndexedEpisodePairSampler(Sampler[tuple[int, int]]):
-    """Hierarchical sampler: dataset -> episode (mass) -> timestep t."""
+    """Hierarchical sampler over unique (episode_id, t) pairs within each epoch."""
 
     def __init__(
         self,
@@ -889,6 +889,7 @@ class OpenXLocalIndexedEpisodePairSampler(Sampler[tuple[int, int]]):
         seed: int,
         epoch: int,
         resample_each_epoch: bool,
+        stopping_strategy: str = "all_exhausted",
     ) -> None:
         self.index = index
         self.pairs_per_episode = (
@@ -899,8 +900,15 @@ class OpenXLocalIndexedEpisodePairSampler(Sampler[tuple[int, int]]):
         self.seed = int(seed)
         self.epoch = int(epoch)
         self.resample_each_epoch = bool(resample_each_epoch)
+        self.stopping_strategy = str(stopping_strategy).strip().lower()
+        if self.stopping_strategy not in {"all_exhausted", "first_exhausted"}:
+            raise ValueError(
+                "stopping_strategy must be one of {'all_exhausted', 'first_exhausted'}, "
+                f"got {stopping_strategy!r}"
+            )
         self._external_epoch_set = False
         self._iter_invocations = 0
+        self._warned_unique_exhausted = False
 
         self.dataset_ids = np.asarray(index.episode_dataset_ids, dtype=np.int64)
         dataset_offsets = np.asarray(index.dataset_offsets, dtype=np.int64)
@@ -912,31 +920,33 @@ class OpenXLocalIndexedEpisodePairSampler(Sampler[tuple[int, int]]):
 
         n_datasets = len(index.datasets)
         self.episode_ids_by_dataset: List[np.ndarray] = []
-        self.episode_mass_prefix_by_dataset: List[np.ndarray] = []
+        self.episode_pair_prefix_by_dataset: List[np.ndarray] = []
         dataset_mass = np.zeros((n_datasets,), dtype=np.float64)
+        dataset_pair_capacity = np.zeros((n_datasets,), dtype=np.int64)
 
         for dataset_id in range(n_datasets):
             mask = (self.dataset_ids == dataset_id) & (self.max_t > 0)
             episode_ids = np.nonzero(mask)[0].astype(np.int64, copy=False)
             if episode_ids.size == 0:
                 self.episode_ids_by_dataset.append(np.empty((0,), dtype=np.int64))
-                self.episode_mass_prefix_by_dataset.append(
-                    np.empty((0,), dtype=np.float64)
-                )
+                self.episode_pair_prefix_by_dataset.append(np.empty((0,), dtype=np.int64))
                 continue
-            masses = self.max_t[episode_ids].astype(np.float64, copy=False)
+            counts = self.max_t[episode_ids].astype(np.int64, copy=False)
             if self.pairs_per_episode is not None:
-                masses = np.minimum(masses, float(self.pairs_per_episode))
-            masses = np.maximum(masses, 0.0)
-            if masses.sum() <= 0.0:
+                counts = np.minimum(counts, int(self.pairs_per_episode))
+            counts = np.maximum(counts, 0)
+            positive = counts > 0
+            if not bool(np.any(positive)):
                 self.episode_ids_by_dataset.append(np.empty((0,), dtype=np.int64))
-                self.episode_mass_prefix_by_dataset.append(
-                    np.empty((0,), dtype=np.float64)
-                )
+                self.episode_pair_prefix_by_dataset.append(np.empty((0,), dtype=np.int64))
                 continue
+            episode_ids = episode_ids[positive]
+            counts = counts[positive]
+            prefix = np.cumsum(counts, dtype=np.int64)
             self.episode_ids_by_dataset.append(episode_ids)
-            self.episode_mass_prefix_by_dataset.append(np.cumsum(masses, dtype=np.float64))
-            dataset_mass[dataset_id] = float(masses.sum())
+            self.episode_pair_prefix_by_dataset.append(prefix)
+            dataset_pair_capacity[dataset_id] = int(prefix[-1])
+            dataset_mass[dataset_id] = float(prefix[-1])
 
         if weights_by_size:
             base = dataset_mass.copy()
@@ -950,15 +960,26 @@ class OpenXLocalIndexedEpisodePairSampler(Sampler[tuple[int, int]]):
             raise ValueError("No sampleable datasets for indexed_full mode")
 
         self.dataset_mass = dataset_mass
+        self.dataset_pair_capacity = dataset_pair_capacity
+        self.total_unique_pairs = int(dataset_pair_capacity.sum())
         self.dataset_probabilities = base / base.sum()
-        self.valid_dataset_ids = np.nonzero(self.dataset_probabilities > 0.0)[0].astype(
-            np.int64
-        )
+        self.valid_dataset_ids = np.nonzero(
+            (self.dataset_probabilities > 0.0) & (self.dataset_pair_capacity > 0)
+        )[0].astype(np.int64)
+        if self.valid_dataset_ids.size == 0:
+            raise ValueError("No datasets with positive probability and available pairs")
         self.valid_dataset_probs = self.dataset_probabilities[self.valid_dataset_ids]
         self.valid_dataset_probs = self.valid_dataset_probs / self.valid_dataset_probs.sum()
 
         if num_samples is None:
-            inferred = int(round(float(dataset_mass.sum())))
+            if self.stopping_strategy == "all_exhausted":
+                inferred = int(self.total_unique_pairs)
+            else:
+                ratios = (
+                    self.dataset_pair_capacity[self.valid_dataset_ids].astype(np.float64)
+                    / self.valid_dataset_probs.astype(np.float64)
+                )
+                inferred = int(np.floor(float(np.min(ratios))))
             self.num_samples = max(1, inferred)
         else:
             self.num_samples = max(1, int(num_samples))
@@ -999,36 +1020,177 @@ class OpenXLocalIndexedEpisodePairSampler(Sampler[tuple[int, int]]):
         cache[episode_id] = chosen
         return chosen
 
+    def _allocate_dataset_quotas(
+        self,
+        *,
+        rng: np.random.Generator,
+        target_samples: int,
+    ) -> tuple[np.ndarray, int]:
+        quotas = np.zeros((len(self.index.datasets),), dtype=np.int64)
+        if target_samples <= 0:
+            return quotas, 0
+
+        initial = rng.multinomial(int(target_samples), self.valid_dataset_probs).astype(
+            np.int64,
+            copy=False,
+        )
+        quotas[self.valid_dataset_ids] = initial
+        quotas = np.minimum(quotas, self.dataset_pair_capacity)
+
+        remaining = int(target_samples - int(quotas.sum()))
+        while remaining > 0:
+            candidates = np.nonzero(quotas < self.dataset_pair_capacity)[0].astype(
+                np.int64,
+                copy=False,
+            )
+            if candidates.size == 0:
+                break
+            weights = self.dataset_probabilities[candidates].astype(np.float64, copy=False)
+            if float(weights.sum()) <= 0.0:
+                weights = (
+                    self.dataset_pair_capacity[candidates] - quotas[candidates]
+                ).astype(np.float64, copy=False)
+            weights = weights / weights.sum()
+
+            proposed_local = rng.multinomial(remaining, weights).astype(
+                np.int64,
+                copy=False,
+            )
+            increments = np.zeros_like(quotas)
+            increments[candidates] = proposed_local
+            spare = self.dataset_pair_capacity - quotas
+            increments = np.minimum(increments, spare)
+            added = int(increments.sum())
+            if added <= 0:
+                break
+            quotas += increments
+            remaining -= added
+
+        return quotas, remaining
+
+    def _linear_index_to_pair(
+        self,
+        *,
+        dataset_id: int,
+        linear_index: int,
+        epoch_term: int,
+        subset_cache: Dict[int, np.ndarray],
+    ) -> tuple[int, int]:
+        episode_ids = self.episode_ids_by_dataset[dataset_id]
+        prefix = self.episode_pair_prefix_by_dataset[dataset_id]
+        if episode_ids.size == 0 or prefix.size == 0:
+            raise RuntimeError(f"Dataset {dataset_id} has no sampleable episodes")
+
+        pair_idx = int(linear_index)
+        local_idx = int(np.searchsorted(prefix, pair_idx, side="right"))
+        if local_idx >= episode_ids.size:
+            local_idx = episode_ids.size - 1
+
+        prev_cum = int(prefix[local_idx - 1]) if local_idx > 0 else 0
+        offset_in_episode = pair_idx - prev_cum
+        episode_id = int(episode_ids[local_idx])
+        max_t = int(self.max_t[episode_id])
+        if max_t <= 0:
+            raise RuntimeError(
+                f"Sampler selected unsampleable episode: episode_id={episode_id}, max_t={max_t}"
+            )
+
+        if self.pairs_per_episode is None or self.pairs_per_episode >= max_t:
+            t = int(offset_in_episode)
+        else:
+            subset = self._episode_subset(
+                episode_id=episode_id,
+                max_t=max_t,
+                cap=int(self.pairs_per_episode),
+                epoch_term=epoch_term,
+                cache=subset_cache,
+            )
+            t = int(subset[offset_in_episode])
+        return (episode_id, t)
+
+    def _sample_one_with_replacement(
+        self,
+        *,
+        rng: np.random.Generator,
+        epoch_term: int,
+        subset_cache: Dict[int, np.ndarray],
+    ) -> tuple[int, int]:
+        dataset_id = int(rng.choice(self.valid_dataset_ids, p=self.valid_dataset_probs))
+        prefix = self.episode_pair_prefix_by_dataset[dataset_id]
+        if prefix.size == 0:
+            raise RuntimeError(f"Dataset {dataset_id} has zero available pair capacity")
+        linear_index = int(rng.integers(0, int(prefix[-1])))
+        return self._linear_index_to_pair(
+            dataset_id=dataset_id,
+            linear_index=linear_index,
+            epoch_term=epoch_term,
+            subset_cache=subset_cache,
+        )
+
     def __iter__(self) -> Iterator[tuple[int, int]]:
         epoch_term = self._epoch_term()
         rng = np.random.default_rng(self.seed + epoch_term * 1_000_003)
         subset_cache: Dict[int, np.ndarray] = {}
+        quotas, remaining = self._allocate_dataset_quotas(
+            rng=rng,
+            target_samples=self.num_samples,
+        )
 
-        for _ in range(self.num_samples):
-            dataset_id = int(rng.choice(self.valid_dataset_ids, p=self.valid_dataset_probs))
-            episode_ids = self.episode_ids_by_dataset[dataset_id]
-            prefix = self.episode_mass_prefix_by_dataset[dataset_id]
-            if episode_ids.size == 0 or prefix.size == 0:
-                continue
-
-            u = float(rng.random()) * float(prefix[-1])
-            local_idx = int(np.searchsorted(prefix, u, side="right"))
-            if local_idx >= episode_ids.size:
-                local_idx = episode_ids.size - 1
-            episode_id = int(episode_ids[local_idx])
-            max_t = int(self.max_t[episode_id])
-            if max_t <= 0:
-                continue
-
-            if self.pairs_per_episode is None or self.pairs_per_episode >= max_t:
-                t = int(rng.integers(0, max_t))
-            else:
-                subset = self._episode_subset(
-                    episode_id=episode_id,
-                    max_t=max_t,
-                    cap=int(self.pairs_per_episode),
-                    epoch_term=epoch_term,
-                    cache=subset_cache,
+        draw_order_parts: List[np.ndarray] = []
+        per_dataset_linear_indices: Dict[int, np.ndarray] = {}
+        for dataset_id in np.nonzero(quotas > 0)[0].astype(np.int64, copy=False):
+            count = int(quotas[dataset_id])
+            capacity = int(self.dataset_pair_capacity[dataset_id])
+            if count > capacity:
+                raise RuntimeError(
+                    f"Quota exceeds capacity for dataset {int(dataset_id)}: "
+                    f"quota={count} capacity={capacity}"
                 )
-                t = int(subset[rng.integers(0, subset.shape[0])])
-            yield (episode_id, t)
+            linear = rng.choice(capacity, size=count, replace=False).astype(
+                np.int64,
+                copy=False,
+            )
+            per_dataset_linear_indices[int(dataset_id)] = linear
+            draw_order_parts.append(
+                np.full((count,), int(dataset_id), dtype=np.int64)
+            )
+
+        if draw_order_parts:
+            draw_order = np.concatenate(draw_order_parts)
+            rng.shuffle(draw_order)
+        else:
+            draw_order = np.empty((0,), dtype=np.int64)
+
+        pointers = np.zeros((len(self.index.datasets),), dtype=np.int64)
+        for dataset_id_raw in draw_order:
+            dataset_id = int(dataset_id_raw)
+            idx = int(pointers[dataset_id])
+            pointers[dataset_id] += 1
+            linear = per_dataset_linear_indices.get(dataset_id)
+            if linear is None or idx >= linear.shape[0]:
+                raise RuntimeError(
+                    f"Sampler internal state mismatch for dataset {dataset_id} (idx={idx})"
+                )
+            yield self._linear_index_to_pair(
+                dataset_id=dataset_id,
+                linear_index=int(linear[idx]),
+                epoch_term=epoch_term,
+                subset_cache=subset_cache,
+            )
+
+        if remaining > 0:
+            if not self._warned_unique_exhausted:
+                logger.warning(
+                    "Requested %d samples but only %d unique pairs are available; "
+                    "using replacement for the final %d samples",
+                    self.num_samples,
+                    int(quotas.sum()),
+                    remaining,
+                )
+                self._warned_unique_exhausted = True
+            for _ in range(remaining):
+                yield self._sample_one_with_replacement(
+                    rng=rng,
+                    epoch_term=epoch_term,
+                    subset_cache=subset_cache,
+                )

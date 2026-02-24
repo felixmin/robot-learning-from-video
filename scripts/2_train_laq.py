@@ -39,6 +39,7 @@ from common.unified_logging import resolve_runs_dir, setup_unified_logging, setu
 from laq import (
     LAQTask,
     EMACallback,
+    TrainPreviewBufferCallback,
     ValidationStrategyCallback,
     create_validation_strategies,
 )
@@ -275,6 +276,36 @@ def main(cfg: DictConfig):
         )
         logger.info("✓ Dataset usage logger added")
 
+    # Train preview buffer: snapshots from already-consumed train batches.
+    # Used by basic visualization to avoid iterating train_dataloader in validation.
+    preview_cfg = training_config.get("train_preview_buffer")
+    if preview_cfg is None:
+        raise ValueError(
+            "Missing `training.train_preview_buffer` config. Expected:\n"
+            "training:\n"
+            "  train_preview_buffer:\n"
+            "    enabled: true|false\n"
+            "    max_samples: <int>\n"
+            "    samples_per_batch: <int>\n"
+        )
+    if bool(preview_cfg.get("enabled", True)):
+        if preview_cfg.get("max_samples") is None:
+            raise ValueError("Missing `training.train_preview_buffer.max_samples` config.")
+        if preview_cfg.get("samples_per_batch") is None:
+            raise ValueError("Missing `training.train_preview_buffer.samples_per_batch` config.")
+        callbacks.append(
+            TrainPreviewBufferCallback(
+                enabled=True,
+                max_samples=int(preview_cfg.max_samples),
+                samples_per_batch=int(preview_cfg.samples_per_batch),
+            )
+        )
+        logger.info("✓ Train preview buffer callback added")
+        logger.info(f"  - max_samples: {int(preview_cfg.max_samples)}")
+        logger.info(f"  - samples_per_batch: {int(preview_cfg.samples_per_batch)}")
+    else:
+        logger.info("✓ Train preview buffer disabled")
+
     # Setup validation strategies
     val_config = cfg.get("validation")
     if val_config is None:
@@ -405,6 +436,7 @@ def main(cfg: DictConfig):
         raise ValueError("Missing `validation.limit_batches` config.")
     val_check_interval = val_config.check_interval
     limit_val_batches = val_config.limit_batches
+    check_val_every_n_epoch = val_config.get("check_val_every_n_epoch", 1)
 
     if training_config.get("log_every_n_steps") is None:
         raise ValueError("Missing `training.log_every_n_steps` config.")
@@ -442,6 +474,7 @@ def main(cfg: DictConfig):
         log_every_n_steps=log_every_n_steps,
         val_check_interval=val_check_interval,  # Configurable validation frequency
         limit_val_batches=limit_val_batches,  # Limit validation batches
+        check_val_every_n_epoch=check_val_every_n_epoch,
         enable_progress_bar=bool(progress_bar_cfg.enabled),
         enable_model_summary=bool(model_summary_cfg.enabled),
     )
@@ -450,6 +483,7 @@ def main(cfg: DictConfig):
     logger.info(f"  - Max epochs: {training_config.epochs}")
     logger.info(f"  - Val check interval: {val_check_interval}")
     logger.info(f"  - Limit val batches: {limit_val_batches}")
+    logger.info(f"  - Check val every n epoch: {check_val_every_n_epoch}")
     logger.info(f"  - Precision: {cfg.get('precision', '32-true')}")
     logger.info(f"  - Accelerator: auto")
     logger.info(f"  - Devices: auto")

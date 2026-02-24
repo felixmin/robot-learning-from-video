@@ -4,22 +4,120 @@ PyTorch Lightning callbacks for LAQ training.
 Includes:
 - ValidationStrategyCallback: Flexible validation with bucket-aware routing
 - EMACallback: Exponential moving average of model weights
+- TrainPreviewBufferCallback: Non-intrusive train sample snapshots for visualization
 """
 
 import gc
-from typing import Optional, List, Dict, Any
+from collections import deque
+from typing import Optional, List, Dict, Any, Deque
 
 import torch
-from torchvision.utils import make_grid
 import lightning.pytorch as pl
 from lightning.pytorch.callbacks import Callback
-from einops import rearrange
 
-try:
-    import wandb
-    WANDB_AVAILABLE = True
-except ImportError:
-    WANDB_AVAILABLE = False
+
+class TrainPreviewBufferCallback(Callback):
+    """
+    Cache a small rolling window of train samples for visualization.
+
+    This callback records snapshots from already-consumed train batches in
+    `on_train_batch_end`, so validation strategies can visualize train samples
+    without creating a new iterator over `trainer.train_dataloader`.
+    """
+
+    def __init__(
+        self,
+        *,
+        enabled: bool = True,
+        max_samples: int = 256,
+        samples_per_batch: int = 4,
+        metadata_keys: Optional[List[str]] = None,
+    ):
+        super().__init__()
+        self.enabled = bool(enabled)
+        self.max_samples = int(max_samples)
+        self.samples_per_batch = int(samples_per_batch)
+        if self.max_samples <= 0:
+            raise ValueError("TrainPreviewBufferCallback.max_samples must be > 0")
+        if self.samples_per_batch <= 0:
+            raise ValueError("TrainPreviewBufferCallback.samples_per_batch must be > 0")
+        if metadata_keys is None:
+            metadata_keys = [
+                "dataset_name",
+                "dataset_type",
+                "language",
+                "task",
+                "environment",
+                "scene_id",
+            ]
+        self.metadata_keys = [str(k) for k in metadata_keys]
+        self._frames: Deque[torch.Tensor] = deque(maxlen=self.max_samples)
+        self._metadata: Deque[Dict[str, Any]] = deque(maxlen=self.max_samples)
+
+    def on_train_batch_end(
+        self,
+        trainer: pl.Trainer,
+        pl_module: pl.LightningModule,
+        outputs,
+        batch: Any,
+        batch_idx: int,
+    ) -> None:
+        if not self.enabled:
+            return
+        if not isinstance(batch, dict):
+            return
+        frames = batch.get("frames")
+        if not isinstance(frames, torch.Tensor) or frames.ndim == 0:
+            return
+
+        batch_size = int(frames.shape[0])
+        take = min(self.samples_per_batch, batch_size)
+        if take <= 0:
+            return
+
+        for i in range(take):
+            frame = frames[i].detach().cpu()
+            if frame.dtype == torch.uint8:
+                frame = frame.to(dtype=torch.float32).div_(255.0)
+            self._frames.append(frame)
+            self._metadata.append(self._extract_metadata(batch, i))
+
+    def sample(
+        self,
+        num_samples: int,
+    ) -> tuple[Optional[torch.Tensor], Optional[List[Dict[str, Any]]]]:
+        if num_samples <= 0:
+            raise ValueError("TrainPreviewBufferCallback.sample(num_samples) expects > 0")
+
+        available = len(self._frames)
+        if available == 0:
+            return None, None
+
+        take = min(int(num_samples), available)
+        selected = torch.randperm(available)[:take].tolist()
+        frames = torch.stack([self._frames[i] for i in selected], dim=0)
+        metadata = [self._metadata[i] for i in selected]
+        return frames, metadata
+
+    def _extract_metadata(self, batch: Dict[str, Any], i: int) -> Dict[str, Any]:
+        meta: Dict[str, Any] = {}
+        for key in self.metadata_keys:
+            if key not in batch:
+                continue
+            value = batch[key]
+            if isinstance(value, (list, tuple)):
+                if i < len(value):
+                    meta[key] = value[i]
+            elif isinstance(value, torch.Tensor):
+                if value.ndim == 0:
+                    meta[key] = value.item()
+                elif i < value.shape[0]:
+                    item = value[i]
+                    if isinstance(item, torch.Tensor) and item.ndim == 0:
+                        meta[key] = item.item()
+            else:
+                meta[key] = value
+        return meta
 
 
 class ValidationStrategyCallback(Callback):
