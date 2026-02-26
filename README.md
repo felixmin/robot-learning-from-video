@@ -1,3 +1,5 @@
+This code is build on [LAPA](https://github.com/LatentActionPretraining/LAPA).
+
 # High-Level Robot Planner
 
 A three-stage robot learning system that learns policies from videos without action labels.
