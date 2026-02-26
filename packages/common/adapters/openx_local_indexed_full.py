@@ -995,9 +995,9 @@ class OpenXLocalIndexedEpisodePairSampler(Sampler[tuple[int, int]]):
             (int(self.seed) & ((1 << 64) - 1))
             ^ (int(episode_id) * 0x9E3779B97F4A7C15)
             ^ (int(epoch_term) * 0xBF58476D1CE4E5B9)
+            ^ (int(draw_id) * 0x94D049BB133111EB)
         ) & ((1 << 64) - 1)
-        base = int(self._splitmix64(key) % int(max_t))
-        return int((base + int(draw_id)) % int(max_t))
+        return int(self._splitmix64(key) % int(max_t))
 
     def _allocate_dataset_quotas(
         self,
@@ -1125,6 +1125,21 @@ class OpenXLocalIndexedEpisodePairSampler(Sampler[tuple[int, int]]):
         rng = np.random.default_rng(self.seed + epoch_term * 1_000_003)
         subset_cache: Dict[int, np.ndarray] = {}
         draw_id = 0
+
+        # For pairs_per_episode=1, "fresh_per_draw" means stateless sampling:
+        # choose dataset by configured weights, episode/timestep with replacement,
+        # and derive t from draw_id so repeated episode draws get fresh offsets.
+        if self.repeat_t_policy == "fresh_per_draw" and self.pairs_per_episode == 1:
+            for _ in range(self.num_samples):
+                yield self._sample_one_with_replacement(
+                    rng=rng,
+                    epoch_term=epoch_term,
+                    subset_cache=subset_cache,
+                    draw_id=draw_id,
+                )
+                draw_id += 1
+            return
+
         quotas, remaining = self._allocate_dataset_quotas(
             rng=rng,
             target_samples=self.num_samples,

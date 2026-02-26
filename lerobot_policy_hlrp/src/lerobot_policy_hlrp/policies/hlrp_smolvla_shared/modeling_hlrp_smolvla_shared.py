@@ -8,6 +8,7 @@ from typing import Any
 import torch
 import torch.nn.functional as F
 
+from foundation.action_tokens import ActionTokenConfig
 from foundation.backends.interfaces import FoundationBatch
 from foundation.backends.smolvla_shared.artifact import (
     SmolVLASharedArtifactManifest,
@@ -17,7 +18,7 @@ from foundation.backends.smolvla_shared.config import SmolVLASharedCoreConfig
 from foundation.backends.smolvla_shared.model import SmolVLASharedCore
 from foundation.backends.smolvla_shared.preprocess import pad_vector
 from lerobot.policies.pretrained import PreTrainedPolicy
-from lerobot.utils.constants import ACTION
+from lerobot.utils.constants import ACTION, OBS_STATE
 
 from lerobot_policy_hlrp.policies.hlrp_smolvla_shared.configuration_hlrp_smolvla_shared import (
     HLRPSmolVLASharedConfig,
@@ -72,6 +73,10 @@ class HLRPSmolVLASharedPolicy(PreTrainedPolicy):
                 action_dim=int(self.config.max_action_dim),
                 torch_dtype=_dtype_from_name(self.config.torch_dtype),
                 trust_remote_code=bool(self.config.trust_remote_code),
+                action_tokens=ActionTokenConfig(
+                    codebook_size=int(self.config.codebook_size),
+                    code_seq_len=int(self.config.code_seq_len),
+                ),
                 use_gpu_preprocessing=bool(self.config.use_gpu_preprocessing),
                 image_size=tuple(self.config.image_size),
                 flow_hidden_dim=int(self.config.flow_hidden_dim),
@@ -152,7 +157,12 @@ class HLRPSmolVLASharedPolicy(PreTrainedPolicy):
     def _to_foundation_batch(self, batch: dict[str, Any]) -> FoundationBatch:
         frames = self._extract_frames(batch)
         instructions = self._extract_instructions(batch, batch_size=int(frames.shape[0]))
-        return FoundationBatch(frames=frames, instructions=instructions)
+        state = batch.get(OBS_STATE)
+        if state is not None:
+            if not torch.is_tensor(state):
+                state = torch.as_tensor(state, dtype=torch.float32)
+            state = state.to(torch.float32)
+        return FoundationBatch(frames=frames, instructions=instructions, state=state)
 
     def _try_load_stage2_artifact(
         self,
@@ -168,7 +178,12 @@ class HLRPSmolVLASharedPolicy(PreTrainedPolicy):
         )
         self._assert_manifest_compatible(manifest=manifest)
 
-        missing_allowed = {"action_head.weight", "action_head.bias"}
+        missing_allowed = {
+            "action_head.weight",
+            "action_head.bias",
+            "action_out_proj.weight",
+            "action_out_proj.bias",
+        }
         missing, unexpected = self.core.load_state_dict(core_state_dict, strict=False)
         missing_disallowed = [k for k in missing if k not in missing_allowed]
         if unexpected:

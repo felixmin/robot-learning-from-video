@@ -40,7 +40,7 @@ def sample_beta_time(
 
 
 def make_noisy_target(target: Tensor, noise: Tensor, time: Tensor) -> tuple[Tensor, Tensor]:
-    time_expanded = time[:, None]
+    time_expanded = time.reshape(time.shape[0], *([1] * (target.ndim - 1)))
     x_t = time_expanded * noise + (1.0 - time_expanded) * target
     u_t = noise - target
     return x_t, u_t

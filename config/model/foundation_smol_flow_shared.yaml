@@ -11,15 +11,28 @@ vla:
   model_name: HuggingFaceTB/SmolVLM2-500M-Video-Instruct
   torch_dtype: bf16  # bf16, fp16, fp32
   trust_remote_code: true
+  freeze_vlm: true
+  freeze_vision_encoder: true
+  load_vlm_weights: true
+  attention_mode: cross_attn
+  num_expert_layers: -1
+  num_vlm_layers: 16
+  self_attn_every_n_layers: 2
+  expert_width_multiplier: 0.75
+  add_image_special_tokens: false
+  tokenizer_max_length: 48
+  pad_language_to: longest
+  max_state_dim: 32
+  prefix_length: -1
   use_gpu_preprocessing: true
-  image_size: [384, 384]
+  image_size: [512, 512]
 
 laq:
   checkpoint: ""  # required at runtime (Stage 1 LAQ checkpoint)
 
 action_tokens:
-  codebook_size: 8
-  code_seq_len: 4
+  codebook_size: 2048
+  code_seq_len: 1
   action_start: "<ACTION>"
   action_end: "</ACTION>"
   token_fmt: "<ACT_{i}>"
@@ -27,7 +40,7 @@ action_tokens:
 flow:
   action_dim: null
   flow_hidden_dim: 1024
-  flow_steps: 8
+  flow_steps: 10
   latent_loss_weight: 1.0
   action_loss_weight: 0.0
   min_period: 4.0e-3

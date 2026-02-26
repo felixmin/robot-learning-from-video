@@ -10,11 +10,13 @@ from foundation.backends.smolvla_shared.artifact import (
     save_smolvla_shared_artifact,
 )
 from foundation.backends.smolvla_shared.model import SmolVLASharedCore
+from foundation.backends.smolvla_shared.smolvlm_with_expert import SmolVLMWithExpertModel
 
 __all__ = [
     "SmolVLASharedBackendConfig",
     "SmolVLASharedCoreConfig",
     "SmolVLASharedCore",
+    "SmolVLMWithExpertModel",
     "SMOLVLA_SHARED_ARTIFACT_FILENAME",
     "SMOLVLA_SHARED_ARTIFACT_SCHEMA_VERSION",
     "SmolVLASharedArtifactManifest",

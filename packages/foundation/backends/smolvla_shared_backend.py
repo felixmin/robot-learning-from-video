@@ -8,6 +8,7 @@ from foundation.backends.interfaces import BackendMode, FoundationBatch, LatentO
 from foundation.backends.smolvla_shared.config import SmolVLASharedBackendConfig
 from foundation.backends.smolvla_shared.losses import action_regression_loss, latent_flow_loss
 from foundation.backends.smolvla_shared.model import SmolVLASharedCore
+from foundation.backends.smolvla_shared.smolvlm_with_expert import SmolVLMWithExpertModel
 
 
 class SmolVLASharedBackend(torch.nn.Module):
@@ -20,6 +21,7 @@ class SmolVLASharedBackend(torch.nn.Module):
         vlm: torch.nn.Module | None = None,
         processor: Any | None = None,
         frames_to_images: Callable[[torch.Tensor], list[Any]] | None = None,
+        smol_model: SmolVLMWithExpertModel | None = None,
     ) -> None:
         super().__init__()
         self.cfg = config
@@ -28,6 +30,7 @@ class SmolVLASharedBackend(torch.nn.Module):
             vlm=vlm,
             processor=processor,
             frames_to_images=frames_to_images,
+            smol_model=smol_model,
         )
 
         self.codebook_size = int(self.cfg.action_tokens.codebook_size)

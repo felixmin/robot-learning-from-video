@@ -23,6 +23,7 @@ class FoundationBatch:
     target_codes: torch.Tensor | None = None  # [B, S] long (optional)
     target_latent_vectors: torch.Tensor | None = None  # [B, S, D] or [B, D] (optional)
     target_actions: torch.Tensor | None = None  # [B, A] float (optional)
+    state: torch.Tensor | None = None  # [B, S_state] or [B, T, S_state] (optional)
     meta: dict[str, Any] | None = None
 
 

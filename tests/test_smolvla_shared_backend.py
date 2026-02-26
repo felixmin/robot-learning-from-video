@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
-from typing import Any, List
+from typing import Any
 
 import torch
 
@@ -12,51 +12,97 @@ from foundation.backends.smolvla_shared_backend import SmolVLASharedBackend
 from foundation.vla_inputs import ChatConfig
 
 
-class FakeProcessor:
-    def apply_chat_template(self, messages, tokenize: bool, add_generation_prompt: bool):
-        assert tokenize is False
-        parts: List[str] = []
-        for msg in messages:
-            for item in msg.get("content", []):
-                if item.get("type") == "image":
-                    parts.append("<image>")
-                elif item.get("type") == "text":
-                    parts.append(str(item.get("text", "")))
-        if add_generation_prompt:
-            parts.append("<assistant>")
-        return " ".join([p for p in parts if p])
-
-    def __call__(self, *, text, images, return_tensors: str, padding: bool):
+class FakeTokenizer:
+    def __call__(self, texts, return_tensors: str, padding: str, truncation: bool, max_length: int):
         assert return_tensors == "pt"
-        assert padding is True
-        assert isinstance(text, list)
-        assert len(text) == len(images)
-        assert all(isinstance(x, list) and len(x) == 1 for x in images)
-        b = len(text)
-        lengths = [max(1, len(str(t).split())) for t in text]
+        assert truncation is True
+        bsize = len(texts)
+        lengths = [max(1, min(max_length, len(str(t).split()))) for t in texts]
         max_len = max(lengths)
-        input_ids = torch.zeros((b, max_len), dtype=torch.long)
-        attention_mask = torch.zeros_like(input_ids)
-        for i, l in enumerate(lengths):
-            input_ids[i, :l] = torch.arange(1, l + 1, dtype=torch.long)
-            attention_mask[i, :l] = 1
-        pixel_values = torch.zeros((b, 3, 8, 8), dtype=torch.float32)
-        return {"input_ids": input_ids, "attention_mask": attention_mask, "pixel_values": pixel_values}
+        input_ids = torch.zeros((bsize, max_len), dtype=torch.long)
+        attention_mask = torch.zeros((bsize, max_len), dtype=torch.long)
+        for i, length in enumerate(lengths):
+            input_ids[i, :length] = torch.arange(1, length + 1, dtype=torch.long)
+            attention_mask[i, :length] = 1
+        return {"input_ids": input_ids, "attention_mask": attention_mask}
 
 
-class DummyVLM(torch.nn.Module):
-    def __init__(self, hidden_size: int):
+class FakeProcessor:
+    def __init__(self) -> None:
+        self.tokenizer = FakeTokenizer()
+
+
+class FakeSmolModel(torch.nn.Module):
+    def __init__(self, hidden_size: int = 16, expert_hidden_size: int = 12):
         super().__init__()
-        self.config = SimpleNamespace(text_config=SimpleNamespace(hidden_size=hidden_size))
-        self.proj = torch.nn.Linear(1, hidden_size, bias=False)
+        self.config = SimpleNamespace(
+            text_config=SimpleNamespace(
+                hidden_size=hidden_size,
+                head_dim=4,
+                num_attention_heads=2,
+                num_key_value_heads=2,
+            )
+        )
+        self.expert_hidden_size = expert_hidden_size
+        self.processor = FakeProcessor()
+        self.vlm = torch.nn.Linear(1, 1, bias=False)
+        self.prefix_proj = torch.nn.Linear(hidden_size, hidden_size)
+        self.suffix_proj = torch.nn.Linear(expert_hidden_size, expert_hidden_size)
+        self.prefix_to_suffix = torch.nn.Linear(hidden_size, expert_hidden_size)
+        self.lang_embed = torch.nn.Embedding(2048, hidden_size)
+        self.image_proj = torch.nn.Linear(3, hidden_size)
 
-    def forward(self, input_ids, attention_mask, pixel_values, output_hidden_states: bool, return_dict: bool):
-        assert output_hidden_states is True
-        assert return_dict is True
-        b, l = input_ids.shape
-        x = torch.ones((b, l, 1), dtype=torch.float32, device=input_ids.device)
-        last = self.proj(x)
-        return SimpleNamespace(hidden_states=(last,))
+        self.train_expert_only = True
+        for p in self.vlm.parameters():
+            p.requires_grad = False
+        self.vlm.eval()
+
+    def train(self, mode: bool = True):
+        super().train(mode)
+        if self.train_expert_only:
+            self.vlm.eval()
+        return self
+
+    def embed_image(self, image: torch.Tensor) -> torch.Tensor:
+        # image: [B, C, H, W] -> two visual tokens
+        bsize = int(image.shape[0])
+        pooled = image.mean(dim=(2, 3)).transpose(1, 2) if image.ndim == 5 else image.mean(dim=(2, 3))
+        pooled = pooled.to(torch.float32)
+        token = self.image_proj(pooled)
+        return token[:, None, :].expand(bsize, 2, -1)
+
+    def embed_language_tokens(self, tokens: torch.Tensor) -> torch.Tensor:
+        return self.lang_embed(tokens)
+
+    def forward(
+        self,
+        *,
+        attention_mask: torch.Tensor,
+        position_ids: torch.LongTensor,
+        past_key_values: dict[str, torch.Tensor] | None,
+        inputs_embeds: list[torch.Tensor | None],
+        use_cache: bool,
+        fill_kv_cache: bool,
+    ) -> tuple[list[torch.Tensor | None], dict[str, torch.Tensor] | None]:
+        del attention_mask, position_ids
+
+        prefix, suffix = inputs_embeds
+        cache = {} if past_key_values is None else dict(past_key_values)
+
+        prefix_out = None
+        if prefix is not None:
+            prefix_out = self.prefix_proj(prefix)
+            if fill_kv_cache and use_cache:
+                cache["prefix_ctx"] = prefix_out.mean(dim=1, keepdim=True)
+
+        ctx = cache.get("prefix_ctx")
+        suffix_out = None
+        if suffix is not None:
+            suffix_out = self.suffix_proj(suffix)
+            if ctx is not None:
+                suffix_out = suffix_out + self.prefix_to_suffix(ctx).to(dtype=suffix_out.dtype)
+
+        return [prefix_out, suffix_out], cache
 
 
 def _make_backend() -> SmolVLASharedBackend:
@@ -69,25 +115,26 @@ def _make_backend() -> SmolVLASharedBackend:
             trust_remote_code=False,
             chat=ChatConfig(system_prompt="sys"),
             action_tokens=ActionTokenConfig(codebook_size=8, code_seq_len=4),
-            use_gpu_preprocessing=False,
-            image_size=(384, 384),
+            use_gpu_preprocessing=True,
+            image_size=(64, 64),
             flow_hidden_dim=32,
             flow_steps=4,
             latent_loss_weight=1.0,
             action_loss_weight=1.0,
+            max_state_dim=4,
+            freeze_vlm=True,
         ),
-        vlm=DummyVLM(hidden_size=16),
-        processor=FakeProcessor(),
-        frames_to_images=lambda frames: [object() for _ in range(frames.shape[0])],
+        smol_model=FakeSmolModel(),
     )
 
 
 def _make_batch() -> FoundationBatch:
     return FoundationBatch(
-        frames=torch.randint(0, 256, (2, 2, 8, 8, 3), dtype=torch.uint8),
+        frames=torch.randint(0, 256, (2, 2, 16, 16, 3), dtype=torch.uint8),
         instructions=["pick", "place"],
         target_latent_vectors=torch.randn(2, 4, 2),
         target_actions=torch.randn(2, 3),
+        state=torch.randn(2, 2),
     )
 
 
@@ -121,3 +168,16 @@ def test_smolvla_shared_backend_actions_and_multitask() -> None:
     assert latent.actions is not None
     assert latent.vector.shape == (2, 8)
     assert latent.actions.shape == (2, 3)
+
+
+def test_smolvla_shared_backend_freezes_vlm_by_default() -> None:
+    backend = _make_backend()
+    backend.setup(device=torch.device("cpu"))
+
+    vlm_params = list(backend.core.vlm.parameters())
+    assert len(vlm_params) > 0
+    assert all(not p.requires_grad for p in vlm_params)
+    assert backend.core.vlm.training is False
+
+    backend.train()
+    assert backend.core.vlm.training is False

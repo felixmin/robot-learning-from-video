@@ -22,6 +22,8 @@ class HLRPSmolVLASharedConfig(PreTrainedConfig):
     image_size: tuple[int, int] = (384, 384)
 
     latent_vector_dim: int = 128
+    codebook_size: int = 2048
+    code_seq_len: int = 1
     flow_hidden_dim: int = 1024
     flow_steps: int = 8
     min_period: float = 4e-3

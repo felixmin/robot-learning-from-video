@@ -21,6 +21,7 @@ from foundation.constrained_decode import ActionTokenIds
 from foundation.online_laq import (
     LatentCodeProvider,
     extract_oxe_actions,
+    extract_oxe_initial_state,
     extract_oxe_language,
     oxe_frames_to_laq_video,
 )
@@ -331,6 +332,7 @@ class VLATokenBackendLightningModule(pl.LightningModule):
         actions: torch.Tensor | None = None
         codes: torch.Tensor | None = None
         vectors: torch.Tensor | None = None
+        state = extract_oxe_initial_state(batch)
 
         if self.backend_mode is BackendMode.CODES:
             codes = self.code_provider.codes_from_video(video).to(torch.long).detach().cpu()
@@ -355,6 +357,7 @@ class VLATokenBackendLightningModule(pl.LightningModule):
                 target_codes=codes,
                 target_latent_vectors=vectors,
                 target_actions=actions,
+                state=state,
             ),
             mode=self.backend_mode,
         )

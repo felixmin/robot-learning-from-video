@@ -137,3 +137,26 @@ def extract_oxe_actions(batch: Dict[str, Any]) -> torch.Tensor:
     if out.ndim != 2:
         raise ValueError(f"Expected action tensor [B, A], got {tuple(out.shape)}")
     return out
+
+
+def extract_oxe_initial_state(batch: Dict[str, Any]) -> torch.Tensor | None:
+    state = batch.get("initial_state")
+    if state is None:
+        return None
+
+    if torch.is_tensor(state):
+        out = state.to(torch.float32)
+    elif isinstance(state, list):
+        if not state:
+            return None
+        first = state[0]
+        if torch.is_tensor(first):
+            out = torch.stack([x.to(torch.float32) for x in state], dim=0)
+        else:
+            out = torch.as_tensor(state, dtype=torch.float32)
+    else:
+        out = torch.as_tensor(state, dtype=torch.float32)
+
+    if out.ndim != 2:
+        raise ValueError(f"Expected initial_state tensor [B, S], got {tuple(out.shape)}")
+    return out

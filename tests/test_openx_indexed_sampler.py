@@ -155,6 +155,33 @@ def test_sampler_fresh_per_draw_varies_t_on_repeated_episode_draws() -> None:
     assert len(set(t_values)) > 1
 
 
+def test_sampler_fresh_per_draw_uses_weighted_replacement_without_capacity_collapse() -> None:
+    index = _build_index(
+        steps_by_dataset=[[10, 10], [10, 10, 10, 10, 10, 10, 10, 10]],
+        dataset_weights=[0.99, 0.01],
+    )
+    sampler = OpenXLocalIndexedEpisodePairSampler(
+        index=index,
+        pairs_per_episode=1,
+        weights_by_size=False,
+        num_samples=1000,
+        seed=5,
+        epoch=0,
+        resample_each_epoch=True,
+        repeat_t_policy="fresh_per_draw",
+    )
+
+    samples = list(iter(sampler))
+    assert len(samples) == 1000
+
+    dataset_ids = index.episode_dataset_ids
+    per_dataset = Counter(int(dataset_ids[ep]) for ep, _ in samples)
+    # Replacement mode should follow configured weights instead of clipping to
+    # unique episode capacity (which would over-sample dataset 1 here).
+    assert per_dataset[0] > 900
+    assert per_dataset[1] < 100
+
+
 def test_sampler_cached_subset_keeps_t_fixed_on_repeated_episode_draws() -> None:
     index = _build_index(
         steps_by_dataset=[[10]],

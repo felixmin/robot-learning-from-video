@@ -352,6 +352,8 @@ def main(cfg: DictConfig):
 
         trust_remote_code = bool(OmegaConf.select(cfg, "model.vla.trust_remote_code") or False)
         use_gpu_preprocessing = bool(OmegaConf.select(cfg, "model.vla.use_gpu_preprocessing") or False)
+        freeze_vlm_cfg = OmegaConf.select(cfg, "model.vla.freeze_vlm")
+        freeze_vlm = True if freeze_vlm_cfg is None else bool(freeze_vlm_cfg)
         image_size_cfg = OmegaConf.select(cfg, "model.vla.image_size")
         image_size = tuple(image_size_cfg) if image_size_cfg else (384, 384)
         flow_cfg = OmegaConf.select(cfg, "model.flow")
@@ -362,26 +364,47 @@ def main(cfg: DictConfig):
         action_dim_cfg = OmegaConf.select(flow_cfg, "action_dim")
         action_dim = int(action_dim_cfg) if action_dim_cfg is not None else None
 
+        backend_kwargs = dict(
+            model_name=str(model_name),
+            latent_vector_dim=latent_vector_dim,
+            action_dim=action_dim,
+            freeze_vlm=freeze_vlm,
+            torch_dtype=dtype,
+            trust_remote_code=trust_remote_code,
+            chat=ChatConfig(system_prompt=cfg.model.chat.system_prompt),
+            action_tokens=action_cfg,
+            use_gpu_preprocessing=use_gpu_preprocessing,
+            image_size=image_size,
+            flow_hidden_dim=int(flow_cfg.flow_hidden_dim),
+            flow_steps=int(flow_cfg.flow_steps),
+            latent_loss_weight=float(flow_cfg.latent_loss_weight),
+            action_loss_weight=float(flow_cfg.action_loss_weight),
+            min_period=float(OmegaConf.select(flow_cfg, "min_period") or 4e-3),
+            max_period=float(OmegaConf.select(flow_cfg, "max_period") or 4.0),
+            time_beta_alpha=float(OmegaConf.select(flow_cfg, "time_beta_alpha") or 1.5),
+            time_beta_beta=float(OmegaConf.select(flow_cfg, "time_beta_beta") or 1.0),
+        )
+
+        optional_vla_overrides: dict[str, object] = {
+            "freeze_vision_encoder": OmegaConf.select(cfg, "model.vla.freeze_vision_encoder"),
+            "load_vlm_weights": OmegaConf.select(cfg, "model.vla.load_vlm_weights"),
+            "attention_mode": OmegaConf.select(cfg, "model.vla.attention_mode"),
+            "num_expert_layers": OmegaConf.select(cfg, "model.vla.num_expert_layers"),
+            "num_vlm_layers": OmegaConf.select(cfg, "model.vla.num_vlm_layers"),
+            "self_attn_every_n_layers": OmegaConf.select(cfg, "model.vla.self_attn_every_n_layers"),
+            "expert_width_multiplier": OmegaConf.select(cfg, "model.vla.expert_width_multiplier"),
+            "add_image_special_tokens": OmegaConf.select(cfg, "model.vla.add_image_special_tokens"),
+            "tokenizer_max_length": OmegaConf.select(cfg, "model.vla.tokenizer_max_length"),
+            "pad_language_to": OmegaConf.select(cfg, "model.vla.pad_language_to"),
+            "max_state_dim": OmegaConf.select(cfg, "model.vla.max_state_dim"),
+            "prefix_length": OmegaConf.select(cfg, "model.vla.prefix_length"),
+        }
+        for key, value in optional_vla_overrides.items():
+            if value is not None:
+                backend_kwargs[key] = value
+
         backend = SmolVLASharedBackend(
-            config=SmolVLASharedBackendConfig(
-                model_name=str(model_name),
-                latent_vector_dim=latent_vector_dim,
-                action_dim=action_dim,
-                torch_dtype=dtype,
-                trust_remote_code=trust_remote_code,
-                chat=ChatConfig(system_prompt=cfg.model.chat.system_prompt),
-                action_tokens=action_cfg,
-                use_gpu_preprocessing=use_gpu_preprocessing,
-                image_size=image_size,
-                flow_hidden_dim=int(flow_cfg.flow_hidden_dim),
-                flow_steps=int(flow_cfg.flow_steps),
-                latent_loss_weight=float(flow_cfg.latent_loss_weight),
-                action_loss_weight=float(flow_cfg.action_loss_weight),
-                min_period=float(OmegaConf.select(flow_cfg, "min_period") or 4e-3),
-                max_period=float(OmegaConf.select(flow_cfg, "max_period") or 4.0),
-                time_beta_alpha=float(OmegaConf.select(flow_cfg, "time_beta_alpha") or 1.5),
-                time_beta_beta=float(OmegaConf.select(flow_cfg, "time_beta_beta") or 1.0),
-            ),
+            config=SmolVLASharedBackendConfig(**backend_kwargs),
             frames_to_images=oxe_first_frames_to_pil,
         )
         try:

@@ -237,7 +237,7 @@ adapter:
     max_pairs: null
     seed: 42
     resample_each_epoch: true
-    steps_per_epoch: 5000
-    stopping_strategy: first_exhausted
+    steps_per_epoch: null
+    stopping_strategy: all_exhausted
     repeat_t_policy_train: fresh_per_draw
     repeat_t_policy_val: cached_subset
