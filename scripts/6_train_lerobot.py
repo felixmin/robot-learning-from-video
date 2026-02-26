@@ -147,7 +147,7 @@ def _install_editable_policy(
     )
 
 
-def _command_from_cfg(cfg: DictConfig) -> list[str]:
+def _lerobot_run_command_from_cfg(cfg: DictConfig) -> list[str]:
     train_cmd = str(OmegaConf.select(cfg, "lerobot.command") or "lerobot-train")
 
     policy_type = OmegaConf.select(cfg, "lerobot.policy_type")
@@ -292,7 +292,7 @@ def main(cfg: DictConfig) -> None:
             env=env,
         )
 
-    cmd = _command_from_cfg(cfg)
+    cmd = _lerobot_run_command_from_cfg(cfg)
     logger.info("Launching LeRobot command:")
     logger.info("  %s", shlex.join(cmd))
     subprocess.run(cmd, cwd=str(workspace_root), env=env, check=True)

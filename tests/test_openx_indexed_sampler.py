@@ -41,10 +41,10 @@ def _build_index(
     )
 
 
-def test_sampler_no_replacement_when_pairs_per_episode_is_one() -> None:
+def test_num_samples_defaults_to_total_episode_slots() -> None:
     index = _build_index(
         steps_by_dataset=[[6, 5, 4], [8, 7]],
-        dataset_weights=[0.95, 0.05],
+        dataset_weights=[0.5, 0.5],
     )
     sampler = OpenXLocalIndexedEpisodePairSampler(
         index=index,
@@ -55,64 +55,33 @@ def test_sampler_no_replacement_when_pairs_per_episode_is_one() -> None:
         epoch=0,
         resample_each_epoch=True,
     )
-
-    samples = list(iter(sampler))
-    assert len(samples) == len(sampler) == 5
-    assert len(set(samples)) == len(samples)
-
-    per_episode = Counter(ep for ep, _ in samples)
-    assert set(per_episode.values()) == {1}
+    assert len(sampler) == 5
 
 
-def test_sampler_redistributes_when_dataset_quota_exceeds_capacity() -> None:
+def test_pairs_per_episode_scales_cycle_length() -> None:
     index = _build_index(
-        steps_by_dataset=[[5, 5], [5, 5, 5, 5, 5, 5, 5, 5]],
-        dataset_weights=[0.99, 0.01],
-    )
-    sampler = OpenXLocalIndexedEpisodePairSampler(
-        index=index,
-        pairs_per_episode=1,
-        weights_by_size=False,
-        num_samples=10,
-        seed=7,
-        epoch=0,
-        resample_each_epoch=True,
-    )
-
-    samples = list(iter(sampler))
-    assert len(samples) == 10
-    assert len(set(samples)) == 10
-
-    dataset_ids = index.episode_dataset_ids
-    per_dataset = Counter(int(dataset_ids[ep]) for ep, _ in samples)
-    assert per_dataset[0] == 2
-    assert per_dataset[1] == 8
-
-
-def test_sampler_no_replacement_for_timesteps_within_episode() -> None:
-    index = _build_index(
-        steps_by_dataset=[[4]],
+        steps_by_dataset=[[10, 10, 10]],
         dataset_weights=[1.0],
     )
     sampler = OpenXLocalIndexedEpisodePairSampler(
         index=index,
-        pairs_per_episode=None,
+        pairs_per_episode=2,
         weights_by_size=False,
-        num_samples=4,
-        seed=11,
+        num_samples=None,
+        seed=7,
         epoch=0,
         resample_each_epoch=True,
     )
+    assert len(sampler) == 6
 
     samples = list(iter(sampler))
-    assert len(samples) == 4
-    assert len(set(samples)) == 4
-    assert {t for _, t in samples} == {0, 1, 2, 3}
+    per_episode = Counter(ep for ep, _ in samples)
+    assert sorted(per_episode.values()) == [2, 2, 2]
 
 
-def test_sampler_falls_back_to_replacement_only_after_unique_capacity() -> None:
+def test_cycle_rebuild_reuses_episodes_after_full_pass() -> None:
     index = _build_index(
-        steps_by_dataset=[[10, 10, 10]],
+        steps_by_dataset=[[20, 20, 20]],
         dataset_weights=[1.0],
     )
     sampler = OpenXLocalIndexedEpisodePairSampler(
@@ -120,189 +89,129 @@ def test_sampler_falls_back_to_replacement_only_after_unique_capacity() -> None:
         pairs_per_episode=1,
         weights_by_size=False,
         num_samples=7,
-        seed=5,
+        seed=3,
         epoch=0,
         resample_each_epoch=True,
     )
 
     samples = list(iter(sampler))
     assert len(samples) == 7
-    assert len(set(samples)) < len(samples)
-    assert len(set(samples)) <= 3
+
+    first_cycle_eps = [ep for ep, _ in samples[:3]]
+    assert len(set(first_cycle_eps)) == 3
+
+    per_episode = Counter(ep for ep, _ in samples)
+    assert max(per_episode.values()) - min(per_episode.values()) <= 1
 
 
-def test_sampler_fresh_per_draw_varies_t_on_repeated_episode_draws() -> None:
+def test_weighted_dataset_sampling_follows_configured_weights() -> None:
     index = _build_index(
-        steps_by_dataset=[[10]],
-        dataset_weights=[1.0],
+        steps_by_dataset=[[10, 10], [10] * 8],
+        dataset_weights=[0.9, 0.1],
     )
     sampler = OpenXLocalIndexedEpisodePairSampler(
         index=index,
         pairs_per_episode=1,
         weights_by_size=False,
-        num_samples=6,
+        num_samples=2000,
         seed=5,
         epoch=0,
         resample_each_epoch=True,
-        repeat_t_policy="fresh_per_draw",
     )
 
     samples = list(iter(sampler))
-    assert len(samples) == 6
-    assert all(ep == 0 for ep, _ in samples)
-
-    t_values = [int(t) for _, t in samples]
-    assert len(set(t_values)) > 1
-
-
-def test_sampler_fresh_per_draw_uses_weighted_replacement_without_capacity_collapse() -> None:
-    index = _build_index(
-        steps_by_dataset=[[10, 10], [10, 10, 10, 10, 10, 10, 10, 10]],
-        dataset_weights=[0.99, 0.01],
-    )
-    sampler = OpenXLocalIndexedEpisodePairSampler(
-        index=index,
-        pairs_per_episode=1,
-        weights_by_size=False,
-        num_samples=1000,
-        seed=5,
-        epoch=0,
-        resample_each_epoch=True,
-        repeat_t_policy="fresh_per_draw",
-    )
-
-    samples = list(iter(sampler))
-    assert len(samples) == 1000
-
     dataset_ids = index.episode_dataset_ids
     per_dataset = Counter(int(dataset_ids[ep]) for ep, _ in samples)
-    # Replacement mode should follow configured weights instead of clipping to
-    # unique episode capacity (which would over-sample dataset 1 here).
-    assert per_dataset[0] > 900
-    assert per_dataset[1] < 100
+    frac0 = per_dataset[0] / float(len(samples))
+    frac1 = per_dataset[1] / float(len(samples))
+    assert 0.84 <= frac0 <= 0.96
+    assert 0.04 <= frac1 <= 0.16
 
 
-def test_sampler_cached_subset_keeps_t_fixed_on_repeated_episode_draws() -> None:
+def test_repeated_episode_draws_vary_timesteps() -> None:
     index = _build_index(
-        steps_by_dataset=[[10]],
+        steps_by_dataset=[[100]],
         dataset_weights=[1.0],
     )
     sampler = OpenXLocalIndexedEpisodePairSampler(
         index=index,
         pairs_per_episode=1,
         weights_by_size=False,
-        num_samples=6,
-        seed=5,
+        num_samples=24,
+        seed=11,
         epoch=0,
         resample_each_epoch=True,
-        repeat_t_policy="cached_subset",
     )
 
     samples = list(iter(sampler))
-    assert len(samples) == 6
     assert all(ep == 0 for ep, _ in samples)
-
     t_values = [int(t) for _, t in samples]
-    assert len(set(t_values)) == 1
+    assert len(set(t_values)) >= 12
 
 
-def test_all_exhausted_epoch_length_matches_total_capacity() -> None:
+def test_sampler_is_deterministic_for_same_seed_and_epoch() -> None:
     index = _build_index(
-        steps_by_dataset=[[100] * 100, [1000] * 1000],
+        steps_by_dataset=[[12, 12, 12], [12, 12]],
+        dataset_weights=[0.6, 0.4],
+    )
+    sampler_a = OpenXLocalIndexedEpisodePairSampler(
+        index=index,
+        pairs_per_episode=1,
+        weights_by_size=False,
+        num_samples=40,
+        seed=99,
+        epoch=0,
+        resample_each_epoch=True,
+    )
+    sampler_b = OpenXLocalIndexedEpisodePairSampler(
+        index=index,
+        pairs_per_episode=1,
+        weights_by_size=False,
+        num_samples=40,
+        seed=99,
+        epoch=0,
+        resample_each_epoch=True,
+    )
+    assert list(iter(sampler_a)) == list(iter(sampler_b))
+
+
+def test_set_epoch_changes_sequence_when_resampling_enabled() -> None:
+    index = _build_index(
+        steps_by_dataset=[[12, 12, 12], [12, 12]],
         dataset_weights=[0.5, 0.5],
     )
     sampler = OpenXLocalIndexedEpisodePairSampler(
         index=index,
         pairs_per_episode=1,
         weights_by_size=False,
-        num_samples=None,
-        seed=0,
+        num_samples=40,
+        seed=21,
         epoch=0,
         resample_each_epoch=True,
-        stopping_strategy="all_exhausted",
     )
+    sampler.set_epoch(0)
+    seq0 = list(iter(sampler))
+    sampler.set_epoch(1)
+    seq1 = list(iter(sampler))
+    assert seq0 != seq1
 
-    assert len(sampler) == 1100
 
-
-def test_first_exhausted_epoch_length_uses_min_capacity_over_probability() -> None:
+def test_set_epoch_does_not_change_sequence_when_resampling_disabled() -> None:
     index = _build_index(
-        steps_by_dataset=[[100], [1000]],
+        steps_by_dataset=[[12, 12, 12], [12, 12]],
         dataset_weights=[0.5, 0.5],
     )
     sampler = OpenXLocalIndexedEpisodePairSampler(
         index=index,
         pairs_per_episode=1,
         weights_by_size=False,
-        num_samples=None,
-        seed=0,
+        num_samples=40,
+        seed=21,
         epoch=0,
-        resample_each_epoch=True,
-        stopping_strategy="first_exhausted",
+        resample_each_epoch=False,
     )
-
-    # capacities are [1, 1] because pairs_per_episode=1 and one episode per dataset.
-    # with probabilities [0.5, 0.5], epoch size is floor(min(capacity_i / p_i)) = 2.
-    assert len(sampler) == 2
-
-
-def test_first_exhausted_epoch_length_balances_before_small_dataset_exhausts() -> None:
-    index = _build_index(
-        steps_by_dataset=[[100] * 100, [1000] * 1000],
-        dataset_weights=[0.5, 0.5],
-    )
-    sampler = OpenXLocalIndexedEpisodePairSampler(
-        index=index,
-        pairs_per_episode=1,
-        weights_by_size=False,
-        num_samples=None,
-        seed=0,
-        epoch=0,
-        resample_each_epoch=True,
-        stopping_strategy="first_exhausted",
-    )
-    assert len(sampler) == 200
-
-
-def test_sampler_rejects_unknown_stopping_strategy() -> None:
-    index = _build_index(
-        steps_by_dataset=[[4]],
-        dataset_weights=[1.0],
-    )
-    try:
-        OpenXLocalIndexedEpisodePairSampler(
-            index=index,
-            pairs_per_episode=1,
-            weights_by_size=False,
-            num_samples=None,
-            seed=0,
-            epoch=0,
-            resample_each_epoch=True,
-            stopping_strategy="bad_value",
-        )
-    except ValueError as exc:
-        assert "stopping_strategy" in str(exc)
-    else:
-        raise AssertionError("Expected ValueError for unknown stopping_strategy")
-
-
-def test_sampler_rejects_unknown_repeat_t_policy() -> None:
-    index = _build_index(
-        steps_by_dataset=[[4]],
-        dataset_weights=[1.0],
-    )
-    try:
-        OpenXLocalIndexedEpisodePairSampler(
-            index=index,
-            pairs_per_episode=1,
-            weights_by_size=False,
-            num_samples=None,
-            seed=0,
-            epoch=0,
-            resample_each_epoch=True,
-            repeat_t_policy="bad_policy",
-        )
-    except ValueError as exc:
-        assert "repeat_t_policy" in str(exc)
-    else:
-        raise AssertionError("Expected ValueError for unknown repeat_t_policy")
+    sampler.set_epoch(0)
+    seq0 = list(iter(sampler))
+    sampler.set_epoch(1)
+    seq1 = list(iter(sampler))
+    assert seq0 == seq1

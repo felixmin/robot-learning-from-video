@@ -33,23 +33,12 @@ from foundation.action_tokens import ActionTokenConfig
 from foundation.callbacks import (
     ThroughputLoggingCallback,
     ThroughputLoggingConfig,
+    VLALatentFlowDecodeVizConfig,
+    VLALatentFlowDecodeVisualizationCallback,
     VLATrainSampleVizConfig,
     VLATrainSampleVisualizationCallback,
     VLASampleVizConfig,
     VLASampleVisualizationCallback,
-)
-from foundation.backends.interfaces import BackendMode
-from foundation.image_adapters import oxe_first_frames_to_pil
-# Legacy backends kept for migration/reference.
-from foundation.legacy.backends.qwen3vl_chat_backend import (
-    Qwen3VLChatActionTokenBackend,
-    Qwen3VLChatBackendConfig,
-)
-from foundation.legacy.backends.smol_latent_head_backend import (
-    SmolFlowActionBackend,
-    SmolFlowActionBackendConfig,
-    SmolLatentHeadBackend,
-    SmolLatentHeadBackendConfig,
 )
 from foundation.backends.smolvla_shared.artifact import (
     SMOLVLA_SHARED_ARTIFACT_FILENAME,
@@ -182,27 +171,15 @@ def main(cfg: DictConfig):
     laq_provider = LAQTaskCodeProvider(encoder_vq)
 
     backend_type = OmegaConf.select(cfg, "model.backend")
-    if not backend_type:
-        raise ValueError("Set `model.backend` (e.g., 'smolvla_shared').")
     backend_type = str(backend_type)
+
     backend_mode_raw = OmegaConf.select(cfg, "model.training_mode")
-    if not backend_mode_raw:
-        raise ValueError("Set `model.training_mode` to one of: codes, latent_flow, actions, multitask.")
-    try:
-        backend_mode = BackendMode(str(backend_mode_raw))
-    except ValueError as exc:
-        raise ValueError(
-            f"Unknown model.training_mode={backend_mode_raw!r}. Use one of: codes, latent_flow, actions, multitask."
-        ) from exc
+    backend_mode = BackendMode(str(backend_mode_raw))
 
     model_name = cfg.model.vla.model_name
+
     torch_dtype = str(cfg.model.vla.torch_dtype).lower()
     dtype_map = {"bf16": torch.bfloat16, "fp16": torch.float16, "fp32": torch.float32}
-    if torch_dtype not in dtype_map:
-        raise ValueError(
-            f"Unknown model.vla.torch_dtype={torch_dtype!r}. "
-            f"Supported: {sorted(dtype_map.keys())}"
-        )
     dtype = dtype_map[torch_dtype]
 
     action_cfg = ActionTokenConfig(
@@ -210,141 +187,7 @@ def main(cfg: DictConfig):
     )
 
     action_token_ids = None
-    if backend_type == "qwen3vl_chat_tokens":
-        if backend_mode is not BackendMode.CODES:
-            raise ValueError("qwen3vl_chat_tokens backend currently supports only model.training_mode=codes")
-        from transformers import Qwen3VLForConditionalGeneration, Qwen3VLProcessor
-
-        vla_model = Qwen3VLForConditionalGeneration.from_pretrained(
-            model_name,
-            torch_dtype=dtype,
-            attn_implementation=cfg.model.vla.attn_implementation,
-        )
-        vla_model.train()
-        processor = Qwen3VLProcessor.from_pretrained(model_name)
-
-        backend = Qwen3VLChatActionTokenBackend(
-            config=Qwen3VLChatBackendConfig(
-                model_name=str(model_name),
-                torch_dtype=dtype,
-                attn_implementation=cfg.model.vla.attn_implementation,
-                chat=ChatConfig(system_prompt=cfg.model.chat.system_prompt),
-                action_tokens=action_cfg,
-            ),
-            vla_model=vla_model,
-            processor=processor,
-            frames_to_images=oxe_first_frames_to_pil,
-        )
-        backend.setup(device=torch.device("cpu"))
-        action_token_ids = backend.action_token_ids
-
-        code_ids = list(action_token_ids.action_code_ids)
-        if len(set(code_ids)) != len(code_ids):
-            raise RuntimeError(
-                "Action code token ids are not unique. "
-                "This typically means the action tokens were not properly added to the tokenizer. "
-                f"code_ids={code_ids}"
-            )
-        between_ids = list(action_token_ids.between_token_ids)
-        if not between_ids:
-            raise RuntimeError(
-                "between_token_ids is empty. Constrained decoding must allow separator tokens "
-                "to match the supervised target format."
-            )
-        if any(int(t) in set(code_ids) for t in between_ids):
-            raise RuntimeError(
-                "One or more between_token_ids overlaps with an action code token id; "
-                "this will confuse constrained decoding. "
-                f"between_token_ids={between_ids} code_ids={code_ids}"
-            )
-        if action_token_ids.action_start_id in code_ids or action_token_ids.action_end_id in code_ids:
-            raise RuntimeError(
-                "Action wrapper token id overlaps with an action code token id. "
-                f"start_id={action_token_ids.action_start_id} end_id={action_token_ids.action_end_id} code_ids={code_ids}"
-            )
-        if action_token_ids.action_start_id in between_ids or action_token_ids.action_end_id in between_ids:
-            raise RuntimeError(
-                "between_token_ids overlaps with an action wrapper token id; "
-                f"start_id={action_token_ids.action_start_id} end_id={action_token_ids.action_end_id} between_token_ids={between_ids}"
-            )
-        unk_id = getattr(processor.tokenizer, "unk_token_id", None)
-        if unk_id is not None and unk_id in code_ids:
-            raise RuntimeError(
-                "One or more action code tokens mapped to unk_token_id; tokenization will be broken. "
-                f"unk_token_id={unk_id} code_ids={code_ids}"
-            )
-        pad_id = getattr(processor.tokenizer, "pad_token_id", None)
-        if pad_id is not None and int(pad_id) in code_ids:
-            raise RuntimeError(
-                "pad_token_id overlaps with an action code token id; this will break decoding/parsing. "
-                f"pad_token_id={int(pad_id)} code_ids={code_ids}"
-            )
-
-    elif backend_type == "smol_latent_head":
-        if backend_mode is not BackendMode.CODES:
-            raise ValueError("smol_latent_head backend currently supports only model.training_mode=codes")
-        trust_remote_code = bool(OmegaConf.select(cfg, "model.vla.trust_remote_code") or False)
-        use_gpu_preprocessing = bool(OmegaConf.select(cfg, "model.vla.use_gpu_preprocessing") or False)
-        image_size_cfg = OmegaConf.select(cfg, "model.vla.image_size")
-        image_size = tuple(image_size_cfg) if image_size_cfg else (384, 384)
-        backend = SmolLatentHeadBackend(
-            config=SmolLatentHeadBackendConfig(
-                model_name=str(model_name),
-                torch_dtype=dtype,
-                trust_remote_code=trust_remote_code,
-                chat=ChatConfig(system_prompt=cfg.model.chat.system_prompt),
-                action_tokens=action_cfg,
-                use_gpu_preprocessing=use_gpu_preprocessing,
-                image_size=image_size,
-            ),
-            frames_to_images=oxe_first_frames_to_pil,
-        )
-        try:
-            backend.setup(device=torch.device("cpu"))
-        except Exception as exc:
-            help_msg = hf_download_help_message(exc=exc)
-            if help_msg:
-                logger.error(help_msg)
-            raise
-    elif backend_type == "smol_flow_action":
-        if backend_mode not in (BackendMode.MULTITASK, BackendMode.ACTIONS):
-            raise ValueError("smol_flow_action backend supports model.training_mode in {actions, multitask}")
-
-        trust_remote_code = bool(OmegaConf.select(cfg, "model.vla.trust_remote_code") or False)
-        use_gpu_preprocessing = bool(OmegaConf.select(cfg, "model.vla.use_gpu_preprocessing") or False)
-        image_size_cfg = OmegaConf.select(cfg, "model.vla.image_size")
-        image_size = tuple(image_size_cfg) if image_size_cfg else (384, 384)
-        flow_cfg = OmegaConf.select(cfg, "model.flow")
-        if flow_cfg is None:
-            raise ValueError("Missing model.flow config for smol_flow_action backend")
-
-        latent_vector_dim = int(laq_provider.code_seq_len * laq_provider.codebook_dim)
-        backend = SmolFlowActionBackend(
-            config=SmolFlowActionBackendConfig(
-                model_name=str(model_name),
-                latent_vector_dim=latent_vector_dim,
-                action_dim=int(flow_cfg.action_dim),
-                torch_dtype=dtype,
-                trust_remote_code=trust_remote_code,
-                chat=ChatConfig(system_prompt=cfg.model.chat.system_prompt),
-                action_tokens=action_cfg,
-                use_gpu_preprocessing=use_gpu_preprocessing,
-                image_size=image_size,
-                flow_hidden_dim=int(flow_cfg.flow_hidden_dim),
-                flow_steps=int(flow_cfg.flow_steps),
-                latent_loss_weight=float(flow_cfg.latent_loss_weight),
-                action_loss_weight=float(flow_cfg.action_loss_weight),
-            ),
-            frames_to_images=oxe_first_frames_to_pil,
-        )
-        try:
-            backend.setup(device=torch.device("cpu"))
-        except Exception as exc:
-            help_msg = hf_download_help_message(exc=exc)
-            if help_msg:
-                logger.error(help_msg)
-            raise
-    elif backend_type == "smolvla_shared":
+    if backend_type == "smolvla_shared":
         if backend_mode not in (BackendMode.LATENT_FLOW, BackendMode.ACTIONS, BackendMode.MULTITASK):
             raise ValueError(
                 "smolvla_shared backend supports model.training_mode in {latent_flow, actions, multitask}"
@@ -466,6 +309,19 @@ def main(cfg: DictConfig):
                 )
             )
         )
+        flow_viz_cfg = OmegaConf.select(viz_cfg, "flow_decode")
+        if flow_viz_cfg and bool(flow_viz_cfg.enabled):
+            callbacks.append(
+                VLALatentFlowDecodeVisualizationCallback(
+                    laq_checkpoint_path=str(laq_ckpt),
+                    cfg=VLALatentFlowDecodeVizConfig(
+                        enabled=True,
+                        num_samples=int(flow_viz_cfg.num_samples),
+                        every_n_val=int(flow_viz_cfg.every_n_val),
+                        max_decode_batch_size=int(flow_viz_cfg.max_decode_batch_size),
+                    ),
+                )
+            )
     train_viz_cfg = cfg.training.train_visualization
     if train_viz_cfg and bool(train_viz_cfg.enabled):
         callbacks.append(

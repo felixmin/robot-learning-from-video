@@ -2,17 +2,38 @@
 
 defaults:
   - /model@model: foundation_smol_flow_shared
-  - /data@data: oxe_local_indexed
+  - /data@data: octo_dataset
   - /training@training: vla_lightning
   - /cluster@cluster: local_dev
   - optional /user_config: local
 
 experiment:
-  name: vla_smol_flow_shared
+  name: latent_smolvla
   description: "SmolVLM shared trunk with SmolVLA-style latent flow pretraining (Stage 2)"
 
 submit:
   script: 4_train_foundation
 
+data:
+  loader:
+    batch_size: 128
+  adapter:
+    openx_local:
+      auto_discover: false
+
+training:
+  max_steps: 200000
+  max_epochs: 1000
+  accumulate_grad_batches: 2
+  validation:
+    check_interval: 1000
+  checkpoint:
+    every_n_train_steps: 1000
+  train_visualization:
+    every_n_steps: 1000
+  profiler:
+    enabled: false
+
 logging:
+  use_wandb: true
   tags: ["foundation", "smol", "flow", "latent"]

@@ -1,0 +1,78 @@
+# @package _global_
+
+# Stage 3: Libero training with HLRP latent SmolVLA policy.
+# Mirrors the official LeRobot SmolVLA Libero recipe and swaps:
+# - policy.type -> hlrp_smolvla_shared
+# - pretrained init -> Stage-2 artifact handoff
+
+defaults:
+  - /cluster@cluster: local_dev
+  - optional /user_config: local
+
+experiment:
+  name: lerobot_hlrp_smolvla_shared_libero
+  description: "Stage 3 Libero train (HLRP latent SmolVLA from Stage-2 artifact)"
+
+submit:
+  script: 6_train_lerobot
+
+logging:
+  use_wandb: true
+  tags: ["stage3", "lerobot", "libero", "hlrp-policy", "smolvla"]
+
+lerobot:
+  command: lerobot-train
+  install_policy_editable: null
+
+  policy_type: hlrp_smolvla_shared
+  policy_repo_id: felixmin/hlrp_smolvla_shared_libero
+  policy_device: cuda
+  push_to_hub: false
+  wandb_enable: true
+
+  # Required: Stage-2 handoff artifact path.
+  stage2_artifact: null
+
+  dataset_repo_id: HuggingFaceVLA/libero
+  dataset_episodes: null
+
+  env_type: libero
+  env_task: libero_10
+  output_dir: ${logging.runs_dir}/lerobot_smolvla_shared_libero
+  job_name: ${experiment.name}
+
+  # Mirrors the SmolVLA Libero training recipe.
+  steps: 100000
+  batch_size: 64
+  num_workers: 4
+  eval_freq: 20000
+  eval_batch_size: 2
+  log_freq: 200
+  save_freq: 20000
+
+  env:
+    MUJOCO_GL: egl
+    HF_HOME: /mnt/data/tmp/hf
+    HF_HUB_CACHE: /mnt/data/tmp/hf/hub
+    HF_DATASETS_CACHE: /mnt/data/tmp/hf/datasets
+
+  # Keep the local pre-downloaded LIBERO snapshot and match SmolVLA recipe flags.
+  extra_args:
+    - --dataset.root=/mnt/data/workspace/hflibero/datasets--HuggingFaceVLA--libero/snapshots/86958911c0f959db2bbbdb107eb3e17c5f9c798e
+    - --policy.image_size=[512,512]
+    - --policy.latent_vector_dim=32
+    - --policy.flow_steps=10
+    - --dataset.use_imagenet_stats=false
+    - --policy.n_action_steps=50
+    - --optimizer.type=adamw
+    - --optimizer.betas=[0.9,0.95]
+    - --scheduler.type=cosine_decay_with_warmup
+    - --scheduler.num_warmup_steps=100
+    - --scheduler.num_decay_steps=99900
+    - --scheduler.peak_lr=1e-4
+    - --scheduler.decay_lr=2.5e-6
+    - --eval.n_episodes=10
+    - --dataset.video_backend=pyav
+    - --env.observation_height=512
+    - --env.observation_width=512
+    - --use_policy_training_preset=false

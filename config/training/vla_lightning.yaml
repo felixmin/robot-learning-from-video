@@ -1,8 +1,8 @@
 # Stage 2 (Foundation) Lightning training settings (non-debug defaults).
 
 max_steps: 200000
-max_epochs: 1
-accumulate_grad_batches: 1
+max_epochs: 1000
+accumulate_grad_batches: 2
 precision: bf16-mixed
 gradient_clip_val: 1.0
 log_every_n_steps: 10
@@ -25,6 +25,11 @@ validation:
     every_n_val: 1
     include_freeform_pred: false
     freeform_max_new_tokens: 32
+    flow_decode:
+      enabled: true
+      num_samples: 4
+      every_n_val: 1
+      max_decode_batch_size: 2
 
 train_visualization:
   enabled: true
@@ -68,7 +73,7 @@ overfit_batches: null
 limit_train_batches: null
 
 profiler:
-  enabled: true
+  enabled: false
   type: advanced
   dirpath: ./profiles
   filename: profile

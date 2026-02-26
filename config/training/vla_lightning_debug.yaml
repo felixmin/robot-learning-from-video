@@ -27,6 +27,11 @@ validation:
     every_n_val: 1
     include_freeform_pred: false
     freeform_max_new_tokens: 32
+    flow_decode:
+      enabled: true
+      num_samples: 4
+      every_n_val: 1
+      max_decode_batch_size: 2
 
 # Save a few training samples (image + instruction + GT/pred tokens).
 train_visualization:

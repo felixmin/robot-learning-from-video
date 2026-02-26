@@ -31,7 +31,7 @@ adapter:
     mode: indexed_full
     # <=0 means "all available shards"
     max_shards_per_dataset: 0
-    # <=0 means "all valid pairs per episode"
+    # Number of draws per episode per cycle before reshuffling episode order.
     pairs_per_episode: 1
     # <=0 means auto (all CPUs)
     index_workers: 0
@@ -55,9 +55,3 @@ adapter:
     seed: 42
     resample_each_epoch: true
     steps_per_epoch: 5000
-    # all_exhausted consumes full split; first_exhausted stops when one source ends
-    stopping_strategy: first_exhausted
-    # Train: vary t across repeated episode draws in replacement mode.
-    repeat_t_policy_train: fresh_per_draw
-    # Val: keep stable subset mapping for repeatability.
-    repeat_t_policy_val: cached_subset

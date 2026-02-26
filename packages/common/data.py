@@ -137,9 +137,6 @@ class OpenXLocalDataModule(pl.LightningDataModule):
         auto_weight = float(local_cfg["auto_weight"])
         seed = int(local_cfg["seed"])
         resample_each_epoch = bool(local_cfg["resample_each_epoch"])
-        stopping_strategy = str(local_cfg["stopping_strategy"])
-        repeat_t_policy_train = str(local_cfg["repeat_t_policy_train"])
-        repeat_t_policy_val = str(local_cfg["repeat_t_policy_val"])
         steps_per_epoch = local_cfg["steps_per_epoch"]
         if steps_per_epoch is not None and int(steps_per_epoch) <= 0:
             raise ValueError(
@@ -249,8 +246,6 @@ class OpenXLocalDataModule(pl.LightningDataModule):
             seed=seed,
             epoch=0,
             resample_each_epoch=resample_each_epoch,
-            stopping_strategy=stopping_strategy,
-            repeat_t_policy=repeat_t_policy_train,
         )
         self.val_sampler = OpenXLocalIndexedEpisodePairSampler(
             index=val_index,
@@ -260,8 +255,6 @@ class OpenXLocalDataModule(pl.LightningDataModule):
             seed=seed + 1,
             epoch=0,
             resample_each_epoch=False,
-            stopping_strategy=stopping_strategy,
-            repeat_t_policy=repeat_t_policy_val,
         )
 
         dataset_names = [d["name"] for d in self._resolved_datasets]
