@@ -17,6 +17,7 @@ import lightning.pytorch as pl
 import torch
 
 from foundation.backends.interfaces import BackendMode, FoundationBatch, VLABackend
+from foundation.backends.smolvla_shared.input_transform import normalize_vector_mean_std
 from foundation.constrained_decode import ActionTokenIds
 from foundation.online_laq import (
     LatentCodeProvider,
@@ -48,6 +49,7 @@ class VLATokenBackendLightningModule(pl.LightningModule):
         backend: VLABackend,
         code_provider: LatentCodeProvider,
         backend_mode: BackendMode = BackendMode.CODES,
+        normalization_stats: dict[str, dict[str, Any]] | None = None,
         optimizer: VLAOptimizerConfig | None = None,
         action_token_ids: ActionTokenIds | None = None,
         train_teacher_forced_metrics_every_n_steps: int | None = None,
@@ -56,6 +58,7 @@ class VLATokenBackendLightningModule(pl.LightningModule):
         self.backend = backend  # should be an nn.Module so Lightning can optimize it
         self.code_provider = code_provider
         self.backend_mode = backend_mode
+        self.normalization_stats = normalization_stats
         self.optimizer_cfg = optimizer or VLAOptimizerConfig()
         self.action_token_ids = action_token_ids
         self.train_teacher_forced_metrics_every_n_steps = train_teacher_forced_metrics_every_n_steps
@@ -107,6 +110,30 @@ class VLATokenBackendLightningModule(pl.LightningModule):
                 out.append("_")
         suffix = "".join(out).strip("_")
         return suffix or "unknown"
+
+    @staticmethod
+    def _extract_policy_image_streams(frames: torch.Tensor) -> dict[str, torch.Tensor]:
+        if frames.ndim != 5:
+            raise ValueError(f"Expected OXE frames tensor [B,T,...], got shape {tuple(frames.shape)}")
+        if frames.shape[-1] == 3:
+            return {"observation.images.rgb": frames[:, 0, ...]}
+        if frames.shape[2] == 3:
+            return {"observation.images.rgb": frames[:, 0, ...]}
+        if frames.shape[1] == 3:
+            return {"observation.images.rgb": frames[:, :, 0, ...]}
+        raise ValueError(
+            "Unrecognized frames layout; expected last dim=3 (BTHWC), shape[2]=3 (BTCHW), "
+            f"or shape[1]=3 (BCTHW). Got {tuple(frames.shape)}"
+        )
+
+    @staticmethod
+    def _extract_policy_image_padding_masks(
+        image_streams: dict[str, torch.Tensor],
+    ) -> dict[str, torch.Tensor]:
+        masks: dict[str, torch.Tensor] = {}
+        for key, stream in image_streams.items():
+            masks[key] = torch.ones((int(stream.shape[0]),), dtype=torch.bool, device=stream.device)
+        return masks
 
     def _log_vector_stats(self, *, prefix: str, pred: torch.Tensor, gt: torch.Tensor) -> dict[str, float]:
         if pred.shape != gt.shape or pred.numel() == 0:
@@ -162,8 +189,20 @@ class VLATokenBackendLightningModule(pl.LightningModule):
             self.log(f"val/{key}", float(value), prog_bar=False, sync_dist=True)
 
         if batch_idx == 0:
+            image_streams = self._extract_policy_image_streams(frames)
+            state = extract_oxe_initial_state({"initial_state": batch["initial_state"]})
+            state = normalize_vector_mean_std(
+                value=state,
+                stats=self.normalization_stats,
+                key_candidates=["observation.state", "initial_state", "state"],
+            )
             latent = self.backend.latent_from_batch(
-                FoundationBatch(frames=frames, instructions=instructions),
+                FoundationBatch(
+                    image_streams=image_streams,
+                    image_padding_masks=self._extract_policy_image_padding_masks(image_streams),
+                    task_text=instructions,
+                    state=state,
+                ),
                 mode=self.backend_mode,
             )
             pred = latent.tokens
@@ -330,9 +369,10 @@ class VLATokenBackendLightningModule(pl.LightningModule):
         instructions = extract_oxe_language(batch)
         video = oxe_frames_to_laq_video(frames)
         actions: torch.Tensor | None = None
+        action_is_pad: torch.Tensor | None = None
         codes: torch.Tensor | None = None
         vectors: torch.Tensor | None = None
-        state = extract_oxe_initial_state(batch)
+        state = extract_oxe_initial_state({"initial_state": batch["initial_state"]})
 
         if self.backend_mode is BackendMode.CODES:
             codes = self.code_provider.codes_from_video(video).to(torch.long).detach().cpu()
@@ -345,18 +385,36 @@ class VLATokenBackendLightningModule(pl.LightningModule):
             codes = codes.to(torch.long).detach().cpu()
             vectors = vectors.detach().cpu()
             actions = extract_oxe_actions(batch).detach().cpu()
+            action_is_pad = batch["action_is_pad"]
         elif self.backend_mode is BackendMode.ACTIONS:
             actions = extract_oxe_actions(batch).detach().cpu()
+            action_is_pad = batch["action_is_pad"]
         else:
             raise NotImplementedError(f"Unsupported backend mode: {self.backend_mode}")
 
+        state = normalize_vector_mean_std(
+            value=state,
+            stats=self.normalization_stats,
+            key_candidates=["observation.state", "initial_state", "state"],
+        )
+        if actions is not None:
+            actions = normalize_vector_mean_std(
+                value=actions,
+                stats=self.normalization_stats,
+                key_candidates=["action", "ACTION"],
+            )
+
+        image_streams = self._extract_policy_image_streams(frames)
+
         out = self.backend.loss_from_batch(
             FoundationBatch(
-                frames=frames,
-                instructions=instructions,
+                image_streams=image_streams,
+                image_padding_masks=self._extract_policy_image_padding_masks(image_streams),
+                task_text=instructions,
                 target_codes=codes,
                 target_latent_vectors=vectors,
                 target_actions=actions,
+                action_is_pad=action_is_pad,
                 state=state,
             ),
             mode=self.backend_mode,

@@ -111,6 +111,7 @@ def _make_backend() -> SmolVLASharedBackend:
             model_name="dummy",
             latent_vector_dim=8,
             action_dim=3,
+            action_chunk_size=50,
             torch_dtype=torch.float32,
             trust_remote_code=False,
             chat=ChatConfig(system_prompt="sys"),
@@ -130,10 +131,16 @@ def _make_backend() -> SmolVLASharedBackend:
 
 def _make_batch() -> FoundationBatch:
     return FoundationBatch(
-        frames=torch.randint(0, 256, (2, 2, 16, 16, 3), dtype=torch.uint8),
-        instructions=["pick", "place"],
+        image_streams={
+            "observation.images.rgb": torch.randint(0, 256, (2, 2, 16, 16, 3), dtype=torch.uint8),
+        },
+        image_padding_masks={
+            "observation.images.rgb": torch.ones((2, 2), dtype=torch.bool),
+        },
+        task_text=["pick", "place"],
         target_latent_vectors=torch.randn(2, 4, 2),
-        target_actions=torch.randn(2, 3),
+        target_actions=torch.randn(2, 50, 3),
+        action_is_pad=torch.zeros((2, 50), dtype=torch.bool),
         state=torch.randn(2, 2),
     )
 
@@ -181,3 +188,46 @@ def test_smolvla_shared_backend_freezes_vlm_by_default() -> None:
 
     backend.train()
     assert backend.core.vlm.training is False
+
+
+def test_action_flow_loss_mean_uses_global_masked_mean() -> None:
+    backend = _make_backend()
+    backend.setup(device=torch.device("cpu"))
+
+    b, t, a = 2, 50, 3
+    target_actions = torch.zeros((b, t, a), dtype=torch.float32)
+    target_actions[0] = 1.0
+    target_actions[1] = 2.0
+    mask = torch.zeros((b, t), dtype=torch.bool)
+    mask[0, 1:] = True  # sample 0: only 1 valid step; sample 1: all 50 valid steps
+
+    batch = FoundationBatch(
+        image_streams={"observation.images.rgb": torch.randint(0, 256, (b, 2, 16, 16, 3), dtype=torch.uint8)},
+        image_padding_masks={"observation.images.rgb": torch.ones((b, 2), dtype=torch.bool)},
+        task_text=["pick", "place"],
+        state=torch.randn(b, 2),
+        action_is_pad=mask,
+    )
+
+    noise = torch.randn_like(target_actions)
+    time = torch.full((b,), 0.3, dtype=torch.float32)
+    per_sample = backend.core.action_flow_loss(
+        batch=batch,
+        target_actions=target_actions,
+        action_is_pad=mask,
+        noise=noise,
+        time=time,
+        reduction="none",
+    )
+    mean_loss = backend.core.action_flow_loss(
+        batch=batch,
+        target_actions=target_actions,
+        action_is_pad=mask,
+        noise=noise,
+        time=time,
+        reduction="mean",
+    )
+
+    valid_counts = (~mask).sum(dim=1).to(dtype=per_sample.dtype) * a
+    expected = (per_sample * valid_counts).sum() / valid_counts.sum()
+    assert torch.allclose(mean_loss, expected, atol=1e-6)

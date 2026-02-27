@@ -10,19 +10,29 @@ import torch
 @dataclass(frozen=True)
 class FoundationBatch:
     """
-    Minimal common batch shape for Stage 2.
+    Shared batch schema for Stage 2 and Stage 3.
 
-    - `frames` is expected to include the frame sequence used by the LAQ teacher
-      (today typically a pair t,t+Δ; future may use T>2).
-    - Device expectation: frames live on CPU (uint8) because many processors
-      require PIL/NumPy conversion.
+    Canonical fields:
+    - `image_streams`: mapping camera_key -> image tensor.
+    - `task_text` or pretokenized language fields.
+    - `state`.
+    - optional supervision targets (`target_latent_vectors`, `target_actions`)
+      and optional action padding mask (`action_is_pad`).
     """
 
-    frames: torch.Tensor
-    instructions: Sequence[str]
+    # Canonical multimodal inputs.
+    image_streams: dict[str, torch.Tensor] | None = None
+    image_padding_masks: dict[str, torch.Tensor] | None = None
+    task_text: Sequence[str] | None = None
+    subtask_text: Sequence[str] | None = None
+    language_tokens: torch.Tensor | None = None  # [B, L] long
+    language_attention_mask: torch.Tensor | None = None  # [B, L] bool
+
+    # Optional supervision and state.
     target_codes: torch.Tensor | None = None  # [B, S] long (optional)
     target_latent_vectors: torch.Tensor | None = None  # [B, S, D] or [B, D] (optional)
-    target_actions: torch.Tensor | None = None  # [B, A] float (optional)
+    target_actions: torch.Tensor | None = None  # [B, A] or [B, T, A] float (optional)
+    action_is_pad: torch.Tensor | None = None  # [B, T] bool (optional)
     state: torch.Tensor | None = None  # [B, S_state] or [B, T, S_state] (optional)
     meta: dict[str, Any] | None = None
 

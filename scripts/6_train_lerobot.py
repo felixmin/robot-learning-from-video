@@ -148,10 +148,11 @@ def _install_editable_policy(
 
 
 def _lerobot_run_command_from_cfg(cfg: DictConfig) -> list[str]:
-    train_cmd = str(OmegaConf.select(cfg, "lerobot.command") or "lerobot-train")
+    train_cmd_raw = OmegaConf.select(cfg, "lerobot.command")
 
     policy_type = OmegaConf.select(cfg, "lerobot.policy_type")
     policy_repo_id = OmegaConf.select(cfg, "lerobot.policy_repo_id")
+    init_mode = OmegaConf.select(cfg, "lerobot.init_mode")
     dataset_repo_id = OmegaConf.select(cfg, "lerobot.dataset_repo_id")
     output_dir = OmegaConf.select(cfg, "lerobot.output_dir")
     job_name = OmegaConf.select(cfg, "lerobot.job_name")
@@ -162,8 +163,10 @@ def _lerobot_run_command_from_cfg(cfg: DictConfig) -> list[str]:
     eval_batch_size = OmegaConf.select(cfg, "lerobot.eval_batch_size")
     log_freq = OmegaConf.select(cfg, "lerobot.log_freq")
     save_freq = OmegaConf.select(cfg, "lerobot.save_freq")
+    stage2_artifact = OmegaConf.select(cfg, "lerobot.stage2_artifact")
 
     required = {
+        "lerobot.command": train_cmd_raw,
         "lerobot.policy_type": policy_type,
         "lerobot.policy_repo_id": policy_repo_id,
         "lerobot.dataset_repo_id": dataset_repo_id,
@@ -179,6 +182,9 @@ def _lerobot_run_command_from_cfg(cfg: DictConfig) -> list[str]:
     missing = [k for k, v in required.items() if v is None]
     if missing:
         raise ValueError(f"Missing required lerobot config keys: {missing}")
+    if not isinstance(train_cmd_raw, str) or not train_cmd_raw.strip():
+        raise ValueError("lerobot.command must be a non-empty string")
+    train_cmd = train_cmd_raw
 
     cmd = [
         train_cmd,
@@ -197,16 +203,27 @@ def _lerobot_run_command_from_cfg(cfg: DictConfig) -> list[str]:
         f"--wandb.enable={_to_bool_flag(OmegaConf.select(cfg, 'lerobot.wandb_enable') is True)}",
     ]
 
+    if str(policy_type) == "hlrp_smolvla_shared":
+        if init_mode is None:
+            raise ValueError("lerobot.init_mode is required for policy_type=hlrp_smolvla_shared")
+        cmd.append(f"--policy.init_mode={init_mode}")
+        if str(init_mode) == "artifact":
+            if stage2_artifact is None:
+                raise ValueError("lerobot.stage2_artifact is required when lerobot.init_mode=artifact")
+            cmd.append(f"--policy.stage2_artifact={stage2_artifact}")
+        elif str(init_mode) == "scratch":
+            if stage2_artifact is not None:
+                raise ValueError("lerobot.stage2_artifact must be null when lerobot.init_mode=scratch")
+            cmd.append("--policy.stage2_artifact=null")
+        else:
+            raise ValueError(f"Unsupported lerobot.init_mode={init_mode!r}; expected 'artifact' or 'scratch'")
+
     if eval_batch_size is not None:
         cmd.append(f"--eval.batch_size={int(eval_batch_size)}")
 
     policy_device = OmegaConf.select(cfg, "lerobot.policy_device")
     if policy_device is not None:
         cmd.append(f"--policy.device={policy_device}")
-
-    stage2_artifact = OmegaConf.select(cfg, "lerobot.stage2_artifact")
-    if stage2_artifact:
-        cmd.append(f"--policy.stage2_artifact={stage2_artifact}")
 
     episodes = _episodes_arg(OmegaConf.select(cfg, "lerobot.dataset_episodes"))
     if episodes is not None:

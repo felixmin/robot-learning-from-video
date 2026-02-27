@@ -38,7 +38,7 @@ class TestExperimentConfigs:
                 config_name="config", overrides=["experiment=vla_smol_flow_shared"]
             )
 
-            assert cfg.experiment.name == "vla_smol_flow_shared"
+            assert cfg.experiment.name == "latent_smolvla"
             assert cfg.model.training_mode == "latent_flow"
             assert cfg.data.backend == "oxe_local_indexed"
             assert cfg.data.adapter.openx_local.mode == "indexed_full"
@@ -94,7 +94,7 @@ class TestExperimentConsistency:
             "vla_smol_flow_shared",
         ],
     )
-    def test_all_experiments_load(self, config_dir, experiment):
+    def test_stage12_experiments_load(self, config_dir, experiment):
         with initialize_config_dir(version_base=None, config_dir=config_dir):
             cfg = compose(config_name="config", overrides=[f"experiment={experiment}"])
 
@@ -105,3 +105,24 @@ class TestExperimentConsistency:
             assert hasattr(cfg, "cluster")
             assert cfg.experiment.name is not None
             assert cfg.experiment.description is not None
+
+    @pytest.mark.parametrize(
+        "experiment",
+        [
+            "lerobot_hlrp_smolvla_shared_smoke",
+            "lerobot_hlrp_smolvla_shared_libero",
+            "lerobot_hlrp_smolvla_shared_libero_scratch",
+        ],
+    )
+    def test_lerobot_experiments_load(self, config_dir, experiment):
+        with initialize_config_dir(version_base=None, config_dir=config_dir):
+            cfg = compose(config_name="config", overrides=[f"experiment={experiment}"])
+
+            assert hasattr(cfg, "experiment")
+            assert hasattr(cfg, "lerobot")
+            assert hasattr(cfg, "cluster")
+            assert cfg.experiment.name is not None
+            assert cfg.experiment.description is not None
+            assert cfg.lerobot.command is not None
+            assert cfg.lerobot.policy_type is not None
+            assert cfg.lerobot.init_mode in {"artifact", "scratch"}

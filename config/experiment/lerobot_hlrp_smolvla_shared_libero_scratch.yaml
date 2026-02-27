@@ -1,48 +1,41 @@
 # @package _global_
 
-# Stage 3: Libero training with HLRP latent SmolVLA policy.
-# Mirrors the official LeRobot SmolVLA Libero recipe and swaps:
-# - policy.type -> hlrp_smolvla_shared
-# - pretrained init -> Stage-2 artifact handoff
-
 defaults:
   - /cluster@cluster: local_dev
   - optional /user_config: local
 
 experiment:
-  name: lerobot_hlrp_smolvla_shared_libero
-  description: "Stage 3 Libero train (HLRP latent SmolVLA from Stage-2 artifact)"
+  name: lerobot_hlrp_smolvla_shared_libero_scratch
+  description: "Stage 3 Libero train (HLRP shared policy scratch init, SmolVLA-style)"
 
 submit:
   script: 6_train_lerobot
 
 logging:
   use_wandb: true
-  tags: ["stage3", "lerobot", "libero", "hlrp-policy", "smolvla"]
+  tags: ["stage3", "lerobot", "libero", "hlrp-policy", "smolvla", "scratch"]
 
 lerobot:
   command: lerobot-train
   install_policy_editable: null
 
   policy_type: hlrp_smolvla_shared
-  policy_repo_id: felixmin/hlrp_smolvla_shared_libero
+  policy_repo_id: felixmin/hlrp_smolvla_shared_libero_scratch
   policy_device: cuda
   push_to_hub: false
   wandb_enable: true
 
-  init_mode: artifact
-  # Required: Stage-2 handoff artifact path.
-  stage2_artifact: ???
+  init_mode: scratch
+  stage2_artifact: null
 
   dataset_repo_id: HuggingFaceVLA/libero
   dataset_episodes: null
 
   env_type: libero
   env_task: libero_10
-  output_dir: ${logging.runs_dir}/lerobot_smolvla_shared_libero
+  output_dir: ${logging.runs_dir}/lerobot_smolvla_shared_libero_scratch
   job_name: ${experiment.name}
 
-  # Mirrors the SmolVLA Libero training recipe.
   steps: 100000
   batch_size: 64
   num_workers: 4
@@ -57,9 +50,12 @@ lerobot:
     HF_HUB_CACHE: /mnt/data/tmp/hf/hub
     HF_DATASETS_CACHE: /mnt/data/tmp/hf/datasets
 
-  # Keep the local pre-downloaded LIBERO snapshot and match SmolVLA recipe flags.
   extra_args:
     - --dataset.root=/mnt/data/workspace/hflibero/datasets--HuggingFaceVLA--libero/snapshots/86958911c0f959db2bbbdb107eb3e17c5f9c798e
+    - --policy.load_vlm_weights=true
+    - --policy.train_expert_only=true
+    - --policy.freeze_vision_encoder=true
+    - --policy.num_vlm_layers=16
     - --policy.image_size=[512,512]
     - --policy.latent_vector_dim=32
     - --policy.flow_steps=10

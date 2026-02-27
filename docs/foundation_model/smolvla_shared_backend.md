@@ -6,7 +6,11 @@ This backend reimplements the SmolVLA-style flow setup with a shared trunk and s
 
 - Shared trunk: SmolVLM image+language encoder (`packages/foundation/backends/smolvla_shared/model.py`)
 - Latent head: flow-matching on flattened LAQ vectors `[B, S*D]`
-- Real-action head: initialized in shared core, trained in Stage 3 (LeRobot)
+- Real-action head: chunked flow-matching on `[B, T, A]` (Stage 3)
+
+Quick visual references:
+- `docs/foundation_model/smolvla_shared_v2_visual_guide.md`
+- `docs/foundation_model/smolvla_transform_parity.md`
 
 Backend code is split by responsibility:
 
@@ -26,6 +30,8 @@ Use:
 
 Stage 2 mode is `model.training_mode=latent_flow`.
 Only latent-flow loss is optimized in this stage.
+
+Stage 2 exports full action-shape metadata (`action_dim`, `action_chunk_size`) and `normalization_stats` in artifact v2 for strict Stage 3 compatibility.
 
 Example:
 
@@ -47,23 +53,24 @@ Config:
 
 - `config/experiment/lerobot_hlrp_smolvla_shared_smoke.yaml`
 
-Optional Stage-2 checkpoint handoff:
+Optional Stage-2 checkpoint handoff, depending on policy init mode:
 
-- `lerobot.stage2_artifact=/path/to/smolvla_shared_stage2_artifact.pt`
+- `lerobot.init_mode=artifact`: requires `lerobot.stage2_artifact=/path/to/smolvla_shared_stage2_artifact.pt`
+- `lerobot.init_mode=scratch`: requires `lerobot.stage2_artifact=null`
 
 ### Stage 2 -> Stage 3 Artifact Contract
 
-- Schema version: `smolvla_shared.v1`
+- Schema version: `smolvla_shared.v2`
 - Producer: `scripts/4_train_foundation.py` when `model.backend=smolvla_shared`
 - Default output path: `<run_dir>/artifacts/smolvla_shared_stage2_artifact.pt`
 - Payload:
-  - `manifest`: model/flow metadata (`model_name`, `torch_dtype`, `image_size`, `action_dim`, `latent_vector_dim`, flow params, source metadata)
+  - `manifest`: model/flow/transform metadata (`model_name`, `torch_dtype`, `image_size`, `action_dim`, `action_chunk_size`, tokenizer/prompt settings, camera keys, flow params, source metadata)
   - `core_state_dict`: Stage-2 shared core weights (private cache keys dropped)
 - Consumer: `HLRPSmolVLASharedPolicy` in Stage 3
   - Loads `policy.stage2_artifact` only
   - Invalid/mismatched artifact schema fails fast
   - Manifest/config mismatches fail fast
-  - Key mismatches fail fast except optional missing `action_head.*` (latent-only Stage-2 runs)
+  - Strict state dict load (`strict=True`) with no optional-missing fallback
 
 Example:
 

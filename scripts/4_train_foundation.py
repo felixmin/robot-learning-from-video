@@ -25,7 +25,7 @@ workspace_root = Path(__file__).parent.parent
 sys.path.insert(0, str(workspace_root / "packages"))
 
 from common.callbacks import DatasetUsageLoggerCallback, ProgressLoggerCallback
-from common.cache_env import configure_cache_env, hf_download_help_message, resolve_cache_dir
+from common.cache_env import configure_cache_env, resolve_cache_dir
 from common.data_factory import create_datamodule
 from common.logging import set_seed
 from common.unified_logging import resolve_runs_dir, setup_unified_logging, setup_wandb_with_unified_paths
@@ -158,23 +158,11 @@ def main(cfg: DictConfig):
         raise ValueError(
             "Set `model.laq.checkpoint=/path/to/laq.ckpt` for online LAQ labeling."
         )
-    try:
-        encoder_vq = load_laq_encoder_vq_inference_from_checkpoint(laq_ckpt)
-    except Exception as exc:
-        help_msg = hf_download_help_message(exc=exc)
-        if help_msg:
-            logger.error(help_msg)
-        raise RuntimeError(
-            f"Failed to load LAQ checkpoint '{laq_ckpt}'. "
-            "Provide a checkpoint trained with the current LAQ codebase."
-        ) from exc
+    encoder_vq = load_laq_encoder_vq_inference_from_checkpoint(laq_ckpt)
     laq_provider = LAQTaskCodeProvider(encoder_vq)
 
-    backend_type = OmegaConf.select(cfg, "model.backend")
-    backend_type = str(backend_type)
-
-    backend_mode_raw = OmegaConf.select(cfg, "model.training_mode")
-    backend_mode = BackendMode(str(backend_mode_raw))
+    backend_type = str(cfg.model.backend)
+    backend_mode = BackendMode(str(cfg.model.training_mode))
 
     model_name = cfg.model.vla.model_name
 
@@ -193,77 +181,71 @@ def main(cfg: DictConfig):
                 "smolvla_shared backend supports model.training_mode in {latent_flow, actions, multitask}"
             )
 
-        trust_remote_code = bool(OmegaConf.select(cfg, "model.vla.trust_remote_code") or False)
-        use_gpu_preprocessing = bool(OmegaConf.select(cfg, "model.vla.use_gpu_preprocessing") or False)
-        freeze_vlm_cfg = OmegaConf.select(cfg, "model.vla.freeze_vlm")
-        freeze_vlm = True if freeze_vlm_cfg is None else bool(freeze_vlm_cfg)
-        image_size_cfg = OmegaConf.select(cfg, "model.vla.image_size")
-        image_size = tuple(image_size_cfg) if image_size_cfg else (384, 384)
-        flow_cfg = OmegaConf.select(cfg, "model.flow")
-        if flow_cfg is None:
-            raise ValueError("Missing model.flow config for smolvla_shared backend")
+        trust_remote_code = bool(cfg.model.vla.trust_remote_code)
+        use_gpu_preprocessing = bool(cfg.model.vla.use_gpu_preprocessing)
+        freeze_vlm = bool(cfg.model.vla.freeze_vlm)
+        image_size = tuple(int(x) for x in cfg.model.vla.image_size)
+        flow_cfg = cfg.model.flow
 
         latent_vector_dim = int(laq_provider.code_seq_len * laq_provider.codebook_dim)
-        action_dim_cfg = OmegaConf.select(flow_cfg, "action_dim")
-        action_dim = int(action_dim_cfg) if action_dim_cfg is not None else None
+        action_dim = int(flow_cfg.action_dim)
+        action_chunk_size = int(flow_cfg.action_chunk_size)
 
         backend_kwargs = dict(
             model_name=str(model_name),
             latent_vector_dim=latent_vector_dim,
             action_dim=action_dim,
+            action_chunk_size=action_chunk_size,
             freeze_vlm=freeze_vlm,
+            freeze_vision_encoder=bool(cfg.model.vla.freeze_vision_encoder),
+            load_vlm_weights=bool(cfg.model.vla.load_vlm_weights),
+            attention_mode=str(cfg.model.vla.attention_mode),
+            num_expert_layers=int(cfg.model.vla.num_expert_layers),
+            num_vlm_layers=int(cfg.model.vla.num_vlm_layers),
+            self_attn_every_n_layers=int(cfg.model.vla.self_attn_every_n_layers),
+            expert_width_multiplier=float(cfg.model.vla.expert_width_multiplier),
+            add_image_special_tokens=bool(cfg.model.vla.add_image_special_tokens),
+            tokenizer_max_length=int(cfg.model.vla.tokenizer_max_length),
+            pad_language_to=str(cfg.model.vla.pad_language_to),
+            max_state_dim=int(cfg.model.vla.max_state_dim),
+            prefix_length=int(cfg.model.vla.prefix_length),
             torch_dtype=dtype,
             trust_remote_code=trust_remote_code,
             chat=ChatConfig(system_prompt=cfg.model.chat.system_prompt),
             action_tokens=action_cfg,
             use_gpu_preprocessing=use_gpu_preprocessing,
             image_size=image_size,
+            camera_keys=(
+                None if cfg.model.vla.camera_keys is None else tuple(str(k) for k in cfg.model.vla.camera_keys)
+            ),
+            empty_cameras=int(cfg.model.vla.empty_cameras),
             flow_hidden_dim=int(flow_cfg.flow_hidden_dim),
             flow_steps=int(flow_cfg.flow_steps),
             latent_loss_weight=float(flow_cfg.latent_loss_weight),
             action_loss_weight=float(flow_cfg.action_loss_weight),
-            min_period=float(OmegaConf.select(flow_cfg, "min_period") or 4e-3),
-            max_period=float(OmegaConf.select(flow_cfg, "max_period") or 4.0),
-            time_beta_alpha=float(OmegaConf.select(flow_cfg, "time_beta_alpha") or 1.5),
-            time_beta_beta=float(OmegaConf.select(flow_cfg, "time_beta_beta") or 1.0),
+            min_period=float(flow_cfg.min_period),
+            max_period=float(flow_cfg.max_period),
+            time_beta_alpha=float(flow_cfg.time_beta_alpha),
+            time_beta_beta=float(flow_cfg.time_beta_beta),
         )
-
-        optional_vla_overrides: dict[str, object] = {
-            "freeze_vision_encoder": OmegaConf.select(cfg, "model.vla.freeze_vision_encoder"),
-            "load_vlm_weights": OmegaConf.select(cfg, "model.vla.load_vlm_weights"),
-            "attention_mode": OmegaConf.select(cfg, "model.vla.attention_mode"),
-            "num_expert_layers": OmegaConf.select(cfg, "model.vla.num_expert_layers"),
-            "num_vlm_layers": OmegaConf.select(cfg, "model.vla.num_vlm_layers"),
-            "self_attn_every_n_layers": OmegaConf.select(cfg, "model.vla.self_attn_every_n_layers"),
-            "expert_width_multiplier": OmegaConf.select(cfg, "model.vla.expert_width_multiplier"),
-            "add_image_special_tokens": OmegaConf.select(cfg, "model.vla.add_image_special_tokens"),
-            "tokenizer_max_length": OmegaConf.select(cfg, "model.vla.tokenizer_max_length"),
-            "pad_language_to": OmegaConf.select(cfg, "model.vla.pad_language_to"),
-            "max_state_dim": OmegaConf.select(cfg, "model.vla.max_state_dim"),
-            "prefix_length": OmegaConf.select(cfg, "model.vla.prefix_length"),
-        }
-        for key, value in optional_vla_overrides.items():
-            if value is not None:
-                backend_kwargs[key] = value
 
         backend = SmolVLASharedBackend(
             config=SmolVLASharedBackendConfig(**backend_kwargs),
-            frames_to_images=oxe_first_frames_to_pil,
         )
-        try:
-            backend.setup(device=torch.device("cpu"))
-        except Exception as exc:
-            help_msg = hf_download_help_message(exc=exc)
-            if help_msg:
-                logger.error(help_msg)
-            raise
+        backend.setup(device=torch.device("cpu"))
     else:
         raise ValueError(f"Unknown model.backend={backend_type!r}")
+
+    normalization_stats = OmegaConf.to_container(
+        cfg.model.vla.normalization_stats,
+        resolve=True,
+    )
 
     module = VLATokenBackendLightningModule(
         backend=backend,
         code_provider=laq_provider,
         backend_mode=backend_mode,
+        normalization_stats=normalization_stats,
         optimizer=VLAOptimizerConfig(
             lr=float(cfg.training.optimizer.lr),
             weight_decay=float(cfg.training.optimizer.weight_decay),
@@ -460,8 +442,17 @@ def main(cfg: DictConfig):
             model_name=str(backend_cfg.model_name),
             torch_dtype=torch_dtype,
             image_size=(int(backend_cfg.image_size[0]), int(backend_cfg.image_size[1])),
-            action_dim=(None if backend_cfg.action_dim is None else int(backend_cfg.action_dim)),
+            action_dim=int(backend_cfg.action_dim),
+            action_chunk_size=int(backend_cfg.action_chunk_size),
+            code_seq_len=int(backend_cfg.action_tokens.code_seq_len),
             latent_vector_dim=int(backend_cfg.latent_vector_dim),
+            tokenizer_max_length=int(backend_cfg.tokenizer_max_length),
+            pad_language_to=str(backend_cfg.pad_language_to),
+            system_prompt=backend_cfg.chat.system_prompt,
+            max_state_dim=int(backend_cfg.max_state_dim),
+            camera_keys=(
+                None if backend_cfg.camera_keys is None else tuple(str(k) for k in backend_cfg.camera_keys)
+            ),
             flow_hidden_dim=int(backend_cfg.flow_hidden_dim),
             flow_steps=int(backend_cfg.flow_steps),
             min_period=float(backend_cfg.min_period),
@@ -472,6 +463,7 @@ def main(cfg: DictConfig):
             source_training_mode=backend_mode.value,
             source_run_dir=str(output_dir),
             source_global_step=int(trainer.global_step),
+            normalization_stats=normalization_stats,
         )
         save_smolvla_shared_artifact(
             path=artifact_path,

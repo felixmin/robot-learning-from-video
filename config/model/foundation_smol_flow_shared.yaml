@@ -26,6 +26,9 @@ vla:
   prefix_length: -1
   use_gpu_preprocessing: true
   image_size: [512, 512]
+  camera_keys: null
+  empty_cameras: 0
+  normalization_stats: {}
 
 laq:
   checkpoint: ""  # required at runtime (Stage 1 LAQ checkpoint)
@@ -38,7 +41,8 @@ action_tokens:
   token_fmt: "<ACT_{i}>"
 
 flow:
-  action_dim: null
+  action_dim: 32
+  action_chunk_size: 50
   flow_hidden_dim: 1024
   flow_steps: 10
   latent_loss_weight: 1.0

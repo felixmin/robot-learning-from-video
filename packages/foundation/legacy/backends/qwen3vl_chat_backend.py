@@ -92,6 +92,21 @@ class Qwen3VLChatActionTokenBackend(torch.nn.Module):
 
         self._action_token_ids: ActionTokenIds | None = None
 
+    @staticmethod
+    def _extract_frames(batch: FoundationBatch) -> torch.Tensor:
+        streams = batch.image_streams
+        if streams is None:
+            raise ValueError("batch.image_streams is required")
+        if "observation.images.rgb" not in streams:
+            raise KeyError("batch.image_streams must include key 'observation.images.rgb'")
+        return streams["observation.images.rgb"]
+
+    @staticmethod
+    def _extract_instructions(batch: FoundationBatch) -> list[str]:
+        if batch.task_text is None:
+            raise ValueError("batch.task_text is required")
+        return [str(x) for x in batch.task_text]
+
     def setup(self, *, device: torch.device) -> None:
         if self.vla_model is None or self.processor is None:
             from transformers import Qwen3VLForConditionalGeneration, Qwen3VLProcessor
@@ -151,11 +166,8 @@ class Qwen3VLChatActionTokenBackend(torch.nn.Module):
             raise NotImplementedError(f"{type(self).__name__} only supports mode={BackendMode.CODES.value!r}")
         device, _token_ids = self._require_ready()
 
-        frames = batch.frames
-        if not isinstance(frames, torch.Tensor):
-            raise TypeError("FoundationBatch.frames must be a torch.Tensor")
-
-        instructions = list(batch.instructions)
+        frames = self._extract_frames(batch)
+        instructions = self._extract_instructions(batch)
         if batch.target_codes is None:
             raise ValueError("batch.target_codes is required for code loss computation.")
         codes = batch.target_codes.to(torch.long)
@@ -184,8 +196,8 @@ class Qwen3VLChatActionTokenBackend(torch.nn.Module):
             raise NotImplementedError(f"{type(self).__name__} only supports mode={BackendMode.CODES.value!r}")
         device, token_ids = self._require_ready()
 
-        frames = batch.frames
-        instructions = list(batch.instructions)
+        frames = self._extract_frames(batch)
+        instructions = self._extract_instructions(batch)
         images = self.frames_to_images(frames)
         prompt_inputs = build_prompt_inputs(
             processor=self.processor,

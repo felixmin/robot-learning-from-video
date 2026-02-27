@@ -1014,14 +1014,38 @@ class VLATrainSampleVisualizationCallback(Callback):
 
         try:
             from foundation.backends.interfaces import BackendMode, FoundationBatch
+            from foundation.backends.smolvla_shared.input_transform import normalize_vector_mean_std
             from foundation.online_laq import (
                 extract_oxe_actions,
+                extract_oxe_initial_state,
                 extract_oxe_language,
                 oxe_frames_to_laq_video,
             )
         except Exception:
             logger.debug("train sample viz: failed to import helpers", exc_info=True)
             return
+
+        def _policy_image_streams(frames_tensor: torch.Tensor) -> dict[str, torch.Tensor]:
+            if frames_tensor.ndim != 5:
+                raise ValueError(
+                    f"Expected OXE frames tensor [B,T,...], got shape {tuple(frames_tensor.shape)}"
+                )
+            if frames_tensor.shape[-1] == 3:
+                return {"observation.images.rgb": frames_tensor[:, 0, ...]}
+            if frames_tensor.shape[2] == 3:
+                return {"observation.images.rgb": frames_tensor[:, 0, ...]}
+            if frames_tensor.shape[1] == 3:
+                return {"observation.images.rgb": frames_tensor[:, :, 0, ...]}
+            raise ValueError(
+                "Unrecognized frames layout; expected last dim=3 (BTHWC), shape[2]=3 (BTCHW), "
+                f"or shape[1]=3 (BCTHW). Got {tuple(frames_tensor.shape)}"
+            )
+
+        def _policy_image_padding_masks(image_streams: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
+            masks: dict[str, torch.Tensor] = {}
+            for key, stream in image_streams.items():
+                masks[key] = torch.ones((int(stream.shape[0]),), dtype=torch.bool, device=stream.device)
+            return masks
 
         mode = getattr(pl_module, "backend_mode", BackendMode.CODES)
         if not isinstance(mode, BackendMode):
@@ -1110,8 +1134,22 @@ class VLATrainSampleVisualizationCallback(Callback):
         pred_actions_sel: list[list[float]] | None = None
         gen_debug: Optional[list[dict[str, Any]]] = None
         try:
+            image_streams = _policy_image_streams(frames_sel)
+            state = extract_oxe_initial_state(batch)
+            if state is not None:
+                state = state[chosen]
+                state = normalize_vector_mean_std(
+                    value=state,
+                    stats=getattr(pl_module, "normalization_stats", None),
+                    key_candidates=["observation.state", "initial_state", "state"],
+                )
             latent = backend.latent_from_batch(
-                FoundationBatch(frames=frames_sel, instructions=instr_sel),
+                FoundationBatch(
+                    image_streams=image_streams,
+                    image_padding_masks=_policy_image_padding_masks(image_streams),
+                    task_text=instr_sel,
+                    state=state,
+                ),
                 mode=mode,
             )
             tokens = latent.tokens

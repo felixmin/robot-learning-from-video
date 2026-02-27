@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from typing import Any, Callable
+from typing import Any
 
 import torch
 
 from foundation.backends.interfaces import BackendMode, FoundationBatch, LatentOutput, LossOutput
 from foundation.backends.smolvla_shared.config import SmolVLASharedBackendConfig
-from foundation.backends.smolvla_shared.losses import action_regression_loss, latent_flow_loss
+from foundation.backends.smolvla_shared.input_transform import to_action_chunk
+from foundation.backends.smolvla_shared.losses import action_flow_loss, latent_flow_loss
 from foundation.backends.smolvla_shared.model import SmolVLASharedCore
 from foundation.backends.smolvla_shared.smolvlm_with_expert import SmolVLMWithExpertModel
 
@@ -20,7 +21,6 @@ class SmolVLASharedBackend(torch.nn.Module):
         config: SmolVLASharedBackendConfig,
         vlm: torch.nn.Module | None = None,
         processor: Any | None = None,
-        frames_to_images: Callable[[torch.Tensor], list[Any]] | None = None,
         smol_model: SmolVLMWithExpertModel | None = None,
     ) -> None:
         super().__init__()
@@ -29,7 +29,6 @@ class SmolVLASharedBackend(torch.nn.Module):
             config=config.to_core_config(),
             vlm=vlm,
             processor=processor,
-            frames_to_images=frames_to_images,
             smol_model=smol_model,
         )
 
@@ -57,13 +56,14 @@ class SmolVLASharedBackend(torch.nn.Module):
         if batch.target_actions is None:
             raise ValueError("batch.target_actions is required")
         actions = batch.target_actions
-        if actions.ndim != 2:
-            raise ValueError(f"Expected target_actions [B,A], got {tuple(actions.shape)}")
+        if actions.ndim not in (2, 3):
+            raise ValueError(f"Expected target_actions [B,A] or [B,T,A], got {tuple(actions.shape)}")
         if self.cfg.action_dim is None:
             raise ValueError("Action mode requires action_dim in backend config")
-        if int(actions.shape[1]) != int(self.cfg.action_dim):
+        actions = to_action_chunk(actions=actions, chunk_size=int(self.cfg.action_chunk_size))
+        if int(actions.shape[-1]) > int(self.cfg.action_dim):
             raise ValueError(
-                f"target_actions dim mismatch: expected {int(self.cfg.action_dim)}, got {int(actions.shape[1])}"
+                f"target_actions dim mismatch: configured action_dim={int(self.cfg.action_dim)}, got {int(actions.shape[-1])}"
             )
         return actions
 
@@ -82,7 +82,12 @@ class SmolVLASharedBackend(torch.nn.Module):
 
         if mode is BackendMode.ACTIONS:
             target_actions = self._require_target_actions(batch)
-            action_loss = action_regression_loss(core=self.core, batch=batch, target_actions=target_actions)
+            action_loss = action_flow_loss(
+                core=self.core,
+                batch=batch,
+                target_actions=target_actions,
+                action_is_pad=batch.action_is_pad,
+            )
             total = float(self.cfg.action_loss_weight) * action_loss
             return LossOutput(
                 loss=total,
@@ -96,7 +101,12 @@ class SmolVLASharedBackend(torch.nn.Module):
             target_vec = self._require_target_vector(batch)
             target_actions = self._require_target_actions(batch)
             latent_loss = latent_flow_loss(core=self.core, batch=batch, target_vectors=target_vec)
-            action_loss = action_regression_loss(core=self.core, batch=batch, target_actions=target_actions)
+            action_loss = action_flow_loss(
+                core=self.core,
+                batch=batch,
+                target_actions=target_actions,
+                action_is_pad=batch.action_is_pad,
+            )
             total = float(self.cfg.latent_loss_weight) * latent_loss + float(self.cfg.action_loss_weight) * action_loss
             return LossOutput(
                 loss=total,

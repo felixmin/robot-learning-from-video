@@ -36,8 +36,9 @@ lerobot:
   push_to_hub: false
   wandb_enable: false
 
-  # Optional Stage-2 contract artifact.
-  stage2_artifact: null
+  init_mode: artifact
+  # Required Stage-2 contract artifact.
+  stage2_artifact: ???
 
   dataset_repo_id: HuggingFaceVLA/libero
   dataset_episodes: "[0]"

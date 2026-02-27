@@ -18,7 +18,15 @@ class DummyCodeProvider:
 class DummyBackend:
     def latent_from_batch(self, batch: FoundationBatch, *, mode: BackendMode) -> LatentOutput:
         assert mode is BackendMode.CODES
-        b = int(batch.frames.shape[0])
+        assert batch.image_streams is not None
+        assert batch.image_padding_masks is not None
+        assert batch.state is not None
+        b = int(batch.image_streams["observation.images.rgb"].shape[0])
+        mask = batch.image_padding_masks["observation.images.rgb"]
+        assert mask.dtype == torch.bool
+        assert tuple(mask.shape) == (b,)
+        assert torch.equal(mask, torch.ones((b,), dtype=torch.bool, device=mask.device))
+        assert tuple(batch.state.shape) == (b, 2)
         tokens = torch.tensor([[3, 1, 7, 0]] * b, dtype=torch.long)
         return LatentOutput(tokens=tokens, logits=None, vector=None, meta=None)
 
@@ -49,6 +57,7 @@ def test_vla_train_visualization_callback_writes_files(tmp_path):
     batch = {
         "frames": torch.randint(0, 256, (2, 2, 16, 16, 3), dtype=torch.uint8),
         "language": ["pick up block", "push button"],
+        "initial_state": torch.tensor([[1.0, -1.0], [2.0, -2.0]], dtype=torch.float32),
         "episode_id": ["ep1", "ep2"],
         "frame_idx": [0, 5],
     }

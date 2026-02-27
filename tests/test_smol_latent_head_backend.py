@@ -97,8 +97,11 @@ def test_smol_latent_head_backend_loss_and_latents():
     backend.setup(device=torch.device("cpu"))
 
     batch = FoundationBatch(
-        frames=torch.randint(0, 256, (2, 2, 8, 8, 3), dtype=torch.uint8),
-        instructions=["pick", "place"],
+        image_streams={
+            "observation.images.rgb": torch.randint(0, 256, (2, 2, 8, 8, 3), dtype=torch.uint8),
+        },
+        image_padding_masks={"observation.images.rgb": torch.ones((2, 2), dtype=torch.bool)},
+        task_text=["pick", "place"],
         target_codes=torch.tensor([[1, 2, 3, 4], [4, 3, 2, 1]], dtype=torch.long),
     )
     out = backend.loss_from_batch(batch, mode=BackendMode.CODES)
@@ -129,8 +132,11 @@ def test_smol_latent_head_backend_handles_dtype_mismatch():
     backend.setup(device=torch.device("cpu"))
 
     batch = FoundationBatch(
-        frames=torch.randint(0, 256, (2, 2, 8, 8, 3), dtype=torch.uint8),
-        instructions=["pick", "place"],
+        image_streams={
+            "observation.images.rgb": torch.randint(0, 256, (2, 2, 8, 8, 3), dtype=torch.uint8),
+        },
+        image_padding_masks={"observation.images.rgb": torch.ones((2, 2), dtype=torch.bool)},
+        task_text=["pick", "place"],
         target_codes=torch.tensor([[1, 2, 3, 4], [4, 3, 2, 1]], dtype=torch.long),
     )
     latent = backend.latent_from_batch(batch, mode=BackendMode.CODES)
@@ -161,8 +167,11 @@ def test_smol_flow_action_backend_multitask():
     backend.setup(device=torch.device("cpu"))
 
     batch = FoundationBatch(
-        frames=torch.randint(0, 256, (2, 2, 8, 8, 3), dtype=torch.uint8),
-        instructions=["pick", "place"],
+        image_streams={
+            "observation.images.rgb": torch.randint(0, 256, (2, 2, 8, 8, 3), dtype=torch.uint8),
+        },
+        image_padding_masks={"observation.images.rgb": torch.ones((2, 2), dtype=torch.bool)},
+        task_text=["pick", "place"],
         target_latent_vectors=torch.randn(2, 4, 2),
         target_actions=torch.randn(2, 3),
     )

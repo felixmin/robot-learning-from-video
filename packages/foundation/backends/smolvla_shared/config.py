@@ -12,7 +12,8 @@ from foundation.vla_inputs import ChatConfig
 class SmolVLASharedCoreConfig:
     model_name: str
     latent_vector_dim: int
-    action_dim: int | None = None
+    action_dim: int
+    action_chunk_size: int
     freeze_vlm: bool = True
     freeze_vision_encoder: bool = True
     load_vlm_weights: bool = True
@@ -34,6 +35,8 @@ class SmolVLASharedCoreConfig:
     )
     use_gpu_preprocessing: bool = True
     image_size: tuple[int, int] = (384, 384)
+    camera_keys: tuple[str, ...] | None = None
+    empty_cameras: int = 0
     flow_hidden_dim: int = 1024
     flow_steps: int = 8
     min_period: float = 4e-3
@@ -46,7 +49,8 @@ class SmolVLASharedCoreConfig:
 class SmolVLASharedBackendConfig:
     model_name: str
     latent_vector_dim: int
-    action_dim: int | None = None
+    action_dim: int
+    action_chunk_size: int
     freeze_vlm: bool = True
     freeze_vision_encoder: bool = True
     load_vlm_weights: bool = True
@@ -68,6 +72,8 @@ class SmolVLASharedBackendConfig:
     )
     use_gpu_preprocessing: bool = True
     image_size: tuple[int, int] = (384, 384)
+    camera_keys: tuple[str, ...] | None = None
+    empty_cameras: int = 0
     flow_hidden_dim: int = 1024
     flow_steps: int = 8
     latent_loss_weight: float = 1.0
@@ -82,6 +88,7 @@ class SmolVLASharedBackendConfig:
             model_name=self.model_name,
             latent_vector_dim=self.latent_vector_dim,
             action_dim=self.action_dim,
+            action_chunk_size=self.action_chunk_size,
             freeze_vlm=self.freeze_vlm,
             freeze_vision_encoder=self.freeze_vision_encoder,
             load_vlm_weights=self.load_vlm_weights,
@@ -101,6 +108,8 @@ class SmolVLASharedBackendConfig:
             action_tokens=self.action_tokens,
             use_gpu_preprocessing=self.use_gpu_preprocessing,
             image_size=self.image_size,
+            camera_keys=self.camera_keys,
+            empty_cameras=self.empty_cameras,
             flow_hidden_dim=self.flow_hidden_dim,
             flow_steps=self.flow_steps,
             min_period=self.min_period,

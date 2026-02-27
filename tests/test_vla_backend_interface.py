@@ -188,8 +188,11 @@ def test_backend_setup_adds_tokens_and_infers_between_ids():
     model.set_suffix_ids(suffix)
 
     batch = FoundationBatch(
-        frames=torch.randint(0, 256, (2, 2, 16, 16, 3), dtype=torch.uint8),
-        instructions=["pick up block", "push button"],
+        image_streams={
+            "observation.images.rgb": torch.randint(0, 256, (2, 2, 16, 16, 3), dtype=torch.uint8),
+        },
+        image_padding_masks={"observation.images.rgb": torch.ones((2, 2), dtype=torch.bool)},
+        task_text=["pick up block", "push button"],
     )
     out = backend.latent_from_batch(batch, mode=BackendMode.CODES)
     assert out.tokens is not None
@@ -221,8 +224,11 @@ def test_backend_loss_from_batch_requires_target_codes():
     )
 
     batch = FoundationBatch(
-        frames=torch.randint(0, 256, (2, 2, 16, 16, 3), dtype=torch.uint8),
-        instructions=["a", "b"],
+        image_streams={
+            "observation.images.rgb": torch.randint(0, 256, (2, 2, 16, 16, 3), dtype=torch.uint8),
+        },
+        image_padding_masks={"observation.images.rgb": torch.ones((2, 2), dtype=torch.bool)},
+        task_text=["a", "b"],
         target_codes=torch.tensor([[3, 1, 7, 0], [3, 1, 7, 0]], dtype=torch.long),
     )
     out = backend.loss_from_batch(batch, mode=BackendMode.CODES)
@@ -234,8 +240,11 @@ def test_backend_loss_raises_without_target_codes():
     backend.setup(device=torch.device("cpu"))
 
     batch = FoundationBatch(
-        frames=torch.randint(0, 256, (2, 2, 16, 16, 3), dtype=torch.uint8),
-        instructions=["a", "b"],
+        image_streams={
+            "observation.images.rgb": torch.randint(0, 256, (2, 2, 16, 16, 3), dtype=torch.uint8),
+        },
+        image_padding_masks={"observation.images.rgb": torch.ones((2, 2), dtype=torch.bool)},
+        task_text=["a", "b"],
         target_codes=None,
     )
     try:

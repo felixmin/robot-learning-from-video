@@ -160,6 +160,21 @@ class SmolLatentHeadBackend(torch.nn.Module):
         self._text_model: torch.nn.Module | None = None
         self._text_embeddings: torch.nn.Module | None = None
 
+    @staticmethod
+    def _extract_frames(batch: FoundationBatch) -> torch.Tensor:
+        streams = batch.image_streams
+        if streams is None:
+            raise ValueError("batch.image_streams is required")
+        if "observation.images.rgb" not in streams:
+            raise KeyError("batch.image_streams must include key 'observation.images.rgb'")
+        return streams["observation.images.rgb"]
+
+    @staticmethod
+    def _extract_instructions(batch: FoundationBatch) -> list[str]:
+        if batch.task_text is None:
+            raise ValueError("batch.task_text is required")
+        return [str(x) for x in batch.task_text]
+
     def _capture_hidden_state_hook(
         self, module: torch.nn.Module, input: Any, output: Any
     ) -> None:
@@ -258,10 +273,11 @@ class SmolLatentHeadBackend(torch.nn.Module):
         """Original forward path using HF processor (slow but reference implementation)."""
         device, vlm, processor, _head = self._require_ready()
 
-        images_1 = self.frames_to_images(batch.frames)
+        frames = self._extract_frames(batch)
+        images_1 = self.frames_to_images(frames)
         # SmolVLMProcessor expects nested images: one sublist per sample.
         images = [[img] for img in images_1]
-        texts = self._build_texts(batch.instructions)
+        texts = self._build_texts(self._extract_instructions(batch))
 
         inputs = processor(
             text=texts,
@@ -323,7 +339,7 @@ class SmolLatentHeadBackend(torch.nn.Module):
         #   [B, 2, H, W, 3] - channels last (most common)
         #   [B, 2, 3, H, W] - channels first
         #   [B, 3, T, H, W] - LAQ video format
-        frames = batch.frames
+        frames = self._extract_frames(batch)
         if frames.ndim != 5:
             raise ValueError(f"Expected frames with ndim=5, got {frames.ndim}")
 
@@ -371,7 +387,7 @@ class SmolLatentHeadBackend(torch.nn.Module):
         # 3. Text Tokenization (Tokenizer only)
         # ========================================
         # Build text with instruction
-        texts = self._build_texts_simple(batch.instructions)
+        texts = self._build_texts_simple(self._extract_instructions(batch))
 
         # Tokenize - use tokenizer directly, not processor
         tokenizer = processor.tokenizer
