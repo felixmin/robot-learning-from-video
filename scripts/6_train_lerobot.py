@@ -70,7 +70,16 @@ def _install_editable_policy(
 
     # 1) Prefer the current interpreter's pip module.
     ok, err = _run_install_command(
-        [python, "-m", "pip", "install", "--no-deps", "-e", str(editable_path)],
+        [
+            python,
+            "-m",
+            "pip",
+            "install",
+            "--no-deps",
+            "--no-build-isolation",
+            "-e",
+            str(editable_path),
+        ],
         logger=logger,
         cwd=cwd,
         env=env,
@@ -90,7 +99,16 @@ def _install_editable_policy(
         )
         if boot_ok:
             ok, err = _run_install_command(
-                [python, "-m", "pip", "install", "--no-deps", "-e", str(editable_path)],
+                [
+                    python,
+                    "-m",
+                    "pip",
+                    "install",
+                    "--no-deps",
+                    "--no-build-isolation",
+                    "-e",
+                    str(editable_path),
+                ],
                 logger=logger,
                 cwd=cwd,
                 env=env,
@@ -112,6 +130,7 @@ def _install_editable_policy(
                 "--python",
                 python,
                 "--no-deps",
+                "--no-build-isolation",
                 "-e",
                 str(editable_path),
             ],
@@ -129,7 +148,7 @@ def _install_editable_policy(
     pip_bin = shutil.which("pip", path=env.get("PATH"))
     if pip_bin is not None:
         ok, err = _run_install_command(
-            [pip_bin, "install", "--no-deps", "-e", str(editable_path)],
+            [pip_bin, "install", "--no-deps", "--no-build-isolation", "-e", str(editable_path)],
             logger=logger,
             cwd=cwd,
             env=env,

@@ -92,6 +92,7 @@ def test_stage2_stage3_adapter_parity_for_core_inputs() -> None:
         lerobot_batch,
         require_action_is_pad=True,
         require_image_padding_masks=True,
+        conditioning_step_index=-1,
     )
     stage3_action_target = HLRPSmolVLASharedPolicy._extract_action_target(policy, lerobot_batch)
 
@@ -125,6 +126,7 @@ def test_stage3_policy_accepts_actions_id_pad_alias() -> None:
         batch,
         require_action_is_pad=True,
         require_image_padding_masks=True,
+        conditioning_step_index=-1,
     )
     assert torch.equal(out.action_is_pad, batch["actions_id_pad"])
 
@@ -152,6 +154,7 @@ def test_stage3_policy_rejects_conflicting_mask_aliases() -> None:
             batch,
             require_action_is_pad=True,
             require_image_padding_masks=True,
+            conditioning_step_index=-1,
         )
     except ValueError as e:
         assert "Conflicting action pad masks" in str(e)
@@ -179,6 +182,7 @@ def test_stage3_policy_inference_batch_allows_missing_action_mask() -> None:
         batch,
         require_action_is_pad=False,
         require_image_padding_masks=False,
+        conditioning_step_index=-1,
     )
     assert out.action_is_pad is None
 
@@ -202,6 +206,7 @@ def test_stage3_policy_inference_batch_allows_missing_image_is_pad() -> None:
         batch,
         require_action_is_pad=False,
         require_image_padding_masks=False,
+        conditioning_step_index=-1,
     )
     mask = out.image_padding_masks["observation.images.rgb"]
     assert mask.dtype == torch.bool

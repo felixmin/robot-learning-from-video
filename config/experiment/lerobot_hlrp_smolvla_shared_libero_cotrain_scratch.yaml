@@ -5,22 +5,22 @@ defaults:
   - optional /user_config: local
 
 experiment:
-  name: lerobot_hlrp_smolvla_shared_libero_scratch
-  description: "Stage 3 Libero train (HLRP shared policy scratch init, SmolVLA-style)"
+  name: lerobot_hlrp_smolvla_shared_libero_cotrain_scratch
+  description: "Stage 3 Libero train (HLRP shared policy scratch init, latent+action alternating)"
 
 submit:
   script: 6_train_lerobot
 
 logging:
   use_wandb: true
-  tags: ["stage3", "lerobot", "libero", "hlrp-policy", "smolvla", "scratch"]
+  tags: ["stage3", "lerobot", "libero", "hlrp-policy", "smolvla", "scratch", "cotrain"]
 
 lerobot:
   command: lerobot-train
   install_policy_editable: null
 
   policy_type: hlrp_smolvla_shared
-  policy_repo_id: felixmin/hlrp_smolvla_shared_libero_scratch
+  policy_repo_id: felixmin/hlrp_smolvla_shared_libero_cotrain_scratch
   policy_device: cuda
   push_to_hub: false
   wandb_enable: true
@@ -33,7 +33,7 @@ lerobot:
 
   env_type: libero
   env_task: libero_10
-  output_dir: ${logging.runs_dir}/lerobot_smolvla_shared_libero_scratch
+  output_dir: ${logging.runs_dir}/lerobot_smolvla_shared_libero_cotrain_scratch
   job_name: ${experiment.name}
 
   steps: 100000
@@ -52,9 +52,14 @@ lerobot:
 
   extra_args:
     - --dataset.root=/mnt/data/workspace/hflibero/datasets--HuggingFaceVLA--libero/snapshots/86958911c0f959db2bbbdb107eb3e17c5f9c798e
-    - --policy.stage3_training_mode=action
+    - --policy.stage3_training_mode=alternating
     - --policy.action_loss_weight=1.0
     - --policy.latent_loss_weight=1.0
+    - --policy.alternating_latent_steps=10
+    - --policy.alternating_supervised_mode=multitask
+    - --policy.laq_checkpoint_path=???
+    - --policy.laq_future_frames=10
+    - --policy.laq_camera_keys=[observation.images.image]
     - --policy.load_vlm_weights=true
     - --policy.train_expert_only=true
     - --policy.freeze_vision_encoder=true

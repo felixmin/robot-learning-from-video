@@ -112,6 +112,7 @@ class TestExperimentConsistency:
             "lerobot_hlrp_smolvla_shared_smoke",
             "lerobot_hlrp_smolvla_shared_libero",
             "lerobot_hlrp_smolvla_shared_libero_scratch",
+            "lerobot_hlrp_smolvla_shared_libero_cotrain_scratch",
         ],
     )
     def test_lerobot_experiments_load(self, config_dir, experiment):

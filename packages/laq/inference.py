@@ -59,6 +59,10 @@ class LAQEncoderVQInference(torch.nn.Module):
     def device(self) -> torch.device:
         return next(self._model.parameters()).device
 
+    @property
+    def image_size(self) -> tuple[int, int]:
+        return tuple(int(x) for x in self._model.image_size)
+
     @torch.no_grad()
     def codes_from_video(self, video: torch.Tensor) -> torch.Tensor:
         """Return codebook indices [B, code_seq_len] for a video batch."""

@@ -12,6 +12,12 @@ from omegaconf import MISSING
 @dataclass
 class HLRPSmolVLASharedConfig(PreTrainedConfig):
     init_mode: str = MISSING
+    stage3_training_mode: str = MISSING
+    action_loss_weight: float = MISSING
+    latent_loss_weight: float = MISSING
+    alternating_latent_steps: int | None = None
+    alternating_supervised_mode: str | None = None
+
     n_obs_steps: int = 1
     chunk_size: int = 50
     n_action_steps: int = 50
@@ -52,6 +58,9 @@ class HLRPSmolVLASharedConfig(PreTrainedConfig):
     time_beta_beta: float = 1.0
 
     stage2_artifact: Path | None = MISSING
+    laq_checkpoint_path: Path | None = None
+    laq_future_frames: int | None = None
+    laq_camera_keys: tuple[str, ...] | None = None
 
     normalization_mapping: dict[str, NormalizationMode] = field(
         default_factory=lambda: {
@@ -72,10 +81,19 @@ class HLRPSmolVLASharedConfig(PreTrainedConfig):
         super().__post_init__()
         if self.init_mode not in {"artifact", "scratch"}:
             raise ValueError(f"init_mode must be one of {{'artifact','scratch'}}, got {self.init_mode!r}")
+        if self.stage3_training_mode not in {"action", "latent", "multitask", "alternating"}:
+            raise ValueError(
+                "stage3_training_mode must be one of {'action','latent','multitask','alternating'}, "
+                f"got {self.stage3_training_mode!r}"
+            )
         if self.init_mode == "artifact" and self.stage2_artifact is None:
             raise ValueError("init_mode='artifact' requires non-null stage2_artifact")
         if self.init_mode == "scratch" and self.stage2_artifact is not None:
             raise ValueError("init_mode='scratch' requires stage2_artifact=null")
+        if self.action_loss_weight <= 0.0:
+            raise ValueError(f"action_loss_weight must be > 0, got {self.action_loss_weight}")
+        if self.latent_loss_weight <= 0.0:
+            raise ValueError(f"latent_loss_weight must be > 0, got {self.latent_loss_weight}")
         if self.n_obs_steps < 1:
             raise ValueError(f"n_obs_steps must be >= 1, got {self.n_obs_steps}.")
         if self.chunk_size < 1:
@@ -86,9 +104,37 @@ class HLRPSmolVLASharedConfig(PreTrainedConfig):
             raise ValueError(
                 f"n_action_steps must be <= chunk_size, got n_action_steps={self.n_action_steps} chunk_size={self.chunk_size}"
             )
+        uses_latent_targets = self.stage3_training_mode in {"latent", "multitask", "alternating"}
+        if uses_latent_targets:
+            if self.laq_checkpoint_path is None:
+                raise ValueError(
+                    "laq_checkpoint_path is required when stage3_training_mode uses latent targets"
+                )
+            if self.laq_future_frames is None or self.laq_future_frames <= 0:
+                raise ValueError(
+                    "laq_future_frames must be > 0 when stage3_training_mode uses latent targets"
+                )
+            if self.laq_camera_keys is None or len(self.laq_camera_keys) == 0:
+                raise ValueError(
+                    "laq_camera_keys must be set to one or more camera keys when "
+                    "stage3_training_mode uses latent targets"
+                )
+
+        if self.stage3_training_mode == "alternating":
+            if self.alternating_latent_steps is None or self.alternating_latent_steps < 1:
+                raise ValueError("alternating_latent_steps must be >= 1 when stage3_training_mode='alternating'")
+            if self.alternating_supervised_mode not in {"action", "multitask"}:
+                raise ValueError(
+                    "alternating_supervised_mode must be one of {'action','multitask'} "
+                    "when stage3_training_mode='alternating'"
+                )
 
     @property
     def observation_delta_indices(self) -> list[int]:
+        if self.stage3_training_mode in {"latent", "multitask", "alternating"}:
+            if self.laq_future_frames is None:
+                raise ValueError("laq_future_frames must be set for latent target modes")
+            return [0, int(self.laq_future_frames)]
         return list(range(1 - self.n_obs_steps, 1))
 
     @property

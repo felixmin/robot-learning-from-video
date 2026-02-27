@@ -59,4 +59,7 @@ lerobot:
   env:
     MUJOCO_GL: egl
 
-  extra_args: []
+  extra_args:
+    - --policy.stage3_training_mode=action
+    - --policy.action_loss_weight=1.0
+    - --policy.latent_loss_weight=1.0

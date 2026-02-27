@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 import torch
+import torch.nn.functional as F
 
 from foundation.action_tokens import ActionTokenConfig
 from foundation.backends.interfaces import FoundationBatch
@@ -53,6 +54,7 @@ class HLRPSmolVLASharedPolicy(PreTrainedPolicy):
 
     config_class = HLRPSmolVLASharedConfig
     name = "hlrp_smolvla_shared"
+    _LATENT_TRAINING_MODES = {"latent", "multitask", "alternating"}
 
     def __init__(
         self,
@@ -123,6 +125,9 @@ class HLRPSmolVLASharedPolicy(PreTrainedPolicy):
         else:
             logger.info("Initialized policy in scratch mode (no stage2 artifact load).")
 
+        self._laq_teacher = None
+        self._laq_image_size: tuple[int, int] | None = None
+        self._train_forward_calls = 0
         self._queues: dict[str, deque[torch.Tensor]] = {}
         self.reset()
 
@@ -146,6 +151,24 @@ class HLRPSmolVLASharedPolicy(PreTrainedPolicy):
             dim *= int(s)
         return int(dim)
 
+    def _uses_latent_targets(self) -> bool:
+        return str(self.config.stage3_training_mode) in self._LATENT_TRAINING_MODES
+
+    def _training_mode_for_step(self) -> str:
+        mode = str(self.config.stage3_training_mode)
+        if mode != "alternating":
+            return mode
+        latent_steps = int(self.config.alternating_latent_steps)
+        cycle = latent_steps + 1
+        step = self._train_forward_calls
+        self._train_forward_calls += 1
+        if (step % cycle) < latent_steps:
+            return "latent"
+        return str(self.config.alternating_supervised_mode)
+
+    def _conditioning_step_index(self) -> int:
+        return 0 if self._uses_latent_targets() else -1
+
     def _extract_image_streams(self, batch: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
         streams: dict[str, torch.Tensor] = {}
         for key in self._image_keys:
@@ -157,18 +180,50 @@ class HLRPSmolVLASharedPolicy(PreTrainedPolicy):
             )
         return streams
 
+    @staticmethod
+    def _select_observation_step(tensor: torch.Tensor, *, step_index: int) -> torch.Tensor:
+        if tensor.ndim != 5:
+            return tensor
+        idx = int(step_index)
+        if idx < 0:
+            idx = int(tensor.shape[1]) + idx
+        if idx < 0 or idx >= int(tensor.shape[1]):
+            raise IndexError(
+                f"Observation step index {step_index} out of bounds for tensor with T={int(tensor.shape[1])}"
+            )
+        return tensor[:, idx, ...]
+
+    def _extract_conditioning_streams(
+        self, image_streams: dict[str, torch.Tensor], *, step_index: int
+    ) -> dict[str, torch.Tensor]:
+        return {
+            key: self._select_observation_step(stream, step_index=step_index)
+            for key, stream in image_streams.items()
+        }
+
     def _extract_image_padding_masks(
         self,
         batch: dict[str, torch.Tensor],
         *,
         image_streams: dict[str, torch.Tensor],
         require_image_padding_masks: bool,
+        conditioning_step_index: int,
     ) -> dict[str, torch.Tensor]:
         masks: dict[str, torch.Tensor] = {}
         for key in image_streams:
             is_pad_key = f"{key}_is_pad"
             if is_pad_key in batch:
-                masks[key] = ~batch[is_pad_key].to(dtype=torch.bool)
+                mask = ~batch[is_pad_key].to(dtype=torch.bool)
+                if mask.ndim == 2:
+                    idx = int(conditioning_step_index)
+                    if idx < 0:
+                        idx = int(mask.shape[1]) + idx
+                    if idx < 0 or idx >= int(mask.shape[1]):
+                        raise IndexError(
+                            f"Image padding mask index {conditioning_step_index} out of bounds for key={key!r} with T={int(mask.shape[1])}"
+                        )
+                    mask = mask[:, idx]
+                masks[key] = mask
                 continue
             if require_image_padding_masks:
                 raise KeyError(is_pad_key)
@@ -212,20 +267,192 @@ class HLRPSmolVLASharedPolicy(PreTrainedPolicy):
             device=device,
         )
 
+    def _extract_laq_frame_pairs(
+        self,
+        batch: dict[str, Any],
+    ) -> tuple[dict[str, torch.Tensor], torch.Tensor]:
+        if self.config.laq_camera_keys is None:
+            raise RuntimeError("laq_camera_keys must be set for latent supervision modes")
+        frame_pairs: dict[str, torch.Tensor] = {}
+        valid_pair: torch.Tensor | None = None
+        for key in self.config.laq_camera_keys:
+            if key not in batch:
+                raise KeyError(f"LAQ camera key {key!r} is missing from batch")
+            frames = batch[key]
+            if not torch.is_tensor(frames):
+                raise TypeError(f"Expected tensor for camera key {key!r}, got {type(frames)}")
+            if frames.ndim != 5:
+                raise ValueError(
+                    f"Expected camera tensor [B,2,C,H,W] or [B,2,H,W,C] for key {key!r}, got {tuple(frames.shape)}"
+                )
+            if int(frames.shape[1]) != 2:
+                raise ValueError(
+                    f"Expected exactly 2 observation steps for LAQ key {key!r}, got T={int(frames.shape[1])}"
+                )
+            if int(frames.shape[2]) == 3:
+                frames_t = frames
+            elif int(frames.shape[-1]) == 3:
+                frames_t = frames.permute(0, 1, 4, 2, 3)
+            else:
+                raise ValueError(f"Unsupported LAQ frame layout for key {key!r}: {tuple(frames.shape)}")
+            if frames_t.dtype == torch.uint8:
+                frames_t = frames_t.to(torch.float32) / 255.0
+            else:
+                frames_t = frames_t.to(torch.float32)
+            frame_pairs[str(key)] = frames_t
+
+            is_pad_key = f"{key}_is_pad"
+            if is_pad_key not in batch:
+                raise KeyError(is_pad_key)
+            is_pad = batch[is_pad_key]
+            if not torch.is_tensor(is_pad):
+                is_pad = torch.as_tensor(is_pad, dtype=torch.bool, device=frames_t.device)
+            is_pad = is_pad.to(device=frames_t.device, dtype=torch.bool)
+            if is_pad.ndim != 2 or int(is_pad.shape[1]) != 2:
+                raise ValueError(
+                    f"Expected {is_pad_key!r} with shape [B,2], got {tuple(is_pad.shape)}"
+                )
+            keep = (~is_pad[:, 0]) & (~is_pad[:, 1])
+            valid_pair = keep if valid_pair is None else (valid_pair & keep)
+
+        if valid_pair is None:
+            raise RuntimeError("LAQ camera extraction produced no camera streams.")
+        return frame_pairs, valid_pair
+
+    def _ensure_laq_teacher(self) -> None:
+        if self._laq_teacher is not None:
+            return
+        if self.config.laq_checkpoint_path is None:
+            raise RuntimeError("laq_checkpoint_path must be set for latent supervision modes")
+        from laq.checkpoints import load_laq_encoder_vq_inference_from_checkpoint
+
+        device = next(self.core.parameters()).device
+        teacher = load_laq_encoder_vq_inference_from_checkpoint(
+            checkpoint_path=str(self.config.laq_checkpoint_path),
+            map_location=device,
+            strict=True,
+            prune_decoders=True,
+        )
+        teacher.to(device=device)
+        teacher.eval()
+        for param in teacher.parameters():
+            param.requires_grad_(False)
+
+        latent_dim = int(teacher.code_seq_len) * int(teacher.codebook_dim)
+        if latent_dim != int(self.config.latent_vector_dim):
+            raise ValueError(
+                f"LAQ latent dim mismatch: config.latent_vector_dim={self.config.latent_vector_dim} "
+                f"but teacher provides {latent_dim} (code_seq_len={teacher.code_seq_len}, codebook_dim={teacher.codebook_dim})"
+            )
+        if int(teacher.code_seq_len) != int(self.config.code_seq_len):
+            raise ValueError(
+                f"LAQ code_seq_len mismatch: config.code_seq_len={self.config.code_seq_len} "
+                f"teacher.code_seq_len={teacher.code_seq_len}"
+            )
+
+        self._laq_teacher = teacher
+        self._laq_image_size = tuple(int(x) for x in teacher.image_size)
+
+    def _compute_latent_targets_online(
+        self,
+        batch: dict[str, Any],
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        self._ensure_laq_teacher()
+        if self._laq_teacher is None or self._laq_image_size is None:
+            raise RuntimeError("LAQ teacher is not initialized.")
+
+        frame_pairs, valid_pair = self._extract_laq_frame_pairs(batch)
+        if len(frame_pairs) != 1:
+            raise NotImplementedError(
+                f"Current Stage-3 LAQ path supports exactly one camera key, got {tuple(frame_pairs.keys())}"
+            )
+        pair = next(iter(frame_pairs.values()))
+        b, t, c, h, w = pair.shape
+        if (int(h), int(w)) != self._laq_image_size:
+            pair = F.interpolate(
+                pair.reshape(b * t, c, h, w),
+                size=self._laq_image_size,
+                mode="bilinear",
+                align_corners=False,
+            ).reshape(b, t, c, self._laq_image_size[0], self._laq_image_size[1])
+        video = pair.permute(0, 2, 1, 3, 4)
+        _, vectors = self._laq_teacher.codes_and_vectors_from_video(video)
+        vectors = vectors.reshape(vectors.shape[0], -1)
+        if int(vectors.shape[1]) != int(self.config.latent_vector_dim):
+            raise ValueError(
+                f"Latent target dim mismatch: expected {self.config.latent_vector_dim}, got {int(vectors.shape[1])}"
+            )
+        return vectors, valid_pair
+
+    @staticmethod
+    def _slice_foundation_batch(batch: FoundationBatch, keep: torch.Tensor) -> FoundationBatch:
+        if keep.ndim != 1:
+            raise ValueError(f"keep mask must be rank 1, got {tuple(keep.shape)}")
+        keep = keep.to(dtype=torch.bool)
+
+        image_streams = (
+            {k: v[keep] for k, v in batch.image_streams.items()} if batch.image_streams is not None else None
+        )
+        image_padding_masks = (
+            {k: v[keep] for k, v in batch.image_padding_masks.items()}
+            if batch.image_padding_masks is not None
+            else None
+        )
+
+        task_text = None
+        keep_cpu = keep.detach().cpu().tolist()
+        if batch.task_text is not None:
+            task_text = [text for text, flag in zip(batch.task_text, keep_cpu) if flag]
+
+        return FoundationBatch(
+            image_streams=image_streams,
+            image_padding_masks=image_padding_masks,
+            task_text=task_text,
+            subtask_text=(
+                None if batch.subtask_text is None else [x for x, f in zip(batch.subtask_text, keep_cpu) if f]
+            ),
+            language_tokens=None if batch.language_tokens is None else batch.language_tokens[keep],
+            language_attention_mask=None
+            if batch.language_attention_mask is None
+            else batch.language_attention_mask[keep],
+            target_codes=None if batch.target_codes is None else batch.target_codes[keep],
+            target_latent_vectors=(
+                None if batch.target_latent_vectors is None else batch.target_latent_vectors[keep]
+            ),
+            target_actions=None if batch.target_actions is None else batch.target_actions[keep],
+            action_is_pad=None if batch.action_is_pad is None else batch.action_is_pad[keep],
+            state=None if batch.state is None else batch.state[keep],
+            meta=batch.meta,
+        )
+
     def _to_foundation_batch(
         self,
         batch: dict[str, Any],
         *,
         require_action_is_pad: bool,
         require_image_padding_masks: bool,
+        conditioning_step_index: int,
     ) -> FoundationBatch:
-        image_streams = self._extract_image_streams(batch)
+        raw_streams = self._extract_image_streams(batch)
+        image_streams = self._extract_conditioning_streams(
+            raw_streams,
+            step_index=conditioning_step_index,
+        )
         first_key = next(iter(image_streams))
         batch_size = int(image_streams[first_key].shape[0])
         instructions = self._extract_instructions(batch, batch_size=batch_size)
         state = batch[OBS_STATE]
         if not torch.is_tensor(state):
             state = torch.as_tensor(state, dtype=torch.float32)
+        if state.ndim == 3:
+            idx = int(conditioning_step_index)
+            if idx < 0:
+                idx = int(state.shape[1]) + idx
+            if idx < 0 or idx >= int(state.shape[1]):
+                raise IndexError(
+                    f"State step index {conditioning_step_index} out of bounds for state tensor with T={int(state.shape[1])}"
+                )
+            state = state[:, idx, :]
         state = state.to(torch.float32)
         state = normalize_vector_mean_std(
             value=state,
@@ -241,6 +468,7 @@ class HLRPSmolVLASharedPolicy(PreTrainedPolicy):
                 batch,
                 image_streams=image_streams,
                 require_image_padding_masks=require_image_padding_masks,
+                conditioning_step_index=conditioning_step_index,
             ),
             task_text=instructions,
             state=state,
@@ -365,21 +593,77 @@ class HLRPSmolVLASharedPolicy(PreTrainedPolicy):
             ACTION: deque(maxlen=self.config.n_action_steps),
         }
 
+    def _zero_loss(self) -> torch.Tensor:
+        return next(self.core.parameters()).sum() * 0.0
+
     def forward(self, batch: dict[str, torch.Tensor]) -> tuple[torch.Tensor, dict | None]:
+        active_mode = self._training_mode_for_step()
+        needs_action_targets = active_mode in {"action", "multitask"}
         foundation_batch = self._to_foundation_batch(
-            batch, require_action_is_pad=True, require_image_padding_masks=True
+            batch,
+            require_action_is_pad=needs_action_targets,
+            require_image_padding_masks=True,
+            conditioning_step_index=self._conditioning_step_index(),
         )
-        target_action = self._extract_action_target(batch)
-        loss = self.core.action_flow_loss(
-            batch=foundation_batch,
-            target_actions=target_action,
-            action_is_pad=foundation_batch.action_is_pad,
-        )
-        return loss, {"loss": float(loss.detach().cpu())}
+        action_loss: torch.Tensor | None = None
+        latent_loss: torch.Tensor | None = None
+
+        if active_mode in {"action", "multitask"}:
+            target_action = self._extract_action_target(batch)
+            action_loss = self.core.action_flow_loss(
+                batch=foundation_batch,
+                target_actions=target_action,
+                action_is_pad=foundation_batch.action_is_pad,
+            )
+
+        latent_valid_count = 0
+        if active_mode in {"latent", "multitask"}:
+            target_latent, valid_pair = self._compute_latent_targets_online(batch)
+            keep = valid_pair.to(device=target_latent.device, dtype=torch.bool)
+            latent_valid_count = int(keep.sum().item())
+            if latent_valid_count > 0:
+                latent_batch = self._slice_foundation_batch(foundation_batch, keep)
+                latent_loss = self.core.latent_flow_loss(
+                    batch=latent_batch,
+                    target_vectors=target_latent[keep],
+                )
+            else:
+                latent_loss = self._zero_loss()
+
+        if active_mode == "action":
+            if action_loss is None:
+                raise RuntimeError("Internal error: action_loss is None for action mode")
+            total = float(self.config.action_loss_weight) * action_loss
+        elif active_mode == "latent":
+            if latent_loss is None:
+                raise RuntimeError("Internal error: latent_loss is None for latent mode")
+            total = float(self.config.latent_loss_weight) * latent_loss
+        elif active_mode == "multitask":
+            if action_loss is None or latent_loss is None:
+                raise RuntimeError("Internal error: missing loss term for multitask mode")
+            total = float(self.config.action_loss_weight) * action_loss + float(self.config.latent_loss_weight) * latent_loss
+        else:
+            raise ValueError(f"Unsupported active training mode: {active_mode!r}")
+
+        metrics: dict[str, float] = {
+            "loss": float(total.detach().cpu()),
+            "mode_action": float(active_mode == "action"),
+            "mode_latent": float(active_mode == "latent"),
+            "mode_multitask": float(active_mode == "multitask"),
+        }
+        if action_loss is not None:
+            metrics["action_loss"] = float(action_loss.detach().cpu())
+        if latent_loss is not None:
+            metrics["latent_loss"] = float(latent_loss.detach().cpu())
+            metrics["latent_valid_pairs"] = float(latent_valid_count)
+        return total, metrics
 
     def predict_action_chunk(self, batch: dict[str, torch.Tensor], **kwargs) -> torch.Tensor:
         foundation_batch = self._to_foundation_batch(
-            batch, require_action_is_pad=False, require_image_padding_masks=False
+            batch,
+            require_action_is_pad=False,
+            require_image_padding_masks=False,
+            conditioning_step_index=self._conditioning_step_index(),
         )
         pred_chunk = self.core.sample_action_chunk(batch=foundation_batch)
         pred_chunk = pred_chunk[:, :, : self._action_dim]

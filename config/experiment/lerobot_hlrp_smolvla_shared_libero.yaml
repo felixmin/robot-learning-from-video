@@ -60,6 +60,9 @@ lerobot:
   # Keep the local pre-downloaded LIBERO snapshot and match SmolVLA recipe flags.
   extra_args:
     - --dataset.root=/mnt/data/workspace/hflibero/datasets--HuggingFaceVLA--libero/snapshots/86958911c0f959db2bbbdb107eb3e17c5f9c798e
+    - --policy.stage3_training_mode=action
+    - --policy.action_loss_weight=1.0
+    - --policy.latent_loss_weight=1.0
     - --policy.image_size=[512,512]
     - --policy.latent_vector_dim=32
     - --policy.flow_steps=10
