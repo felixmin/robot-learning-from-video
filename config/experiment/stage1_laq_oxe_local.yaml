@@ -11,6 +11,7 @@ defaults:
   - /training@training: laq_optimizer
   - /validation@validation: laq_local_rich
   - /cluster@cluster: local_dev
+  - optional /user_config: local
 
 
 experiment:

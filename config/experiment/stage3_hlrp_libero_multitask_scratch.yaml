@@ -20,7 +20,7 @@ lerobot:
   command: lerobot-train
   install_editable: lerobot_policy_hlrp
 
-  output_dir: ${logging.runs_dir}/lerobot_smolvla_shared_libero_cotrain_scratch
+  output_dir: ${logging.runs_dir}
   job_name: ${experiment.name}
   steps: 100000
   batch_size: 32
@@ -31,9 +31,6 @@ lerobot:
 
   shell_env:
     MUJOCO_GL: egl
-    HF_HOME: /mnt/data/workspace/cache/huggingface
-    HF_HUB_CACHE: /mnt/data/workspace/cache/huggingface/hub
-    HF_DATASETS_CACHE: /mnt/data/workspace/cache/huggingface/datasets
 
   wandb:
     enable: true

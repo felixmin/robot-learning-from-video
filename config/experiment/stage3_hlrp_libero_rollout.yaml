@@ -39,7 +39,7 @@ lerobot_eval:
   eval_n_episodes: 5
   eval_batch_size: 1
 
-  output_dir: ${logging.runs_dir}/lerobot_rollout
+  output_dir: ${logging.runs_dir}
   job_name: ${experiment.name}
   seed: 1000
   trust_remote_code: false
