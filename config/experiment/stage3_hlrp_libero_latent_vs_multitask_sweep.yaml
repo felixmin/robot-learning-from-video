@@ -1,0 +1,133 @@
+# @package _global_
+
+defaults:
+  - /cluster@cluster: local_dev
+  - /model/shared@smolvla_core: smolvla_core
+  - optional /user_config: local
+
+experiment:
+  name: ${latent_split_variants.${variant_id}.experiment_name}
+  description: "Stage 3 Libero 3-way sweep: 10% multitask-only vs 100% split (10% multitask + 90% latent-only) vs 100% full multitask baseline"
+
+variant_id: mt10_only
+
+submit:
+  script: 6_train_lerobot
+
+sweep:
+  params:
+    variant_id: mt10_only,mt10_lat100,mt100_full_multitask
+
+latent_split_variants:
+  mt10_only:
+    experiment_name: stage3_hlrp_libero_10pct_multitask_only
+    action_subset_ratio: 0.1
+    latent_scope: action_subset
+  mt10_lat100:
+    experiment_name: stage3_hlrp_libero_100pct_10pct_multitask_90pct_latent
+    action_subset_ratio: 0.1
+    latent_scope: all
+  mt100_full_multitask:
+    experiment_name: stage3_hlrp_libero_100pct_full_multitask_baseline
+    action_subset_ratio: 1.0
+    latent_scope: all
+
+logging:
+  use_wandb: true
+  tags: ["stage3", "lerobot", "libero", "hlrp-policy", "smolvla", "scratch", "cotrain", "latent-vs-multitask"]
+
+lerobot:
+  command: lerobot-train
+  install_editable: lerobot_policy_hlrp
+
+  output_dir: ${logging.runs_dir}/lerobot_smolvla_shared_libero_latent_vs_multitask
+  job_name: ${experiment.name}
+  steps: 100000
+  batch_size: 32
+  num_workers: 4
+  log_freq: 200
+  save_freq: 20000
+  use_policy_training_preset: false
+
+  shell_env:
+    MUJOCO_GL: egl
+    LIBERO_CONFIG_PATH: ${logging.root_dir}/cache/libero_config
+    HF_HOME: /dss/dssmcmlfs01/pn57pi/pn57pi-dss-0001/felix_minzenmay/cache/huggingface
+    HF_HUB_CACHE: /dss/dssmcmlfs01/pn57pi/pn57pi-dss-0001/felix_minzenmay/cache/huggingface/hub
+    HF_DATASETS_CACHE: /dss/dssmcmlfs01/pn57pi/pn57pi-dss-0001/felix_minzenmay/cache/huggingface/datasets
+
+  wandb:
+    enable: true
+
+  policy:
+    type: hlrp_smolvla_shared
+    repo_id: felixmin/hlrp_smolvla_shared_libero_latent_vs_multitask
+    device: cuda
+    push_to_hub: false
+    init_mode: scratch
+    stage2_artifact: null
+    stage3_training_mode: multitask
+    action_loss_weight: 1.0
+    latent_loss_weight: 1.0
+    latent_scope: ${latent_split_variants.${variant_id}.latent_scope}
+    action_subset_ratio: ${latent_split_variants.${variant_id}.action_subset_ratio}
+    action_subset_key: episode_index
+    laq_checkpoint_path: /mnt/data/workspace/code/high-level-robot-planner/runs/2026-02-24_10-41-51_laq_oxe_local/checkpoints/last.ckpt
+    laq_future_frames: 10
+    laq_camera_keys: [observation.images.image]
+    model_name: ${smolvla_core.vla.model_name}
+    load_vlm_weights: ${smolvla_core.vla.load_vlm_weights}
+    train_expert_only: true
+    freeze_vision_encoder: ${smolvla_core.vla.freeze_vision_encoder}
+    attention_mode: ${smolvla_core.vla.attention_mode}
+    num_expert_layers: ${smolvla_core.vla.num_expert_layers}
+    num_vlm_layers: ${smolvla_core.vla.num_vlm_layers}
+    self_attn_every_n_layers: ${smolvla_core.vla.self_attn_every_n_layers}
+    expert_width_multiplier: ${smolvla_core.vla.expert_width_multiplier}
+    add_image_special_tokens: ${smolvla_core.vla.add_image_special_tokens}
+    max_state_dim: ${smolvla_core.vla.max_state_dim}
+    prefix_length: ${smolvla_core.vla.prefix_length}
+    use_gpu_preprocessing: ${smolvla_core.vla.use_gpu_preprocessing}
+    image_size: ${smolvla_core.vla.image_size}
+    empty_cameras: ${smolvla_core.vla.empty_cameras}
+    latent_vector_dim: ${smolvla_core.latent.latent_vector_dim}
+    max_action_dim: ${smolvla_core.flow.max_action_dim}
+    flow_hidden_dim: ${smolvla_core.flow.flow_hidden_dim}
+    flow_steps: ${smolvla_core.flow.flow_steps}
+    chunk_size: ${smolvla_core.flow.chunk_size}
+    tokenizer_max_length: ${smolvla_core.vla.tokenizer_max_length}
+    pad_language_to: ${smolvla_core.vla.pad_language_to}
+    n_action_steps: ${smolvla_core.flow.chunk_size}
+    min_period: ${smolvla_core.flow.min_period}
+    max_period: ${smolvla_core.flow.max_period}
+    time_beta_alpha: ${smolvla_core.flow.time_beta_alpha}
+    time_beta_beta: ${smolvla_core.flow.time_beta_beta}
+
+  dataset:
+    repo_id: HuggingFaceVLA/libero
+    episodes: null
+    root: null
+    use_imagenet_stats: false
+    video_backend: pyav
+
+  env:
+    type: libero
+    task: libero_10
+    observation_height: 512
+    observation_width: 512
+
+  optimizer:
+    type: adamw
+    betas: [0.9, 0.95]
+
+  scheduler:
+    type: cosine_decay_with_warmup
+    num_warmup_steps: 100
+    num_decay_steps: 99900
+    peak_lr: 1e-4
+    decay_lr: 2.5e-6
+
+  eval:
+    freq: 20000
+    batch_size: 2
+    n_episodes: 10

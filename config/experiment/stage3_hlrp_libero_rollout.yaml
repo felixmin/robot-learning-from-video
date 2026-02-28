@@ -46,5 +46,6 @@ lerobot_eval:
 
   env:
     MUJOCO_GL: egl
+    LIBERO_CONFIG_PATH: ${logging.root_dir}/cache/libero_config
 
   extra_args: []
