@@ -56,14 +56,17 @@ python scripts/0_setup_environment.py
 ### Running Training
 
 ```bash
-# Local debug: Small dataset on RTX 5090 or CPU
-python scripts/2_train_laq.py experiment=laq_debug
+# Stage 1 (LAQ) local
+python scripts/2_train_laq.py experiment=stage1_laq_oxe_local
 
-# Modify configuration via CLI
-python scripts/2_train_laq.py experiment=laq_debug data.batch_size=16 training.epochs=10
+# Stage 2 (foundation SmolVLA flow) local
+python scripts/4_train_foundation.py experiment=stage2_smol_flow
 
-# Full training on LRZ cluster (see docs/)
-sbatch slurm/train.sbatch scripts/2_train_laq.py experiment=laq_full
+# Stage 3 (LeRobot action-only) local
+python scripts/6_train_lerobot.py experiment=stage3_hlrp_libero_action_scratch
+
+# Cluster submit (all stages)
+python scripts/submit_job.py experiment=stage3_hlrp_libero_action_scratch cluster=lrz_x100
 ```
 
 ## Configuration
@@ -72,10 +75,23 @@ Uses [Hydra](https://hydra.cc) for composable configuration. Experiments compose
 
 ```bash
 # Override from CLI
-python scripts/2_train_laq.py experiment=laq_full data.batch_size=512 training.optimizer.lr=5e-5
+python scripts/2_train_laq.py experiment=stage1_laq_oxe_local data.loader.batch_size=32 training.optimizer.lr=5e-5
 ```
 
 See `CLAUDE.md` for architecture and config structure details.
+
+## Dataset Sources and Downloads
+
+- Workstation/local training usually uses local dataset paths:
+  - Stage 1/2 OXE local shards: `/mnt/data/oxe` (via `data=oxe_local_indexed`)
+  - Stage 3 Libero snapshot: `/mnt/data/workspace/hflibero/datasets--HuggingFaceVLA--libero/snapshots/<snapshot>`
+- Cluster training:
+  - Stage 1/2 uses dataset paths available on cluster storage; OXE is not auto-downloaded by the training scripts.
+  - Stage 3 can download Libero at run start if `lerobot.dataset.root=null` and `lerobot.dataset.repo_id=HuggingFaceVLA/libero`.
+- Runtime-downloaded datasets/assets:
+  - `HuggingFaceVLA/libero` dataset cache (`HF_DATASETS_CACHE`)
+  - LIBERO environment assets (`~/.cache/libero/assets`) if missing
+  - Hugging Face model/checkpoint cache (`HF_HUB_CACHE`)
 
 ## Development
 
@@ -93,7 +109,7 @@ ruff check packages/ scripts/ tests/
 ## Documentation
 
 - **[CLAUDE.md](CLAUDE.md)** - Project architecture, development commands, and setup for Claude Code
-- **[docs/lrz_workflow.md](docs/lrz_workflow.md)** - LRZ cluster setup, job submission, and debugging
+- **[AGENTS.md](AGENTS.md)** - Operational rules and runbook for local and cluster execution
 
 ## Dependencies
 
@@ -140,4 +156,3 @@ https://github.com/user-attachments/assets/0cc694b1-ff8c-406d-b5a7-a6815fe8c1af
 ## License
 
 MIT License - See LICENSE file for details
-

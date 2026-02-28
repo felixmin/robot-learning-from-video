@@ -74,6 +74,9 @@ Before deciding how to run anything, check `pwd` and `hostname` to determine if 
 
 - GPU: RTX 5090 (32 GB VRAM), System RAM: 64 GB
 - Use for smaller/short LAQ or low-scale training/debug runs.
+- Prefer local datasets on workstation:
+  - Stage 1/2 local OXE shards: `/mnt/data/oxe` (via `data=oxe_local_indexed`)
+  - Stage 3 local Libero snapshot: `/mnt/data/workspace/hflibero/datasets--HuggingFaceVLA--libero/snapshots/<snapshot>`
 - For larger runs, long runs, or shared reproducible jobs, prefer cluster.
 - Conda envs:
   - `hlrp` for LAQ (stage-1) and VLA (stage-2) training
@@ -83,6 +86,8 @@ Before deciding how to run anything, check `pwd` and `hostname` to determine if 
 
 - Connect: `ssh ai`
 - Never run training on login nodes. Use login nodes only for submission, monitoring, code sync, and lightweight ops. Launch compute allocations/jobs for any actual training.
+- Stage 1/2: use dataset paths available on cluster storage (no automatic OXE download by training scripts).
+- Stage 3: Libero can be downloaded at training start by setting `lerobot.dataset.root=null` with `lerobot.dataset.repo_id=HuggingFaceVLA/libero`.
 - Check queue: `squeue --me`
 - Monitor job: `squeue -j <JOBID> -o "%.18i %.30P %.20j %.8T %.10M %.9l %R"`
 - Tail logs: `tail -f <RUN_DIR>/<JOBID>.out` / `.err`
@@ -100,6 +105,10 @@ Submit same run to both clusters for faster start:
 - Runs: `/dss/dssmcmlfs01/pn57pi/pn57pi-dss-0001/felix_minzenmay/runs/<timestamp>_<experiment>`
 - Cache: `/dss/dssmcmlfs01/pn57pi/pn57pi-dss-0001/felix_minzenmay/cache`
 - `submit_job.py` mounts repo/runs/cache into container automatically.
+- Downloaded/runtime caches to be aware of:
+  - `HuggingFaceVLA/libero` dataset cache (`HF_DATASETS_CACHE`)
+  - Hugging Face model/checkpoint cache (`HF_HUB_CACHE`)
+  - LIBERO assets cache (`~/.cache/libero/assets`)
 
 ## Configuration System
 
@@ -115,7 +124,7 @@ defaults:
 
 Override from CLI:
 ```bash
-python scripts/2_train_laq.py experiment=laq_full data.batch_size=512 training.optimizer.lr=5e-5
+python scripts/2_train_laq.py experiment=stage1_laq_oxe_local data.loader.batch_size=32 training.optimizer.lr=5e-5
 ```
 
 ## Submit Workflow
@@ -133,7 +142,7 @@ python scripts/submit_job.py experiment=<sweep_experiment>
 
 Local non-Slurm runs (common on workstation and cluster interactive sessions):
 ```bash
-python scripts/2_train_laq.py experiment=laq_debug
+python scripts/2_train_laq.py experiment=stage1_laq_oxe_local
 ```
 
 See `docs/job_submission.md` for full documentation.

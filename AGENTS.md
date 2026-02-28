@@ -83,6 +83,9 @@ Workstation capability reference (for local non-Slurm runs):
 - GPU: RTX 5090 (32 GB VRAM)
 - System RAM: 64 GB
 - Use local workstation for smaller/short LAQ or low-scale training/debug runs when resources are sufficient.
+- Prefer local datasets on workstation:
+  - Stage 1/2 default local adapter root: `/mnt/data/oxe` (`data=oxe_local_indexed`)
+  - Stage 3 local Libero snapshot root: `/mnt/data/workspace/hflibero/datasets--HuggingFaceVLA--libero/snapshots/<snapshot>`
 - Local workstation training against GCS-backed OXE data (`source=auto` resolving to `gs://...` or explicit `source=gcs`) is a valid training path, not just tuning/debug.
 - "Not representative for cluster behavior" is not, by itself, a reason to reject local training runs when the goal is local training.
 - For larger runs, long runs, or shared reproducible jobs, prefer cluster.
@@ -102,10 +105,22 @@ Workstation capability reference (for local non-Slurm runs):
 
 ## Stage 3 (LeRobot) Config
 - Main train configs:
-  - `config/experiment/lerobot_hlrp_smolvla_shared_libero_scratch.yaml`
-  - `config/experiment/lerobot_hlrp_smolvla_shared_libero_cotrain_scratch.yaml`
+  - `config/experiment/stage3_hlrp_libero_action_scratch.yaml`
+  - `config/experiment/stage3_hlrp_libero_multitask_scratch.yaml`
 - Uses LeRobot policy plugin editable install from:
   - `lerobot_policy_hlrp`
+
+## Dataset Source and Download Behavior
+- Workstation/local runs:
+  - Stage 1/2 typically use local OXE shards (`data=oxe_local_indexed`, root `/mnt/data/oxe`).
+  - Stage 3 typically uses a local Libero snapshot via `lerobot.dataset.root=/mnt/data/workspace/hflibero/...`.
+- Cluster runs:
+  - Stage 1/2 use dataset paths available on cluster storage; scripts do not auto-download OXE shards.
+  - Stage 3 can download Libero at train start by setting `lerobot.dataset.root=null` and using `lerobot.dataset.repo_id=HuggingFaceVLA/libero`.
+- Runtime-downloaded datasets/assets that should be documented:
+  - `HuggingFaceVLA/libero` dataset cache (`HF_DATASETS_CACHE`).
+  - LIBERO environment assets cache (`~/.cache/libero/assets`) if missing.
+  - Hugging Face model/checkpoint cache (`HF_HUB_CACHE`) for model weights used by Stage 2/3 and LAQ dependencies.
 
 ## Cluster Access + Basic Operations
 - Connect:
