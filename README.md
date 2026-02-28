@@ -109,13 +109,21 @@ Human demonstration data is significantly easier and more cost-effective to coll
 
 **Human Demonstration:**
 
-https://github.com/user-attachments/assets/3814434a-f83c-451a-bb72-01cb72a6b8b9
+
+
+
+https://github.com/user-attachments/assets/c85271ec-d35f-4310-ac96-08a0e8d20476
+
 
 
 
 **Franka Emika Robot Execution:**
 
-https://github.com/user-attachments/assets/247a2a0f-5c88-46a1-b2cd-9c3df14daa03
+
+
+
+https://github.com/user-attachments/assets/0cc694b1-ff8c-406d-b5a7-a6815fe8c1af
+
 
 
 
