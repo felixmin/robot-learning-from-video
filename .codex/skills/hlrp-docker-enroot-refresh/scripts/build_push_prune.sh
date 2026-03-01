@@ -128,20 +128,6 @@ case "${PROFILE}" in
       exit 1
     fi
     ;;
-  stage3)
-    if [[ ! -f "${CONTEXT}/lerobot/pyproject.toml" ]]; then
-      echo "Expected build context to contain lerobot/pyproject.toml: ${CONTEXT}" >&2
-      exit 1
-    fi
-    if [[ ! -f "${CONTEXT}/lerobot/MANIFEST.in" ]]; then
-      echo "Expected build context to contain lerobot/MANIFEST.in: ${CONTEXT}" >&2
-      exit 1
-    fi
-    if [[ ! -d "${CONTEXT}/lerobot/src" ]]; then
-      echo "Expected build context to contain lerobot/src/: ${CONTEXT}" >&2
-      exit 1
-    fi
-    ;;
 esac
 
 printf 'Profile: %s\n' "${PROFILE}"

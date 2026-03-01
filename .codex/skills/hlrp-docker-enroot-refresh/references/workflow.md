@@ -55,7 +55,7 @@ mv <new-name>.sqsh hlrp_stage3_lerobot.sqsh
 
 ## Known Failure Modes
 
-- `Dockerfile.stage3` expects the bundled `lerobot/` folder to be present in the repo root build context.
+- `Dockerfile.stage3` installs a pinned baseline `lerobot[libero]` package. Source-tree edits to `lerobot/` are not picked up until runtime editable installs are requested by the stage-3 job config.
 - `docker://docker.io/felixmin/hlrp:stage12` or `docker://docker.io/felixmin/hlrp:stage3` are the wrong Enroot URIs. Use `docker://felixmin/hlrp:stage12` or `docker://felixmin/hlrp:stage3`.
 - `enroot import` can OOM while creating squashfs. The validated fix was `--mem=128G`, `-c 4`, and `ENROOT_MAX_PROCESSORS=4`.
 - If an import job OOMs, the partial `.sqsh` may exist but should be treated as invalid. Do not delete it; create a new output filename for the retry.

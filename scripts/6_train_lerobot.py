@@ -3,8 +3,8 @@
 Script 6: Stage-3 LeRobot fine-tuning/evaluation entrypoint.
 
 This script is intended to run inside the Slurm container launched by
-`scripts/submit_job.py`. It can optionally editable-install a local LeRobot
-policy plugin and then execute `lerobot-train`.
+`scripts/submit_job.py`. It can optionally editable-install mounted LeRobot
+packages and then execute `lerobot-train`.
 """
 
 from __future__ import annotations
@@ -100,7 +100,7 @@ def _run_install_command(
         return False, err
 
 
-def _install_editable_policy(
+def _install_editable_package(
     *,
     editable_path: Path,
     logger,
@@ -203,9 +203,37 @@ def _install_editable_policy(
 
     details = "\n".join(f"- {msg}" for msg in attempted_errors)
     raise RuntimeError(
-        "Failed to editable-install policy package with all supported installers:\n"
+        "Failed to editable-install package with all supported installers:\n"
         f"{details}"
     )
+
+
+def _editable_paths_from_cfg(cfg: DictConfig) -> list[Path]:
+    raw_paths = OmegaConf.select(cfg, "lerobot.install_editables")
+    if raw_paths is None:
+        legacy_path = OmegaConf.select(cfg, "lerobot.install_editable")
+        raw_paths = [] if legacy_path is None else [legacy_path]
+    elif not (OmegaConf.is_list(raw_paths) or isinstance(raw_paths, (list, tuple))):
+        raise ValueError("lerobot.install_editables must be a list of package paths")
+
+    editable_paths: list[Path] = []
+    seen_paths: set[str] = set()
+    for raw_path in raw_paths:
+        if raw_path is None:
+            continue
+        editable_path = Path(str(raw_path))
+        if not editable_path.is_absolute():
+            editable_path = workspace_root / editable_path
+        editable_path = editable_path.resolve()
+        if not editable_path.exists():
+            raise FileNotFoundError(f"Editable package path not found: {editable_path}")
+        editable_key = str(editable_path)
+        if editable_key in seen_paths:
+            continue
+        seen_paths.add(editable_key)
+        editable_paths.append(editable_path)
+
+    return editable_paths
 
 
 def _resolve_libero_benchmark_root() -> Path:
@@ -426,15 +454,9 @@ def main(cfg: DictConfig) -> None:
         env[str(k)] = str(v)
     _ensure_libero_config(env=env, logger=logger)
 
-    install_editable = OmegaConf.select(cfg, "lerobot.install_editable")
-    if install_editable:
-        editable_path = Path(str(install_editable))
-        if not editable_path.is_absolute():
-            editable_path = workspace_root / editable_path
-        if not editable_path.exists():
-            raise FileNotFoundError(f"Editable policy path not found: {editable_path}")
-        logger.info("Installing editable policy package: %s", editable_path)
-        _install_editable_policy(
+    for editable_path in _editable_paths_from_cfg(cfg):
+        logger.info("Installing editable package: %s", editable_path)
+        _install_editable_package(
             editable_path=editable_path,
             logger=logger,
             cwd=workspace_root,

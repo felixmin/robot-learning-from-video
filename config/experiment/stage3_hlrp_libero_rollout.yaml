@@ -28,7 +28,7 @@ logging:
 
 lerobot_eval:
   command: lerobot-eval
-  install_policy_editable: lerobot_policy_hlrp
+  install_editables: [lerobot, lerobot_policy_hlrp]
 
   policy_path: null
   policy_device: cuda

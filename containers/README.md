@@ -18,10 +18,9 @@ The preferred workflow is:
 3. Import the tag to the cluster with Enroot.
 4. Swap the imported `.sqsh` into the matching target path.
 
-For stage 3, the image contains the baseline LeRobot runtime. During active development, jobs can overlay mounted source from this repo with:
+For stage 3, the image contains the baseline LeRobot runtime from the published package. During active development, jobs can overlay mounted source from this repo with:
 
 ```bash
-pip install --no-deps -e /dss/.../high-level-robot-planner/lerobot
-pip install --no-deps -e /dss/.../high-level-robot-planner/lerobot_policy_hlrp
+pip install --no-deps --no-build-isolation -e /dss/.../high-level-robot-planner/lerobot
+pip install --no-deps --no-build-isolation -e /dss/.../high-level-robot-planner/lerobot_policy_hlrp
 ```
-

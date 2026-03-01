@@ -3,8 +3,8 @@
 Script 7: Stage-3 LeRobot rollout/evaluation entrypoint.
 
 This script is intended to run inside the Slurm container launched by
-`scripts/submit_job.py`. It can optionally editable-install a local LeRobot
-policy plugin and then execute `lerobot-eval`.
+`scripts/submit_job.py`. It can optionally editable-install mounted LeRobot
+packages and then execute `lerobot-eval`.
 """
 
 from __future__ import annotations
@@ -46,7 +46,7 @@ def _run_install_command(
         return False, err
 
 
-def _install_editable_policy(
+def _install_editable_package(
     *,
     editable_path: Path,
     logger,
@@ -57,7 +57,7 @@ def _install_editable_policy(
     attempted_errors: list[str] = []
 
     ok, err = _run_install_command(
-        [python, "-m", "pip", "install", "--no-deps", "-e", str(editable_path)],
+        [python, "-m", "pip", "install", "--no-deps", "--no-build-isolation", "-e", str(editable_path)],
         logger=logger,
         cwd=cwd,
         env=env,
@@ -76,7 +76,16 @@ def _install_editable_policy(
         )
         if boot_ok:
             ok, err = _run_install_command(
-                [python, "-m", "pip", "install", "--no-deps", "-e", str(editable_path)],
+                [
+                    python,
+                    "-m",
+                    "pip",
+                    "install",
+                    "--no-deps",
+                    "--no-build-isolation",
+                    "-e",
+                    str(editable_path),
+                ],
                 logger=logger,
                 cwd=cwd,
                 env=env,
@@ -97,6 +106,7 @@ def _install_editable_policy(
                 "--python",
                 python,
                 "--no-deps",
+                "--no-build-isolation",
                 "-e",
                 str(editable_path),
             ],
@@ -113,7 +123,7 @@ def _install_editable_policy(
     pip_bin = shutil.which("pip", path=env.get("PATH"))
     if pip_bin is not None:
         ok, err = _run_install_command(
-            [pip_bin, "install", "--no-deps", "-e", str(editable_path)],
+            [pip_bin, "install", "--no-deps", "--no-build-isolation", "-e", str(editable_path)],
             logger=logger,
             cwd=cwd,
             env=env,
@@ -126,9 +136,37 @@ def _install_editable_policy(
 
     details = "\n".join(f"- {msg}" for msg in attempted_errors)
     raise RuntimeError(
-        "Failed to editable-install policy package with all supported installers:\n"
+        "Failed to editable-install package with all supported installers:\n"
         f"{details}"
     )
+
+
+def _editable_paths_from_cfg(cfg: DictConfig) -> list[Path]:
+    raw_paths = OmegaConf.select(cfg, "lerobot_eval.install_editables")
+    if raw_paths is None:
+        legacy_path = OmegaConf.select(cfg, "lerobot_eval.install_policy_editable")
+        raw_paths = [] if legacy_path is None else [legacy_path]
+    elif not (OmegaConf.is_list(raw_paths) or isinstance(raw_paths, (list, tuple))):
+        raise ValueError("lerobot_eval.install_editables must be a list of package paths")
+
+    editable_paths: list[Path] = []
+    seen_paths: set[str] = set()
+    for raw_path in raw_paths:
+        if raw_path is None:
+            continue
+        editable_path = Path(str(raw_path))
+        if not editable_path.is_absolute():
+            editable_path = workspace_root / editable_path
+        editable_path = editable_path.resolve()
+        if not editable_path.exists():
+            raise FileNotFoundError(f"Editable package path not found: {editable_path}")
+        editable_key = str(editable_path)
+        if editable_key in seen_paths:
+            continue
+        seen_paths.add(editable_key)
+        editable_paths.append(editable_path)
+
+    return editable_paths
 
 
 def _command_from_cfg(cfg: DictConfig) -> list[str]:
@@ -225,15 +263,9 @@ def main(cfg: DictConfig) -> None:
             continue
         env[str(k)] = str(v)
 
-    install_editable = OmegaConf.select(cfg, "lerobot_eval.install_policy_editable")
-    if install_editable:
-        editable_path = Path(str(install_editable))
-        if not editable_path.is_absolute():
-            editable_path = workspace_root / editable_path
-        if not editable_path.exists():
-            raise FileNotFoundError(f"Editable policy path not found: {editable_path}")
-        logger.info("Installing editable policy package: %s", editable_path)
-        _install_editable_policy(
+    for editable_path in _editable_paths_from_cfg(cfg):
+        logger.info("Installing editable package: %s", editable_path)
+        _install_editable_package(
             editable_path=editable_path,
             logger=logger,
             cwd=workspace_root,
