@@ -55,7 +55,7 @@ lerobot:
   use_policy_training_preset: false
 
   shell_env:
-    MUJOCO_GL: egl
+    MUJOCO_GL: osmesa
     LIBERO_CONFIG_PATH: ${logging.root_dir}/cache/libero_config
     HF_HOME: /dss/dssmcmlfs01/pn57pi/pn57pi-dss-0001/felix_minzenmay/cache/huggingface
     HF_HUB_CACHE: /dss/dssmcmlfs01/pn57pi/pn57pi-dss-0001/felix_minzenmay/cache/huggingface/hub

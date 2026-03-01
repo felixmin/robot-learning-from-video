@@ -46,7 +46,7 @@ lerobot_eval:
   trust_remote_code: false
 
   env:
-    MUJOCO_GL: egl
+    MUJOCO_GL: osmesa
     LIBERO_CONFIG_PATH: ${logging.root_dir}/cache/libero_config
 
   extra_args: []

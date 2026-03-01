@@ -25,7 +25,7 @@ lerobot:
   command: lerobot-train
   install_editables: [lerobot, lerobot_policy_hlrp]
 
-  output_dir: ${logging.runs_dir}
+  output_dir: ${logging.runs_dir}/lerobot
   job_name: ${experiment.name}
   steps: 100000
   batch_size: 32
@@ -35,7 +35,11 @@ lerobot:
   use_policy_training_preset: false
 
   shell_env:
-    MUJOCO_GL: egl
+    MUJOCO_GL: osmesa
+    LIBERO_CONFIG_PATH: ${logging.root_dir}/cache/libero_config
+    HF_HOME: /dss/dssmcmlfs01/pn57pi/pn57pi-dss-0001/felix_minzenmay/cache/huggingface
+    HF_HUB_CACHE: /dss/dssmcmlfs01/pn57pi/pn57pi-dss-0001/felix_minzenmay/cache/huggingface/hub
+    HF_DATASETS_CACHE: /dss/dssmcmlfs01/pn57pi/pn57pi-dss-0001/felix_minzenmay/cache/huggingface/datasets
 
   wandb:
     enable: true
