@@ -112,7 +112,7 @@ if [[ "${ALLOW_ACTIVE_JOBS}" -eq 0 ]]; then
 fi
 
 REMOTE_RAW="set -euo pipefail; test -e \"${REPLACEMENT}\"; test -e \"${TARGET}\"; test ! -e \"${BACKUP}\"; mv \"${TARGET}\" \"${BACKUP}\"; mv \"${REPLACEMENT}\" \"${TARGET}\"; ls -lh \"${TARGET}\" \"${BACKUP}\""
-printf -v REMOTE_CMD '%q' "${REMOTE_RAW}"
+printf -v REMOTE_CMD 'bash -lc %q' "${REMOTE_RAW}"
 
 printf 'Profile: %s\n' "${PROFILE}"
 printf 'Target: %s\n' "${TARGET}"
