@@ -19,6 +19,20 @@ For performance reasons over the course of the project we switched from Open X E
   <img src="docs/assets/lam_gpu_utilization.png" alt="LAM training GPU utilization" width="700">
 </p>
 
+## Deployment
+
+For robot teleoperation and policy deployment, we use our [CRISP Controller](https://utiasdsl.github.io/crisp_controllers/) setup:
+<img width="830" height="458" alt="image" src="https://github.com/user-attachments/assets/8a4fe7b9-691f-4c27-b92b-4bf3062fcb92" />
+
+
+Here is a dataset view of a human demonstration:
+
+https://github.com/user-attachments/assets/c85271ec-d35f-4310-ac96-08a0e8d20476
+
+Here is a view of a policy deployed to Lego stacking:
+
+https://github.com/user-attachments/assets/0cc694b1-ff8c-406d-b5a7-a6815fe8c1af
+
 ## Repository Structure
 
 ```
@@ -118,21 +132,6 @@ ruff check packages/ scripts/ tests/
 Python 3.12 with PyTorch 2.9.1. Key packages: pytorch-lightning, transformers, webdataset, hydra-core, wandb, accelerate.
 
 See `environment.yml` for complete dependency list.
-
-## Deployment
-
-For robot teleoperation and policy deployment, we use our [CRISP Controller](https://utiasdsl.github.io/crisp_controllers/) setup:
-<img width="830" height="458" alt="image" src="https://github.com/user-attachments/assets/8a4fe7b9-691f-4c27-b92b-4bf3062fcb92" />
-
-
-Here is a dataset view of a human demonstration:
-
-https://github.com/user-attachments/assets/c85271ec-d35f-4310-ac96-08a0e8d20476
-
-Here is a view of a policy deployed to Lego stacking:
-
-https://github.com/user-attachments/assets/0cc694b1-ff8c-406d-b5a7-a6815fe8c1af
-
 
 
 
