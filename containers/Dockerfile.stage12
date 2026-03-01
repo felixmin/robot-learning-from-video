@@ -21,11 +21,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /workspace/high-level-robot-planner
 
 COPY --chown=user_hlrp:user_hlrp requirements.txt environment.yml ./
-COPY --chown=user_hlrp:user_hlrp config/ config/
 COPY --chown=user_hlrp:user_hlrp packages/ packages/
-COPY --chown=user_hlrp:user_hlrp scripts/ scripts/
-COPY --chown=user_hlrp:user_hlrp lerobot/ lerobot/
-COPY --chown=user_hlrp:user_hlrp lerobot_policy_hlrp/ lerobot_policy_hlrp/
 
 RUN chown -R user_hlrp:user_hlrp /workspace/high-level-robot-planner
 
@@ -40,11 +36,8 @@ ENV HOME=/home/user_hlrp \
 RUN python -m pip install --upgrade pip setuptools wheel \
     && python -m pip install --no-build-isolation egl_probe \
     && python -m pip install -r requirements.txt \
-    && python -m pip install "hf-libero>=0.1.3" "nvidia-ml-py" \
-    && sed -i 's/^dynamic = \["readme"\]/readme = "README.md"/' lerobot/pyproject.toml \
-    && python -m pip install -e "./lerobot[libero,smolvla]" \
-    && python -m pip install -e ./lerobot_policy_hlrp \
+    && python -m pip install "nvidia-ml-py" \
     && (python -m pip uninstall -y torchao || true) \
-    && python -c "import common, foundation, laq, lerobot, lerobot_policy_hlrp; print('ok')"
+    && python -c "import common, foundation, laq; print('ok')"
 
 CMD ["/bin/bash"]

@@ -202,5 +202,6 @@ pip install torch==2.9.1 torchvision==0.24.1 torchaudio==2.9.1 --index-url https
   - Container A: LAQ (stage-1) and VLA (stage-2)
   - Container B: LeRobot (stage-3)
 - This is work in progress and may be unified later.
-- Main stage-3 image: `/dss/dssmcmlfs01/pn57pi/pn57pi-dss-0001/felix_minzenmay/enroot/hlrp_libero.sqsh`
+- Stage-1/2 image: `/dss/dssmcmlfs01/pn57pi/pn57pi-dss-0001/felix_minzenmay/enroot/hlrp_stage12.sqsh`
+- Stage-3 image: `/dss/dssmcmlfs01/pn57pi/pn57pi-dss-0001/felix_minzenmay/enroot/hlrp_stage3_lerobot.sqsh`
 - Run Enroot import on compute nodes (not login), request enough memory to avoid OOM.

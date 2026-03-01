@@ -12,10 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This Dockerfile is designed for lerobot developers who want to
-# mount their code into the container at runtime for live development.
-# The virtual environment is placed in /opt/lerobot-venv to avoid
-# being shadowed when mounting code to /lerobot.
+# This image provides the stage-3 LeRobot runtime and a baseline LeRobot
+# install. During active development, the mounted repo can still override the
+# in-image install with `pip install --no-deps -e ./lerobot` at job start.
 
 # docker build -f docker/Dockerfile.user -t lerobot-user .
 # docker run -it --gpus all -v $(pwd):/lerobot --rm lerobot-user

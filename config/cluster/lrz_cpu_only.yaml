@@ -22,4 +22,4 @@ slurm:
 container:
   # Default to a per-user container path on DSSHOME. Override via
   # `cluster.container.image=/path/to/container.sqsh` if needed.
-  image: ${oc.env:HOME}/workspace/containers/lam.sqsh
+  image: ${oc.env:HOME}/workspace/containers/hlrp_stage12.sqsh

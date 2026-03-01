@@ -33,4 +33,4 @@ data:
 # so this value cleanly overrides `cluster.container.image`.
 cluster:
   container:
-    image: null            # e.g. /dss/.../enroot/lam.sqsh
+    image: null            # e.g. /dss/.../enroot/hlrp_stage12.sqsh

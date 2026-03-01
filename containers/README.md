@@ -1,29 +1,27 @@
-# LRZ Cluster
+# HLRP Containers
 
-To run hlrp on the lrz cluster you need a enroot container based on nvidia ngc. You can build the dockerfile in this package locally, push it to docker hub and then execute import and create on the cluster with your user specific data to get the .sqsh file.
+This repo maintains two container build targets:
 
-## Lerobot in python3.12 install on workstation
-sudo apt-get install cmake build-essential python3-dev pkg-config libavformat-dev libavcodec-dev libavdevice-dev libavutil-dev libswscale-dev libswresample-dev libavfilter-dev
-conda install -c conda-forge cmake ninja
-sudo apt update
-sudo apt install -y libegl1-mesa-dev libgl1-mesa-dev libgles2-mesa-dev
-pip install --no-build-isolation egl_probe hf-egl-probe -> failed
-conda install -c conda-forge "cmake<4" ninja
-pip install --no-build-isolation egl_probe 
-pip install -e ".[libero]"
-pip uninstall torch torchvision torchaudio
-pip3 install --pre torch torchvision --index-url https://download.pytorch.org/whl/nightly/cu128
+- `containers/Dockerfile.stage12`
+  Builds the stage-1/2 image for LAQ and foundation training.
+  Docker tag: `felixmin/hlrp:stage12`
+  Cluster image path: `/dss/dssmcmlfs01/pn57pi/pn57pi-dss-0001/felix_minzenmay/enroot/hlrp_stage12.sqsh`
+- `containers/Dockerfile.stage3`
+  Builds the stage-3 LeRobot image.
+  Docker tag: `felixmin/hlrp:stage3`
+  Cluster image path: `/dss/dssmcmlfs01/pn57pi/pn57pi-dss-0001/felix_minzenmay/enroot/hlrp_stage3_lerobot.sqsh`
 
+The preferred workflow is:
 
+1. Build on the workstation.
+2. Push the matching Docker tag to Docker Hub.
+3. Import the tag to the cluster with Enroot.
+4. Swap the imported `.sqsh` into the matching target path.
 
-## Switch to Olivers file
-After some experiments with the pytorch ngc file where I had issues I moved to olivers file without preinstalled cuda
+For stage 3, the image contains the baseline LeRobot runtime. During active development, jobs can overlay mounted source from this repo with:
 
-workflow:
-build on workstation
-push to dockerhub
-docker push felixmin/hlrp:latest
-enroot import docker://... to download it
-enroot create xyz.sqsh to create it
-
+```bash
+pip install --no-deps -e /dss/.../high-level-robot-planner/lerobot
+pip install --no-deps -e /dss/.../high-level-robot-planner/lerobot_policy_hlrp
+```
 

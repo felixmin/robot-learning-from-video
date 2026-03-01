@@ -14,6 +14,10 @@ variant_id: mt10_only
 submit:
   script: 6_train_lerobot
 
+cluster:
+  container:
+    image: /dss/dssmcmlfs01/pn57pi/pn57pi-dss-0001/felix_minzenmay/enroot/hlrp_stage3_lerobot.sqsh
+
 sweep:
   params:
     variant_id: mt10_only,mt10_lat100,mt100_full_multitask

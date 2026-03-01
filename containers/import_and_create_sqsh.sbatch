@@ -6,8 +6,8 @@
 
 set -euo pipefail
 
-IMG="$HOME/containers/myproj.sqsh"
-REMOTE="docker://ghcr.io/felixmin/hlrp:latest"
+IMG="$HOME/containers/hlrp_stage12.sqsh"
+REMOTE="docker://felixmin/hlrp:stage12"
 
 mkdir -p "$(dirname "$IMG")"
 

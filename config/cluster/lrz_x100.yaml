@@ -16,4 +16,4 @@ slurm:
 container:
   # Default to a per-user container path on DSSHOME. Override via
   # `cluster.container.image=/path/to/container.sqsh` if needed.
-  image: /dss/dssmcmlfs01/pn57pi/pn57pi-dss-0001/felix_minzenmay/enroot/lam.sqsh
+  image: /dss/dssmcmlfs01/pn57pi/pn57pi-dss-0001/felix_minzenmay/enroot/hlrp_stage12.sqsh

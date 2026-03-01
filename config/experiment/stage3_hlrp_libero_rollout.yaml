@@ -20,7 +20,7 @@ cluster:
     mem_gb: 32
     time_limit: "00:30:00"
   container:
-    image: /dss/dssmcmlfs01/pn57pi/pn57pi-dss-0001/felix_minzenmay/enroot/hlrp_libero.sqsh
+    image: /dss/dssmcmlfs01/pn57pi/pn57pi-dss-0001/felix_minzenmay/enroot/hlrp_stage3_lerobot.sqsh
 
 logging:
   use_wandb: false

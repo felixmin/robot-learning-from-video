@@ -3,12 +3,21 @@
 ## Defaults
 
 - Local repo root: `/mnt/data/workspace/code/high-level-robot-planner`
-- Dockerfile: `/mnt/data/workspace/code/high-level-robot-planner/containers/Dockerfile.lerobot`
 - Docker build context: `/mnt/data/workspace/code/high-level-robot-planner`
-- Pushed tag: `felixmin/hlrp:latest`
 - Cluster host: `ai`
 - Cluster Enroot dir: `/dss/dssmcmlfs01/pn57pi/pn57pi-dss-0001/felix_minzenmay/enroot`
-- Active cluster image path: `/dss/dssmcmlfs01/pn57pi/pn57pi-dss-0001/felix_minzenmay/enroot/lam.sqsh`
+
+### Stage 1/2 Profile
+
+- Dockerfile: `/mnt/data/workspace/code/high-level-robot-planner/containers/Dockerfile.stage12`
+- Pushed tag: `felixmin/hlrp:stage12`
+- Active cluster image path: `/dss/dssmcmlfs01/pn57pi/pn57pi-dss-0001/felix_minzenmay/enroot/hlrp_stage12.sqsh`
+
+### Stage 3 Profile
+
+- Dockerfile: `/mnt/data/workspace/code/high-level-robot-planner/containers/Dockerfile.stage3`
+- Pushed tag: `felixmin/hlrp:stage3`
+- Active cluster image path: `/dss/dssmcmlfs01/pn57pi/pn57pi-dss-0001/felix_minzenmay/enroot/hlrp_stage3_lerobot.sqsh`
 
 ## Validated Command Shapes
 
@@ -18,10 +27,10 @@ Local build/push:
 docker system prune -a --volumes -f
 docker builder prune -a -f
 docker build \
-  -f /mnt/data/workspace/code/high-level-robot-planner/containers/Dockerfile.lerobot \
-  -t felixmin/hlrp:latest \
+  -f /mnt/data/workspace/code/high-level-robot-planner/containers/Dockerfile.stage3 \
+  -t felixmin/hlrp:stage3 \
   /mnt/data/workspace/code/high-level-robot-planner
-docker push felixmin/hlrp:latest
+docker push felixmin/hlrp:stage3
 docker system prune -a --volumes -f
 docker builder prune -a -f
 ```
@@ -32,22 +41,22 @@ Cluster import:
 sbatch -p lrz-cpu -q cpu -t 01:00:00 --mem=128G -c 4 -J enroot-import-hlrp-oli \
   --wrap "mkdir -p /dss/dssmcmlfs01/pn57pi/pn57pi-dss-0001/felix_minzenmay/enroot && \
   export ENROOT_MAX_PROCESSORS=4 && \
-  enroot import -o /dss/dssmcmlfs01/pn57pi/pn57pi-dss-0001/felix_minzenmay/enroot/<new-name>.sqsh \
-  docker://felixmin/hlrp:latest && \
-  ls -lh /dss/dssmcmlfs01/pn57pi/pn57pi-dss-0001/felix_minzenmay/enroot/<new-name>.sqsh"
+  enroot import -o /dss/dssmcmlfs01/pn57pi/pn57pi-dss-0001/felix_minzenmay/enroot/hlrp_stage3_<new-name>.sqsh \
+  docker://felixmin/hlrp:stage3 && \
+  ls -lh /dss/dssmcmlfs01/pn57pi/pn57pi-dss-0001/felix_minzenmay/enroot/hlrp_stage3_<new-name>.sqsh"
 ```
 
 Safe swap:
 
 ```bash
-mv lam.sqsh lam_YYYY-MM-DD_pre_refresh.sqsh
-mv <new-name>.sqsh lam.sqsh
+mv hlrp_stage3_lerobot.sqsh hlrp_stage3_lerobot_YYYY-MM-DD_pre_refresh.sqsh
+mv <new-name>.sqsh hlrp_stage3_lerobot.sqsh
 ```
 
 ## Known Failure Modes
 
-- `Dockerfile.lerobot` expects the bundled `lerobot/` folder to be present in the repo root build context.
-- `docker://docker.io/felixmin/hlrp:latest` is the wrong Enroot URI. Use `docker://felixmin/hlrp:latest`.
+- `Dockerfile.stage3` expects the bundled `lerobot/` folder to be present in the repo root build context.
+- `docker://docker.io/felixmin/hlrp:stage12` or `docker://docker.io/felixmin/hlrp:stage3` are the wrong Enroot URIs. Use `docker://felixmin/hlrp:stage12` or `docker://felixmin/hlrp:stage3`.
 - `enroot import` can OOM while creating squashfs. The validated fix was `--mem=128G`, `-c 4`, and `ENROOT_MAX_PROCESSORS=4`.
 - If an import job OOMs, the partial `.sqsh` may exist but should be treated as invalid. Do not delete it; create a new output filename for the retry.
-- Do not replace `lam.sqsh` while jobs are active unless the user explicitly accepts that risk.
+- Do not replace `hlrp_stage12.sqsh` or `hlrp_stage3_lerobot.sqsh` while jobs are active unless the user explicitly accepts that risk.

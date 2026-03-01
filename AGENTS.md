@@ -175,8 +175,10 @@ Typical sequence:
   - Container A: latent action model (stage-1) and VLA/stage-2 training.
   - Container B: LeRobot/stage-3 environment.
   - This is work in progress and may be unified later.
-- Main image used for Stage 3:
-  - `/dss/dssmcmlfs01/pn57pi/pn57pi-dss-0001/felix_minzenmay/enroot/hlrp_libero.sqsh`
+- Stage-1/2 image:
+  - `/dss/dssmcmlfs01/pn57pi/pn57pi-dss-0001/felix_minzenmay/enroot/hlrp_stage12.sqsh`
+- Stage-3 image:
+  - `/dss/dssmcmlfs01/pn57pi/pn57pi-dss-0001/felix_minzenmay/enroot/hlrp_stage3_lerobot.sqsh`
 - If image import/build is needed:
   - Run Enroot import on a compute node (not login node if Enroot unavailable there).
   - Enroot import can OOM; request enough memory.
@@ -217,7 +219,7 @@ With W&B enabled:
 ## Repo-local Skills
 
 ### Available skills
-- `hlrp-docker-enroot-refresh`: Build, push, prune, import, and safely swap the HLRP LeRobot container using `containers/Dockerfile.lerobot`, the bundled `lerobot/` Docker build context in this repo, and the `felix_minzenmay/enroot/lam.sqsh` cluster path. (file: `/mnt/data/workspace/code/high-level-robot-planner/.codex/skills/hlrp-docker-enroot-refresh/SKILL.md`)
+- `hlrp-docker-enroot-refresh`: Build, push, prune, import, and safely swap the HLRP stage-1/2 or stage-3 container using `containers/Dockerfile.stage12` or `containers/Dockerfile.stage3`, the bundled `lerobot/` Docker build context in this repo when needed, and the `felix_minzenmay/enroot/hlrp_stage12.sqsh` or `felix_minzenmay/enroot/hlrp_stage3_lerobot.sqsh` cluster paths. (file: `/mnt/data/workspace/code/high-level-robot-planner/.codex/skills/hlrp-docker-enroot-refresh/SKILL.md`)
 
 ### How to use repo-local skills
 - If the user asks to rebuild, push, import, replace, or debug the cluster container workflow, open the skill and follow it.

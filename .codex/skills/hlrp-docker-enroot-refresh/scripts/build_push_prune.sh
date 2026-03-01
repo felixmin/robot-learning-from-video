@@ -3,11 +3,11 @@ set -euo pipefail
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REPO_ROOT=$(cd "${SCRIPT_DIR}/../../../.." && pwd)
-WORKSPACE_ROOT=$(cd "${REPO_ROOT}/.." && pwd)
 
-IMAGE="felixmin/hlrp:latest"
-DOCKERFILE="${REPO_ROOT}/containers/Dockerfile.lerobot"
-CONTEXT="${REPO_ROOT}"
+PROFILE=""
+IMAGE=""
+DOCKERFILE=""
+CONTEXT=""
 PRUNE_BEFORE=1
 PRUNE_AFTER=1
 DRY_RUN=0
@@ -16,12 +16,13 @@ usage() {
   cat <<'EOF'
 Usage: build_push_prune.sh [options]
 
-Build and push the HLRP image from the workstation, then leave Docker empty.
+Build and push a stage-specific HLRP image from the workstation, then leave Docker empty.
 
 Options:
+  --profile PROFILE             One of: stage12, stage3.
   --image IMAGE                 Docker tag to build and push.
-  --dockerfile PATH             Path to Dockerfile. Defaults to containers/Dockerfile.lerobot.
-  --context PATH                Docker build context. Defaults to the repo root.
+  --dockerfile PATH             Path to Dockerfile. Defaults from --profile.
+  --context PATH                Docker build context. Defaults from --profile.
   --skip-prune-before           Skip the initial Docker prune.
   --skip-prune-after            Skip the final Docker prune.
   --dry-run                     Print commands without executing them.
@@ -40,8 +41,33 @@ run() {
   fi
 }
 
+apply_profile_defaults() {
+  case "${PROFILE}" in
+    stage12|default|laq|foundation)
+      PROFILE="stage12"
+      [[ -n "${IMAGE}" ]] || IMAGE="felixmin/hlrp:stage12"
+      [[ -n "${DOCKERFILE}" ]] || DOCKERFILE="${REPO_ROOT}/containers/Dockerfile.stage12"
+      [[ -n "${CONTEXT}" ]] || CONTEXT="${REPO_ROOT}"
+      ;;
+    stage3|lerobot|libero)
+      PROFILE="stage3"
+      [[ -n "${IMAGE}" ]] || IMAGE="felixmin/hlrp:stage3"
+      [[ -n "${DOCKERFILE}" ]] || DOCKERFILE="${REPO_ROOT}/containers/Dockerfile.stage3"
+      [[ -n "${CONTEXT}" ]] || CONTEXT="${REPO_ROOT}"
+      ;;
+    *)
+      echo "Unsupported --profile: ${PROFILE}" >&2
+      exit 1
+      ;;
+  esac
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --profile)
+      PROFILE="$2"
+      shift 2
+      ;;
     --image)
       IMAGE="$2"
       shift 2
@@ -78,24 +104,53 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+if [[ -z "${PROFILE}" ]]; then
+  echo "--profile is required (stage12 or stage3)" >&2
+  usage >&2
+  exit 1
+fi
+
+apply_profile_defaults
+
 if [[ ! -f "${DOCKERFILE}" ]]; then
   echo "Dockerfile not found: ${DOCKERFILE}" >&2
   exit 1
 fi
 
-if [[ ! -f "${CONTEXT}/lerobot/pyproject.toml" ]]; then
-  echo "Expected build context to contain lerobot/pyproject.toml: ${CONTEXT}" >&2
-  exit 1
-fi
+case "${PROFILE}" in
+  stage12)
+    if [[ ! -f "${CONTEXT}/requirements.txt" ]]; then
+      echo "Expected build context to contain requirements.txt: ${CONTEXT}" >&2
+      exit 1
+    fi
+    if [[ ! -d "${CONTEXT}/packages" ]]; then
+      echo "Expected build context to contain packages/: ${CONTEXT}" >&2
+      exit 1
+    fi
+    ;;
+  stage3)
+    if [[ ! -f "${CONTEXT}/lerobot/pyproject.toml" ]]; then
+      echo "Expected build context to contain lerobot/pyproject.toml: ${CONTEXT}" >&2
+      exit 1
+    fi
+    if [[ ! -f "${CONTEXT}/lerobot/MANIFEST.in" ]]; then
+      echo "Expected build context to contain lerobot/MANIFEST.in: ${CONTEXT}" >&2
+      exit 1
+    fi
+    if [[ ! -d "${CONTEXT}/lerobot/src" ]]; then
+      echo "Expected build context to contain lerobot/src/: ${CONTEXT}" >&2
+      exit 1
+    fi
+    ;;
+esac
 
-if [[ ! -f "${CONTEXT}/lerobot/MANIFEST.in" ]]; then
-  echo "Expected build context to contain lerobot/MANIFEST.in: ${CONTEXT}" >&2
-  exit 1
-fi
+printf 'Profile: %s\n' "${PROFILE}"
+printf 'Image: %s\n' "${IMAGE}"
+printf 'Dockerfile: %s\n' "${DOCKERFILE}"
+printf 'Context: %s\n' "${CONTEXT}"
 
-if [[ ! -d "${CONTEXT}/lerobot/src" ]]; then
-  echo "Expected build context to contain lerobot/src/: ${CONTEXT}" >&2
-  exit 1
+if [[ "${DRY_RUN}" -eq 1 ]]; then
+  printf '\n'
 fi
 
 if [[ "${PRUNE_BEFORE}" -eq 1 ]]; then

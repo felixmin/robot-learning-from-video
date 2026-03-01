@@ -206,7 +206,7 @@ For multiple setup steps, pass multiple commands:
 python scripts/submit_job.py \
     cluster=lrz_h100 \
     experiment=vla_smol \
-    'submit.pre_commands=["pip install -e /dss/.../lerobot","pip install -e /dss/.../high-level-robot-planner/lerobot_policy_hlrp"]'
+    'submit.pre_commands=["pip install --no-deps -e /dss/.../high-level-robot-planner/lerobot","pip install --no-deps -e /dss/.../high-level-robot-planner/lerobot_policy_hlrp"]'
 ```
 
 ---
@@ -299,7 +299,7 @@ Each job generates a script like:
 #SBATCH --time=15:00:00
 #SBATCH --output=/dss/.../runs/slurm/%j.out
 #SBATCH --error=/dss/.../runs/slurm/%j.err
-#SBATCH --container-image=/dss/.../containers/lam.sqsh
+#SBATCH --container-image=/dss/.../enroot/hlrp_stage12.sqsh
 #SBATCH --container-mounts=/dss/.../high-level-robot-planner:/dss/.../high-level-robot-planner
 #SBATCH --container-workdir=/dss/.../high-level-robot-planner
 
