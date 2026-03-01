@@ -193,8 +193,9 @@ pip install torch==2.9.1 torchvision==0.24.1 torchaudio==2.9.1 --index-url https
   - `config/experiment/stage3_hlrp_libero_multitask_scratch.yaml`
 - Uses LeRobot policy plugin from `lerobot_policy_hlrp/` (editable install).
 - Installer fallback order: `python -m pip` → `uv pip` → `pip` (all `--no-deps -e`). Supports different container layouts (with/without pip in active venv).
-- Example smoke command: `python scripts/submit_job.py experiment=stage3_hlrp_libero_action_scratch cluster=lrz_x100 experiment.name=stage3_hlrp_libero_smoke_retry lerobot.steps=50 lerobot.batch_size=2 lerobot.eval.freq=10 lerobot.log_freq=10 lerobot.save_freq=1000`
-- With W&B: `python scripts/submit_job.py experiment=stage3_hlrp_libero_action_scratch cluster=lrz_x100 experiment.name=stage3_hlrp_libero_smoke_wandb lerobot.steps=50 lerobot.batch_size=2 lerobot.eval.freq=10 lerobot.log_freq=10 lerobot.save_freq=1000 logging.use_wandb=true lerobot.wandb.enable=true`
+- For short smoke or verification runs, always add `cluster.compute.time_limit=00:15:00` so the scheduler does not treat them like long jobs.
+- Example smoke command: `python scripts/submit_job.py experiment=stage3_hlrp_libero_action_scratch cluster=lrz_x100 cluster.compute.time_limit=00:15:00 experiment.name=stage3_hlrp_libero_smoke_retry lerobot.steps=50 lerobot.batch_size=2 lerobot.eval.freq=10 lerobot.log_freq=10 lerobot.save_freq=1000`
+- With W&B: `python scripts/submit_job.py experiment=stage3_hlrp_libero_action_scratch cluster=lrz_x100 cluster.compute.time_limit=00:15:00 experiment.name=stage3_hlrp_libero_smoke_wandb lerobot.steps=50 lerobot.batch_size=2 lerobot.eval.freq=10 lerobot.log_freq=10 lerobot.save_freq=1000 logging.use_wandb=true lerobot.wandb.enable=true`
 
 ## Containers
 
