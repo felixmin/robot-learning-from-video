@@ -156,14 +156,9 @@ def generate_sbatch_script(
     python_bin: str = "python",
     *,
     time_limit: str | None = None,
-    time: str | None = None,
 ) -> str:
     """Generate sbatch script content."""
 
-    if time_limit is not None and time is not None:
-        raise ValueError("Pass only one of time_limit or time")
-    if time_limit is None:
-        time_limit = time
     if time_limit is None:
         raise ValueError("Missing time limit (set time_limit or time)")
     if gpus < 0:

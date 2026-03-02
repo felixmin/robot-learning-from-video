@@ -48,9 +48,9 @@ USER user_lerobot
 
 ENV HOME=/home/user_lerobot
 
-COPY --chown=user_lerobot:user_lerobot containers/requirements.stage3-runtime.txt /tmp/hlrp-stage3-runtime.txt
-COPY --chown=user_lerobot:user_lerobot lerobot/pyproject.toml lerobot/README.md lerobot/MANIFEST.in lerobot/setup.py /tmp/lerobot/
-COPY --chown=user_lerobot:user_lerobot lerobot/src /tmp/lerobot/src
+COPY --chown=user_lerobot:user_lerobot containers/requirements.stage3-runtime.txt /opt/hlrp-stage3-runtime.txt
+COPY --chown=user_lerobot:user_lerobot lerobot/pyproject.toml lerobot/README.md lerobot/MANIFEST.in lerobot/setup.py /opt/lerobot-src/
+COPY --chown=user_lerobot:user_lerobot lerobot/src /opt/lerobot-src/src
 
 RUN python3.10 -m venv /opt/lerobot-venv \
     && /opt/lerobot-venv/bin/python -m ensurepip --upgrade \
@@ -58,10 +58,10 @@ RUN python3.10 -m venv /opt/lerobot-venv \
     && /opt/lerobot-venv/bin/python -m pip install --no-build-isolation \
         egl_probe \
         PyOpenGL-accelerate \
-    && /opt/lerobot-venv/bin/python -m pip install --no-build-isolation -e "/tmp/lerobot[libero,smolvla]" \
-    && /opt/lerobot-venv/bin/python -m pip install -r /tmp/hlrp-stage3-runtime.txt \
+    && /opt/lerobot-venv/bin/python -m pip install --no-build-isolation "/opt/lerobot-src[libero,smolvla]" \
+    && /opt/lerobot-venv/bin/python -m pip install -r /opt/hlrp-stage3-runtime.txt \
     && (/opt/lerobot-venv/bin/python -m pip uninstall -y torchao || true) \
-    && /opt/lerobot-venv/bin/python -c "import hydra, omegaconf, importlib; importlib.import_module('lerobot'); importlib.import_module('lerobot.scripts'); print('stage3 image python env ok')"
+    && /opt/lerobot-venv/bin/python -c "import hydra, omegaconf, importlib; importlib.import_module('lerobot'); importlib.import_module('lerobot.scripts.lerobot_train'); print('stage3 image python env ok')"
 
 WORKDIR /workspace/high-level-robot-planner
 

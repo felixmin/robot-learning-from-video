@@ -25,10 +25,17 @@ Configured via `paths.cache_dir` (relative paths resolve against `logging.root_d
 
 - HuggingFace hub weights: `HF_HUB_CACHE=<cache_dir>/huggingface/hub`
 - HuggingFace datasets cache: `HF_DATASETS_CACHE=<cache_dir>/huggingface/datasets`
+- LeRobot dataset / asset cache: `HF_LEROBOT_HOME=<cache_dir>/huggingface/lerobot`
 - torch hub cache: `TORCH_HOME=<cache_dir>/torch`
+- Triton cache: `TRITON_CACHE_DIR=<cache_dir>/triton`
 - W&B cache: `WANDB_CACHE_DIR=<cache_dir>/wandb_cache`
 
-Important: we intentionally **do not** set `HF_HOME` in code, to avoid breaking Hugging Face auth/token discovery.
+For cluster stage-3 runs we keep:
+
+- `HOME` at the real cluster home
+- `HF_HOME=$HOME/.cache/huggingface`
+
+and redirect the heavy caches above into DSS storage. This preserves token discovery while avoiding repeated large downloads into home directories.
 
 ## Hugging Face auth tokens
 

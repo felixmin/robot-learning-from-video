@@ -29,6 +29,7 @@ lerobot:
   job_name: ${experiment.name}
   steps: 100000
   batch_size: 32
+  grad_accum_steps: 1
   num_workers: 4
   log_freq: 200
   save_freq: 20000

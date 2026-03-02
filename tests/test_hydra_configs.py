@@ -110,6 +110,8 @@ class TestExperimentConsistency:
         [
             "stage3_hlrp_libero_action_scratch",
             "stage3_hlrp_libero_multitask_scratch",
+            "stage3_hlrp_libero_multitask_scratch_local",
+            "stage3_hlrp_libero_multitask_scratch_cluster",
         ],
     )
     def test_lerobot_experiments_load(self, config_dir, experiment):

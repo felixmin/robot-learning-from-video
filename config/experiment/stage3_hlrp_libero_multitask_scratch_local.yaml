@@ -6,20 +6,15 @@ defaults:
   - optional /user_config: local
 
 experiment:
-  name: stage3_hlrp_libero_action_scratch
-  description: "Stage 3 Libero action-only training from scratch (HLRP SmolVLA shared policy)"
+  name: stage3_hlrp_libero_multitask_scratch_local
+  description: "Stage 3 Libero latent+action multitask training from scratch on local workstation"
 
 submit:
   script: 6_train_lerobot
 
-cluster:
-  container:
-    image: /dss/dssmcmlfs01/pn57pi/pn57pi-dss-0001/felix_minzenmay/enroot/hlrp_stage3_lerobot.sqsh
-    python_bin: /opt/lerobot-venv/bin/python
-
 logging:
   use_wandb: true
-  tags: ["stage3", "lerobot", "libero", "hlrp-policy", "smolvla", "scratch"]
+  tags: ["stage3", "lerobot", "libero", "hlrp-policy", "smolvla", "scratch", "cotrain", "local"]
 
 lerobot:
   command: lerobot-train
@@ -28,7 +23,7 @@ lerobot:
   output_dir: ${logging.runs_dir}/lerobot
   job_name: ${experiment.name}
   steps: 100000
-  batch_size: 64
+  batch_size: 32
   grad_accum_steps: 1
   num_workers: 4
   log_freq: 200
@@ -36,7 +31,7 @@ lerobot:
   use_policy_training_preset: false
 
   shell_env:
-    MUJOCO_GL: osmesa
+    MUJOCO_GL: egl
     LIBERO_CONFIG_PATH: ${logging.root_dir}/cache/libero_config
 
   wandb:
@@ -44,17 +39,20 @@ lerobot:
 
   policy:
     type: hlrp_smolvla_shared
-    repo_id: felixmin/hlrp_smolvla_shared_libero_scratch
+    repo_id: felixmin/hlrp_smolvla_shared_libero_cotrain_scratch
     device: cuda
     push_to_hub: false
     init_mode: scratch
     stage2_artifact: null
-    stage3_training_mode: action
+    stage3_training_mode: multitask
     action_loss_weight: 1.0
     latent_loss_weight: 1.0
     latent_scope: all
     action_subset_ratio: 1.0
     action_subset_key: episode_index
+    laq_checkpoint_path: /mnt/data/workspace/code/high-level-robot-planner/runs/2026-02-24_10-41-51_laq_oxe_local/checkpoints/last.ckpt
+    laq_future_frames: 10
+    laq_camera_keys: [observation.images.image]
     model_name: ${smolvla_core.vla.model_name}
     load_vlm_weights: ${smolvla_core.vla.load_vlm_weights}
     train_expert_only: true

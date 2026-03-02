@@ -293,6 +293,15 @@ def _ensure_libero_config(env: dict[str, str], logger) -> None:
     logger.info("Bootstrapped LIBERO config: %s", config_file)
 
 
+def _runtime_cwd_from_cfg(cfg: DictConfig) -> Path:
+    run_dir = OmegaConf.select(cfg, "logging.runs_dir")
+    if run_dir is None:
+        raise ValueError("logging.runs_dir must be set for stage-3 runs")
+    cwd = Path(str(run_dir))
+    cwd.mkdir(parents=True, exist_ok=True)
+    return cwd
+
+
 def _lerobot_run_command_from_cfg(cfg: DictConfig) -> list[str]:
     train_cmd_raw = OmegaConf.select(cfg, "lerobot.command")
 
@@ -304,6 +313,7 @@ def _lerobot_run_command_from_cfg(cfg: DictConfig) -> list[str]:
     job_name = OmegaConf.select(cfg, "lerobot.job_name")
     steps = OmegaConf.select(cfg, "lerobot.steps")
     batch_size = OmegaConf.select(cfg, "lerobot.batch_size")
+    grad_accum_steps = OmegaConf.select(cfg, "lerobot.grad_accum_steps")
     num_workers = OmegaConf.select(cfg, "lerobot.num_workers")
     eval_freq = OmegaConf.select(cfg, "lerobot.eval.freq")
     eval_batch_size = OmegaConf.select(cfg, "lerobot.eval.batch_size")
@@ -348,6 +358,9 @@ def _lerobot_run_command_from_cfg(cfg: DictConfig) -> list[str]:
         f"--save_freq={int(save_freq)}",
         f"--wandb.enable={_to_bool_flag(OmegaConf.select(cfg, 'lerobot.wandb.enable') is True)}",
     ]
+
+    if grad_accum_steps is not None:
+        cmd.append(f"--grad_accum_steps={int(grad_accum_steps)}")
 
     if str(policy_type) == "hlrp_smolvla_shared":
         if init_mode is None:
@@ -464,9 +477,11 @@ def main(cfg: DictConfig) -> None:
         )
 
     cmd = _lerobot_run_command_from_cfg(cfg)
+    runtime_cwd = _runtime_cwd_from_cfg(cfg)
     logger.info("Launching LeRobot command:")
     logger.info("  %s", shlex.join(cmd))
-    subprocess.run(cmd, cwd=str(workspace_root), env=env, check=True)
+    logger.info("  cwd=%s", runtime_cwd)
+    subprocess.run(cmd, cwd=str(runtime_cwd), env=env, check=True)
     logger.info("Stage 3 training complete.")
 
 

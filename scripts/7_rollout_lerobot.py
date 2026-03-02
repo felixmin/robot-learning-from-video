@@ -169,6 +169,15 @@ def _editable_paths_from_cfg(cfg: DictConfig) -> list[Path]:
     return editable_paths
 
 
+def _runtime_cwd_from_cfg(cfg: DictConfig) -> Path:
+    run_dir = OmegaConf.select(cfg, "logging.runs_dir")
+    if run_dir is None:
+        raise ValueError("logging.runs_dir must be set for stage-3 runs")
+    cwd = Path(str(run_dir))
+    cwd.mkdir(parents=True, exist_ok=True)
+    return cwd
+
+
 def _command_from_cfg(cfg: DictConfig) -> list[str]:
     eval_cmd = str(OmegaConf.select(cfg, "lerobot_eval.command") or "lerobot-eval")
 
@@ -273,9 +282,11 @@ def main(cfg: DictConfig) -> None:
         )
 
     cmd = _command_from_cfg(cfg)
+    runtime_cwd = _runtime_cwd_from_cfg(cfg)
     logger.info("Launching LeRobot rollout command:")
     logger.info("  %s", shlex.join(cmd))
-    subprocess.run(cmd, cwd=str(workspace_root), env=env, check=True)
+    logger.info("  cwd=%s", runtime_cwd)
+    subprocess.run(cmd, cwd=str(runtime_cwd), env=env, check=True)
     logger.info("Stage 3 rollout complete.")
 
 

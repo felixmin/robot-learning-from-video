@@ -77,3 +77,17 @@ def test_command_builder_requires_non_null_command(config_dir: str) -> None:
         )
     with pytest.raises(ValueError, match="Missing required lerobot config keys"):
         mod._lerobot_run_command_from_cfg(cfg)
+
+
+def test_command_builder_forwards_grad_accum_steps(config_dir: str) -> None:
+    mod = _load_stage3_script_module()
+    with initialize_config_dir(version_base=None, config_dir=config_dir):
+        cfg = compose(
+            config_name="config",
+            overrides=[
+                "experiment=stage3_hlrp_libero_multitask_scratch",
+                "lerobot.grad_accum_steps=2",
+            ],
+        )
+    cmd = mod._lerobot_run_command_from_cfg(cfg)
+    assert "--grad_accum_steps=2" in cmd
