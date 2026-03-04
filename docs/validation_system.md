@@ -113,11 +113,8 @@ Main knobs:
 ## Data Split Interaction
 
 Validation strategy caching runs on whatever val split the DataModule produced.
-
-Data split behavior is in `packages/common/data.py`:
-- `ratio`
-- `metadata`
-- `fixed_count` (target val pair count per dataset via `val_counts_per_dataset`)
+Current split behavior for LeRobot-v3-backed Stage 1/2 is implemented in:
+- `packages/common/lerobot_v3_data.py`
 
 ## Implementation Files
 
@@ -130,9 +127,4 @@ Data split behavior is in `packages/common/data.py`:
 - `packages/laq/validation/flow.py`
 - `config/training/laq_optimizer.yaml`
 
-## Relation to Offline Token Evaluation
-
-The offline script `scripts/eval_action_tokens.py` is separate from this training-time validation system.
-
-- Training-time validation: lightweight, periodic checks during training.
-- Offline token evaluation: deep manual analysis on a chosen checkpoint.
+Training-time validation is intentionally lightweight and periodic during training.

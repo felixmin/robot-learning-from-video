@@ -103,15 +103,7 @@ def main(cfg: DictConfig):
     logger.info(f"  - Batch size: {cfg.data.loader.batch_size}")
     logger.info(f"  - Image size: {cfg.data.preprocess.image_size}")
 
-    if cfg.data.backend == "oxe_local_indexed":
-        dataset_names = [d.name for d in cfg.data.dataset.oxe.datasets]
-        logger.info(f"  - Datasets: {dataset_names}")
-        est_samples = int(len(datamodule.train_dataset))
-        est_batches = est_samples // int(cfg.data.loader.batch_size)
-        logger.info(
-            f"  - Estimated train batches/epoch: ~{est_batches:,} (~{est_samples:,} pairs)"
-        )
-    elif cfg.data.backend == "lerobot_v3":
+    if cfg.data.backend == "lerobot_v3":
         if hasattr(datamodule, "sources"):
             dataset_names = [src.repo_id for src in datamodule.sources]
             logger.info(f"  - Sources: {dataset_names}")
@@ -121,9 +113,7 @@ def main(cfg: DictConfig):
             f"  - Estimated train batches/epoch: ~{est_batches:,} (~{est_samples:,} samples)"
         )
     else:
-        raise ValueError(
-            f"Only data.backend in {{'oxe_local_indexed', 'lerobot_v3'}} is supported, got {cfg.data.backend!r}"
-        )
+        raise ValueError(f"Only data.backend='lerobot_v3' is supported, got {cfg.data.backend!r}")
 
     # Initialize LAQ task
     logger.info("\n" + "=" * 80)

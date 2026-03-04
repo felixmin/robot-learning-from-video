@@ -13,25 +13,6 @@ def config_dir():
 
 
 class TestExperimentConfigs:
-    def test_laq_oxe_local_config(self, config_dir):
-        with initialize_config_dir(version_base=None, config_dir=config_dir):
-            cfg = compose(config_name="config", overrides=["experiment=stage1_laq_oxe_local"])
-
-            assert cfg.experiment.name == "laq_oxe_local"
-            assert cfg.data.backend == "oxe_local_indexed"
-            assert cfg.data.adapter.openx_local.mode == "indexed_full"
-            assert bool(cfg.data.adapter.openx_local.auto_discover) is True
-            assert cfg.cluster.name == "local_dev"
-
-    def test_laq_oxe_cluster_flow_config(self, config_dir):
-        with initialize_config_dir(version_base=None, config_dir=config_dir):
-            cfg = compose(config_name="config", overrides=["experiment=stage1_laq_oxe_cluster"])
-
-            assert cfg.experiment.name == "laq_oxe_cluster"
-            assert cfg.model.flow.model == "raft_large"
-            assert cfg.model.flow.decoder_depth == 2
-            assert bool(cfg.validation.strategies.flow_visualization.enabled) is True
-
     def test_vla_smol_flow_shared_config(self, config_dir):
         with initialize_config_dir(version_base=None, config_dir=config_dir):
             cfg = compose(
@@ -40,18 +21,8 @@ class TestExperimentConfigs:
 
             assert cfg.experiment.name == "latent_smolvla"
             assert cfg.model.training_mode == "latent_flow"
-            assert cfg.data.backend == "oxe_local_indexed"
-            assert cfg.data.adapter.openx_local.mode == "indexed_full"
-
-    def test_vla_cosmos2_tokens_overfit_config(self, config_dir):
-        with initialize_config_dir(version_base=None, config_dir=config_dir):
-            cfg = compose(
-                config_name="config", overrides=["experiment=stage2_cosmos2_tokens_overfit"]
-            )
-
-            assert cfg.experiment.name == "vla_cosmos2_tokens_overfit"
-            assert cfg.data.backend == "oxe_local_indexed"
-            assert cfg.training.overfit_batches == 1
+            assert cfg.data.backend == "lerobot_v3"
+            assert cfg.data.output_format == "foundation"
 
     def test_stage1_octo24_local_config(self, config_dir):
         with initialize_config_dir(version_base=None, config_dir=config_dir):
@@ -110,7 +81,7 @@ class TestConfigComposition:
             cfg = compose(
                 config_name="config",
                 overrides=[
-                    "experiment=stage1_laq_oxe_local",
+                    "experiment=stage1_octo24_local",
                     "data.loader.batch_size=16",
                     "training.optimizer.lr=5e-5",
                     "seed=123",
@@ -120,11 +91,11 @@ class TestConfigComposition:
             assert cfg.data.loader.batch_size == 16
             assert cfg.training.optimizer.lr == 5e-5
             assert cfg.seed == 123
-            assert cfg.experiment.name == "laq_oxe_local"
+            assert cfg.experiment.name == "stage1_octo24_local"
 
     def test_config_is_valid_omegaconf(self, config_dir):
         with initialize_config_dir(version_base=None, config_dir=config_dir):
-            cfg = compose(config_name="config", overrides=["experiment=stage1_laq_oxe_local"])
+            cfg = compose(config_name="config", overrides=["experiment=stage1_octo24_local"])
 
             assert OmegaConf.is_config(cfg)
             assert OmegaConf.is_dict(cfg)
@@ -134,13 +105,7 @@ class TestExperimentConsistency:
     @pytest.mark.parametrize(
         "experiment",
         [
-            "stage1_laq_oxe_cluster",
-            "stage1_laq_oxe_local",
             "stage1_octo24_local",
-            "stage1_laq_oxe_local_sweep",
-            "stage1_laq_token_analysis",
-            "stage2_cosmos2_tokens",
-            "stage2_cosmos2_tokens_overfit",
             "stage2_smol_flow",
             "stage2_octo24_local",
         ],

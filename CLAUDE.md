@@ -75,7 +75,7 @@ Before deciding how to run anything, check `pwd` and `hostname` to determine if 
 - GPU: RTX 5090 (32 GB VRAM), System RAM: 64 GB
 - Use for smaller/short LAQ or low-scale training/debug runs.
 - Prefer local datasets on workstation:
-  - Stage 1/2 local OXE shards: `/mnt/data/oxe` (via `data=oxe_local_indexed`)
+  - Stage 1/2 LeRobot-v3 datasets via Hydra data configs (for example `data=octo24`)
   - Stage 3 local Libero snapshot: `/mnt/data/workspace/hflibero/datasets--HuggingFaceVLA--libero/snapshots/<snapshot>`
 - For larger runs, long runs, or shared reproducible jobs, prefer cluster.
 - Conda envs:
@@ -86,7 +86,7 @@ Before deciding how to run anything, check `pwd` and `hostname` to determine if 
 
 - Connect: `ssh ai`
 - Never run training on login nodes. Use login nodes only for submission, monitoring, code sync, and lightweight ops. Launch compute allocations/jobs for any actual training.
-- Stage 1/2: use dataset paths available on cluster storage (no automatic OXE download by training scripts).
+- Stage 1/2: use LeRobot-v3 datasets and Hugging Face cache paths available on cluster storage.
 - Stage 3: Libero can be downloaded at training start by setting `lerobot.dataset.root=null` with `lerobot.dataset.repo_id=HuggingFaceVLA/libero`.
 - Check queue: `squeue --me`
 - Monitor job: `squeue -j <JOBID> -o "%.18i %.30P %.20j %.8T %.10M %.9l %R"`
@@ -124,7 +124,7 @@ defaults:
 
 Override from CLI:
 ```bash
-python scripts/2_train_laq.py experiment=stage1_laq_oxe_local data.loader.batch_size=32 training.optimizer.lr=5e-5
+python scripts/2_train_laq.py experiment=stage1_octo24_local data.loader.batch_size=32 training.optimizer.lr=5e-5
 ```
 
 ## Submit Workflow
@@ -142,7 +142,7 @@ python scripts/submit_job.py experiment=<sweep_experiment>
 
 Local non-Slurm runs (common on workstation and cluster interactive sessions):
 ```bash
-python scripts/2_train_laq.py experiment=stage1_laq_oxe_local
+python scripts/2_train_laq.py experiment=stage1_octo24_local
 ```
 
 See `docs/job_submission.md` for full documentation.
@@ -177,8 +177,8 @@ pip install torch==2.9.1 torchvision==0.24.1 torchaudio==2.9.1 --index-url https
 
 - **Modular monorepo**: installable packages for tight coupling between stages.
 - **Hybrid training framework**: PyTorch Lightning for stages 1 & 3 (DDP), Lightning Fabric for stage 2 (FSDP multi-node).
-- **Data pipeline**: WebDataset with TAR shards for GPFS-optimized sequential reads.
-- **LAQ data loading**: two modes — local multi-dataset (`LAQDataModule`) and OXE streaming (`OXEDataModule`, auto-detected by `dataset_name` field).
+- **Data pipeline**: LeRobot-v3 source abstraction with weighted multi-dataset sampling.
+- **LAQ data loading**: unified LeRobot-v3 DataModule path for Stage 1 and Stage 2.
 - **Validation**: bucket-strategy binding via `ValidationStrategyCallback`. See config examples in `config/` and implementation in `packages/laq/`.
 
 ## Auth

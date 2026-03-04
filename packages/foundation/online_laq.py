@@ -1,14 +1,14 @@
 """
 Online LAQ label generation helpers.
 
-These utilities adapt OpenX/OXE frame-pair batches to the LAQ (Stage 1) encoder
+These utilities adapt temporal frame tensors to the LAQ (Stage 1) encoder
 to generate discrete latent action codes during Stage 2 training.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Dict, Protocol
+from typing import TYPE_CHECKING, Protocol
 
 import torch
 
@@ -18,12 +18,9 @@ if TYPE_CHECKING:
     from laq.inference import LAQEncoderVQInference
 
 
-def oxe_frames_to_laq_video(frames: torch.Tensor) -> torch.Tensor:
+def frames_to_laq_video(frames: torch.Tensor) -> torch.Tensor:
     """
-    Convert OXE batch frames to LAQ input layout.
-
-    Expected OXE layout (from `common.data.oxe_collate_fn`):
-      - frames: [B, T, H, W, 3] uint8 (T can be 2 for frame pairs; future LAQ may use T>2)
+    Convert temporal frame tensors to LAQ input layout.
 
     LAQ expects:
       - video: [B, 3, T, H, W] float32 in [0, 1]
@@ -94,58 +91,3 @@ class LAQTaskCodeProvider(torch.nn.Module):
     @torch.no_grad()
     def codes_and_vectors_from_video(self, video: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         return self._encoder_vq.codes_and_vectors_from_video(video)
-
-
-def extract_oxe_language(batch: Dict[str, Any]) -> list[str]:
-    language = batch.get("language")
-    if language is None:
-        raise KeyError("Expected OXE batch to include 'language' (list[str])")
-    if not isinstance(language, list):
-        raise TypeError(f"Expected 'language' to be a list[str], got {type(language)}")
-    return [str(x) for x in language]
-
-
-def extract_oxe_actions(batch: Dict[str, Any]) -> torch.Tensor:
-    actions = batch.get("action")
-    if actions is None:
-        raise KeyError("Expected OXE batch to include 'action' metadata")
-
-    if isinstance(actions, torch.Tensor):
-        out = actions.to(torch.float32)
-    elif isinstance(actions, list):
-        if not actions:
-            raise ValueError("Expected non-empty 'action' list in OXE batch")
-        first = actions[0]
-        if isinstance(first, torch.Tensor):
-            out = torch.stack([x.to(torch.float32) for x in actions], dim=0)
-        else:
-            out = torch.as_tensor(actions, dtype=torch.float32)
-    else:
-        out = torch.as_tensor(actions, dtype=torch.float32)
-
-    if out.ndim != 2:
-        raise ValueError(f"Expected action tensor [B, A], got {tuple(out.shape)}")
-    return out
-
-
-def extract_oxe_initial_state(batch: Dict[str, Any]) -> torch.Tensor | None:
-    state = batch.get("initial_state")
-    if state is None:
-        return None
-
-    if torch.is_tensor(state):
-        out = state.to(torch.float32)
-    elif isinstance(state, list):
-        if not state:
-            return None
-        first = state[0]
-        if torch.is_tensor(first):
-            out = torch.stack([x.to(torch.float32) for x in state], dim=0)
-        else:
-            out = torch.as_tensor(state, dtype=torch.float32)
-    else:
-        out = torch.as_tensor(state, dtype=torch.float32)
-
-    if out.ndim != 2:
-        raise ValueError(f"Expected initial_state tensor [B, S], got {tuple(out.shape)}")
-    return out

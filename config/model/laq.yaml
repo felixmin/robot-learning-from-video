@@ -72,7 +72,7 @@ codebook_replace_schedule:
 
 # Optional: Flow supervision config
 # Enriches latent space with motion information via RAFT knowledge distillation
-# To enable, set flow config in an experiment (e.g. laq_oxe_cluster.yaml).
+# To enable, set flow config in an experiment (e.g. stage1_octo24_local.yaml).
 # flow:
 #   enabled: true        # Set false to disable flow without removing the block
 #   model: raft_small    # "raft_small" or "raft_large"

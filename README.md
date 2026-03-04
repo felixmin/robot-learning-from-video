@@ -13,7 +13,7 @@ A three-stage robot learning system that learns policies from videos without act
 ## Performance and resource efficiency
 Performance benchmark of the training pipeline on an Desktop Nvidia 5090 GPU. With the current setup we achieve full GPU utilization.
 
-For performance reasons over the course of the project we switched from Open X Embodiment in rlds format to a preprocessed version that allows direct index based access.
+For performance reasons we use a LeRobot v3-based dataset pipeline with weighted multi-source mixing.
 
 <p align="center">
   <img src="docs/assets/lam_gpu_utilization.png" alt="LAM training GPU utilization" width="700">
@@ -73,7 +73,7 @@ python scripts/0_setup_environment.py
 
 ```bash
 # Stage 1 (LAQ) local
-python scripts/2_train_laq.py experiment=stage1_laq_oxe_local
+python scripts/2_train_laq.py experiment=stage1_octo24_local
 
 # Stage 2 (foundation SmolVLA flow) local
 python scripts/4_train_foundation.py experiment=stage2_smol_flow
@@ -91,7 +91,7 @@ Uses [Hydra](https://hydra.cc) for composable configuration. Experiments compose
 
 ```bash
 # Override from CLI
-python scripts/2_train_laq.py experiment=stage1_laq_oxe_local data.loader.batch_size=32 training.optimizer.lr=5e-5
+python scripts/2_train_laq.py experiment=stage1_octo24_local data.loader.batch_size=32 training.optimizer.lr=5e-5
 ```
 
 See `CLAUDE.md` for architecture and config structure details.
@@ -99,10 +99,11 @@ See `CLAUDE.md` for architecture and config structure details.
 ## Dataset Sources and Downloads
 
 - Workstation/local training usually uses local dataset paths:
-  - Stage 1/2 OXE local shards: `/mnt/data/oxe` (via `data=oxe_local_indexed`)
+  - Stage 1/2 LeRobot-v3 mix via Hydra data config (default in `stage1_octo24_local` / `stage2_octo24_local`)
+  - LeRobot cache root defaults to `${LEROBOT_HOME}` (set explicitly when needed)
   - Stage 3 Libero snapshot: `/mnt/data/workspace/hflibero/datasets--HuggingFaceVLA--libero/snapshots/<snapshot>`
 - Cluster training:
-  - Stage 1/2 uses dataset paths available on cluster storage; OXE is not auto-downloaded by the training scripts.
+  - Stage 1/2 uses LeRobot datasets and Hugging Face cache on cluster storage.
   - Stage 3 can download Libero at run start if `lerobot.dataset.root=null` and `lerobot.dataset.repo_id=HuggingFaceVLA/libero`.
 - Runtime-downloaded datasets/assets:
   - `HuggingFaceVLA/libero` dataset cache (`HF_DATASETS_CACHE`)

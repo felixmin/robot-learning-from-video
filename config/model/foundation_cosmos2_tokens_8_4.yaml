@@ -1,7 +1,7 @@
 # Stage 2 (Foundation) token-based VLA using Cosmos-Reason2 (Qwen3-VL).
 #
 # This variant is for LAQ checkpoints with codebook_size=8 and code_seq_len=4
-# (e.g. LAQ experiment `laq_oxe_local` or `laq_oxe_cluster`).
+# (e.g. from `stage1_octo24_local`).
 
 name: vla_cosmos2_tokens
 

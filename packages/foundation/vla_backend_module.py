@@ -2,7 +2,7 @@
 Stage 2 (Foundation) LightningModule driven by a VLA backend.
 
 Flow:
-1) Take an OXE/OpenX batch containing frames + language.
+1) Take a FoundationBatch containing image streams + text + optional state/action targets.
 2) Run frozen LAQ (Stage 1) to produce target codes [B, S].
 3) Delegate prompting/masking + LM loss + constrained generation/parsing to the backend.
 """
@@ -23,10 +23,6 @@ from foundation.backends.smolvla_shared.input_transform import normalize_vector_
 from foundation.constrained_decode import ActionTokenIds
 from foundation.online_laq import (
     LatentCodeProvider,
-    extract_oxe_actions,
-    extract_oxe_initial_state,
-    extract_oxe_language,
-    oxe_frames_to_laq_video,
 )
 
 
@@ -123,7 +119,7 @@ class VLATokenBackendLightningModule(pl.LightningModule):
     @staticmethod
     def _extract_policy_image_streams(frames: torch.Tensor) -> dict[str, torch.Tensor]:
         if frames.ndim != 5:
-            raise ValueError(f"Expected OXE frames tensor [B,T,...], got shape {tuple(frames.shape)}")
+            raise ValueError(f"Expected temporal frames tensor [B,T,...], got shape {tuple(frames.shape)}")
         if frames.shape[-1] == 3:
             return {"observation.images.rgb": frames[:, 0, ...]}
         if frames.shape[2] == 3:
@@ -199,12 +195,11 @@ class VLATokenBackendLightningModule(pl.LightningModule):
 
         if batch_idx == 0:
             image_streams = self._extract_policy_image_streams(frames)
-            if isinstance(batch, FoundationBatch):
-                state = batch.state
-                if state is None:
-                    raise ValueError("FoundationBatch must include state for validation.")
-            else:
-                state = extract_oxe_initial_state({"initial_state": batch["initial_state"]})
+            if not isinstance(batch, FoundationBatch):
+                raise TypeError("Stage 2 validation expects FoundationBatch.")
+            state = batch.state
+            if state is None:
+                raise ValueError("FoundationBatch must include state for validation.")
             state = normalize_vector_mean_std(
                 value=state,
                 stats=self.normalization_stats,
@@ -516,77 +511,12 @@ class VLATokenBackendLightningModule(pl.LightningModule):
         )
         return out, codes, vectors, actions, frames, instructions
 
-    def _loss_and_targets_from_oxe_batch(
-        self, batch: Any
-    ) -> tuple[Any, torch.Tensor | None, torch.Tensor | None, torch.Tensor | None, torch.Tensor, list[str]]:
-        if not isinstance(batch, dict):
-            raise TypeError("Expected OXE batch dict with keys including 'frames' and 'language'.")
-
-        frames = batch["frames"]
-        instructions = extract_oxe_language(batch)
-        video = oxe_frames_to_laq_video(frames)
-        actions: torch.Tensor | None = None
-        action_is_pad: torch.Tensor | None = None
-        codes: torch.Tensor | None = None
-        vectors: torch.Tensor | None = None
-        state = extract_oxe_initial_state({"initial_state": batch["initial_state"]})
-
-        if self.backend_mode is BackendMode.CODES:
-            code_provider = self._require_code_provider()
-            codes = code_provider.codes_from_video(video).to(torch.long).detach().cpu()
-        elif self.backend_mode is BackendMode.LATENT_FLOW:
-            code_provider = self._require_code_provider()
-            codes, vectors = code_provider.codes_and_vectors_from_video(video)
-            codes = codes.to(torch.long).detach().cpu()
-            vectors = vectors.detach().cpu()
-        elif self.backend_mode is BackendMode.MULTITASK:
-            code_provider = self._require_code_provider()
-            codes, vectors = code_provider.codes_and_vectors_from_video(video)
-            codes = codes.to(torch.long).detach().cpu()
-            vectors = vectors.detach().cpu()
-            actions = extract_oxe_actions(batch).detach().cpu()
-            action_is_pad = batch["action_is_pad"]
-        elif self.backend_mode is BackendMode.ACTIONS:
-            actions = extract_oxe_actions(batch).detach().cpu()
-            action_is_pad = batch["action_is_pad"]
-        else:
-            raise NotImplementedError(f"Unsupported backend mode: {self.backend_mode}")
-
-        state = normalize_vector_mean_std(
-            value=state,
-            stats=self.normalization_stats,
-            key_candidates=["observation.state", "initial_state", "state"],
-        )
-        if actions is not None:
-            actions = normalize_vector_mean_std(
-                value=actions,
-                stats=self.normalization_stats,
-                key_candidates=["action", "ACTION"],
-            )
-
-        image_streams = self._extract_policy_image_streams(frames)
-
-        out = self.backend.loss_from_batch(
-            FoundationBatch(
-                image_streams=image_streams,
-                image_padding_masks=self._extract_policy_image_padding_masks(image_streams),
-                task_text=instructions,
-                target_codes=codes,
-                target_latent_vectors=vectors,
-                target_actions=actions,
-                action_is_pad=action_is_pad,
-                state=state,
-            ),
-            mode=self.backend_mode,
-        )
-        return out, codes, vectors, actions, frames, instructions
-
     def _loss_and_targets_from_batch(
         self, batch: Any
     ) -> tuple[Any, torch.Tensor | None, torch.Tensor | None, torch.Tensor | None, torch.Tensor, list[str]]:
-        if isinstance(batch, FoundationBatch):
-            return self._loss_and_targets_from_foundation_batch(batch)
-        return self._loss_and_targets_from_oxe_batch(batch)
+        if not isinstance(batch, FoundationBatch):
+            raise TypeError("Stage 2 training expects FoundationBatch.")
+        return self._loss_and_targets_from_foundation_batch(batch)
 
     @torch.no_grad()
     def _predict_freeform_text(

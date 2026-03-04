@@ -3,7 +3,7 @@
 defaults:
   - /model/shared@smolvla_core: smolvla_core
   - /model@model: foundation_smol_flow_shared
-  - /data@data: octo_dataset
+  - /data@data: octo24
   - /training@training: vla_lightning
   - /cluster@cluster: local_dev
   - optional /user_config: local
@@ -18,9 +18,7 @@ submit:
 data:
   loader:
     batch_size: 128
-  adapter:
-    openx_local:
-      auto_discover: false
+  output_format: foundation
 
 training:
   max_steps: 200000

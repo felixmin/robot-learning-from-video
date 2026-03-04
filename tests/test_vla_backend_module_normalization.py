@@ -66,15 +66,17 @@ def test_stage2_module_applies_configured_normalization_stats() -> None:
         optimizer=VLAOptimizerConfig(lr=1e-4, weight_decay=0.0),
     )
 
-    batch = {
-        "frames": torch.randint(0, 255, (2, 2, 8, 8, 3), dtype=torch.uint8),
-        "language": ["pick", "place"],
-        "initial_state": torch.tensor([[3.0, 3.0], [1.0, -1.0]], dtype=torch.float32),
-        "action": torch.tensor([[3.0, 6.0], [1.0, 2.0]], dtype=torch.float32),
-        "action_is_pad": torch.zeros((2, 1), dtype=torch.bool),
-    }
+    batch = FoundationBatch(
+        image_streams={
+            "observation.images.rgb": torch.randint(0, 255, (2, 2, 8, 8, 3), dtype=torch.uint8),
+        },
+        task_text=["pick", "place"],
+        state=torch.tensor([[3.0, 3.0], [1.0, -1.0]], dtype=torch.float32),
+        target_actions=torch.tensor([[3.0, 6.0], [1.0, 2.0]], dtype=torch.float32),
+        action_is_pad=torch.zeros((2, 1), dtype=torch.bool),
+    )
 
-    module._loss_and_targets_from_oxe_batch(batch)
+    module._loss_and_targets_from_batch(batch)
 
     assert backend.last_batch is not None
     assert backend.last_mode is BackendMode.ACTIONS

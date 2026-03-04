@@ -12,13 +12,13 @@ Note:
 
 Usage:
     # Submit single job
-    python scripts/submit_job.py experiment=laq_oxe_debug
+    python scripts/submit_job.py experiment=stage1_octo24_local
 
     # Override parameters
-    python scripts/submit_job.py experiment=laq_oxe_debug training.epochs=10
+    python scripts/submit_job.py experiment=stage1_octo24_local training.max_steps=10000
 
     # Dry run (print script, don't submit)
-    python scripts/submit_job.py submit.dry_run=true experiment=laq_oxe_debug
+    python scripts/submit_job.py submit.dry_run=true experiment=stage1_octo24_local
 
     # Custom resources (Hydra overrides)
     python scripts/submit_job.py cluster.compute.time_limit=01:00:00 cluster.compute.gpus_per_node=2 experiment=laq_full
@@ -151,7 +151,6 @@ def generate_sbatch_script(
     cache_dir: Path,
     home_dir: Path,
     hf_token_path: Path | None,
-    tfds_local_root: Path | None,
     pre_commands: list[str] | None = None,
     python_bin: str = "python",
     *,
@@ -199,19 +198,6 @@ fi
         hf_auth_block = """# Hugging Face auth for gated repos (e.g. DINOv3).
 if [ -z "${HF_TOKEN:-}" ] && [ -z "${HUGGINGFACE_HUB_TOKEN:-}" ]; then
   echo "WARNING: No Hugging Face token found; gated models may fail. Run huggingface-cli login or set HF_TOKEN." >&2
-fi
-"""
-
-    tfds_root_block = ""
-    if tfds_local_root is not None:
-        tfds_root_block = f"""# OpenX local root visibility check.
-echo "OPENX_LOCAL_ROOT: {tfds_local_root}"
-if [ -d "{tfds_local_root}" ]; then
-  echo "✓ OpenX local root is visible inside the container"
-  ls -ld "{tfds_local_root}" || true
-else
-  echo "WARNING: OpenX local root is NOT visible inside the container." >&2
-  ls -ld "{tfds_local_root}" || true
 fi
 """
 
@@ -280,8 +266,6 @@ mkdir -p "$TMPDIR"
 	{hf_auth_block}
 
 {gpu_info_block}
-
-{tfds_root_block}
 
 {pre_command_block}
 
@@ -505,21 +489,6 @@ def main():
         if weights_ckpt_path.is_absolute():
             extra_mounts.append(weights_ckpt_path.parent)
 
-    # Local OpenX roots must be mounted explicitly for Enroot containers.
-    tfds_local_root_path: Path | None = None
-    openx_local_root = OmegaConf.select(cfg, "data.adapter.openx_local.root")
-    if openx_local_root:
-        candidate_root = Path(str(openx_local_root))
-        if candidate_root.is_absolute():
-            if candidate_root.exists():
-                extra_mounts.append(candidate_root)
-                tfds_local_root_path = candidate_root
-            else:
-                print(
-                    "WARNING: data.adapter.openx_local.root does not exist on the submit host; "
-                    f"skipping container mount: {candidate_root}"
-                )
-
     # Build container mounts: always mount the project root, plus any external run/cache roots.
     # Mount runs_dir.parent to include all sweep job directories (which are siblings).
     for mount_path in submit_extra_mounts:
@@ -641,7 +610,6 @@ def main():
             cache_dir=cache_dir,
             home_dir=home_dir,
             hf_token_path=hf_token_path,
-            tfds_local_root=tfds_local_root_path,
             pre_commands=pre_commands,
             python_bin=container_python_bin,
         )

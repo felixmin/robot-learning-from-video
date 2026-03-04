@@ -83,9 +83,8 @@ class DatasetUsageLoggerCallback(Callback):
     """
     Track and report how many samples from each dataset were seen.
 
-    Intended for OXE/OpenX batches where `batch["dataset_name"]` is a list[str] of length B.
-    Reports counts since the last report, and can be aligned with step-based validation by
-    printing on each validation end.
+    Expects dataset names in batch metadata (`dataset_name`) and reports counts since the
+    last report. Can be aligned with step-based validation by printing on each validation end.
     """
 
     def __init__(

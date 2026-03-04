@@ -20,5 +20,5 @@ def test_online_laq_import_does_not_require_laq_inference(monkeypatch):
     monkeypatch.setattr(builtins, "__import__", guarded_import)
 
     module = importlib.import_module("foundation.online_laq")
-    assert hasattr(module, "oxe_frames_to_laq_video")
+    assert hasattr(module, "frames_to_laq_video")
     assert hasattr(module, "LAQTaskCodeProvider")

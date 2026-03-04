@@ -190,36 +190,15 @@ class LAQTask(pl.LightningModule):
         Validate batch keys on first batch to catch interface issues early.
 
         This hook runs once per training to verify that the dataloader produces
-        batches with standardized keys (frames, episode_id, frame_idx, etc.).
-        Helps catch configuration errors (e.g., wrong collate function) early.
-
-        Validates against STANDARD_BATCH_KEYS to ensure interface parity between
-        LAQDataModule and OXEDataModule.
+        Stage1Batch samples. Helps catch configuration errors early.
         """
         if self._batch_validated:
             return
 
-        # Only validate when batch is a dict (metadata mode enabled)
-        if isinstance(batch, dict):
-            from common.data import validate_batch_keys, STANDARD_BATCH_KEYS
-            import logging
-
-            logger = logging.getLogger(__name__)
-
-            # Validate all standard keys to ensure interface parity
-            # This catches misconfigured dataloaders early
-            validate_batch_keys(
-                batch,
-                required_keys=list(STANDARD_BATCH_KEYS),
-                raise_on_missing=True,
-            )
-
-            # Log what keys we got (helpful for debugging)
-            if self.trainer.is_global_zero:
-                logger.info(f"Batch keys validated: {list(batch.keys())}")
-                logger.info(f"Required standard keys present: {list(STANDARD_BATCH_KEYS)}")
-        elif isinstance(batch, Stage1Batch):
+        if isinstance(batch, Stage1Batch):
             self._extract_frames_from_stage1_batch(batch)
+        else:
+            raise TypeError(f"Stage 1 expects Stage1Batch, got {type(batch)}")
 
         self._batch_validated = True
 
@@ -232,19 +211,16 @@ class LAQTask(pl.LightningModule):
         Training step.
 
         Args:
-            batch: Frame pairs [B, C, 2, H, W] or metadata dict
+            batch: Stage1Batch
             batch_idx: Batch index
 
         Returns:
             Loss tensor
         """
-        # Handle metadata dict if present
         if isinstance(batch, Stage1Batch):
             frames = self._extract_frames_from_stage1_batch(batch)
-        elif isinstance(batch, dict):
-            frames = batch["frames"]
         else:
-            frames = batch
+            raise TypeError(f"Stage 1 expects Stage1Batch, got {type(batch)}")
 
         # Forward pass - model returns (loss, metrics_dict)
         #
@@ -295,18 +271,7 @@ class LAQTask(pl.LightningModule):
                 meta=batch.meta,
             )
 
-        batch = super().transfer_batch_to_device(batch, device, dataloader_idx)
-
-        if isinstance(batch, dict):
-            frames = batch["frames"]
-            if isinstance(frames, torch.Tensor) and frames.dtype == torch.uint8:
-                batch["frames"] = frames.to(dtype=torch.float32).div_(255.0)
-            return batch
-
-        if isinstance(batch, torch.Tensor) and batch.dtype == torch.uint8:
-            return batch.to(dtype=torch.float32).div_(255.0)
-
-        return batch
+        return super().transfer_batch_to_device(batch, device, dataloader_idx)
 
     def validation_step(
         self,
@@ -317,19 +282,16 @@ class LAQTask(pl.LightningModule):
         Validation step.
 
         Args:
-            batch: Frame pairs [B, C, 2, H, W] or metadata dict
+            batch: Stage1Batch
             batch_idx: Batch index
 
         Returns:
             Loss tensor
         """
-        # Handle metadata dict if present
         if isinstance(batch, Stage1Batch):
             frames = self._extract_frames_from_stage1_batch(batch)
-        elif isinstance(batch, dict):
-            frames = batch["frames"]
         else:
-            frames = batch
+            raise TypeError(f"Stage 1 expects Stage1Batch, got {type(batch)}")
 
         # Forward pass - use step=0 to avoid codebook replacement during validation
         loss, metrics = self.model(frames, step=0)

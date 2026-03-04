@@ -28,7 +28,7 @@ def create_datamodule(cfg_data: Any):
 
     Expected schema:
       data:
-        backend: oxe_local_indexed
+        backend: lerobot_v3
         preprocess: {image_size: int, return_metadata: bool}
         loader: {batch_size: int, num_workers: int, pin_memory: bool, prefetch_factor: int|null}
         dataset: {...}
@@ -40,18 +40,6 @@ def create_datamodule(cfg_data: Any):
     preprocess = data["preprocess"]
     loader = data["loader"]
     dataset = data["dataset"]
-
-    if backend == "oxe_local_indexed":
-        from common.data import OpenXLocalDataModule
-
-        adapter = data["adapter"]
-        oxe = dataset["oxe"]
-        return OpenXLocalDataModule(
-            datasets=list(oxe["datasets"]),
-            preprocess=preprocess,
-            loader=loader,
-            adapter=adapter,
-        )
 
     if backend == "lerobot_v3":
         from common.lerobot_v3_data import LeRobotV3DataModule
@@ -66,6 +54,4 @@ def create_datamodule(cfg_data: Any):
             output_format=str(data["output_format"]),
         )
 
-    raise ValueError(
-        f"Only data.backend in {{'oxe_local_indexed','lerobot_v3'}} is supported, got {backend!r}"
-    )
+    raise ValueError(f"Only data.backend='lerobot_v3' is supported, got {backend!r}")

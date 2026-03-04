@@ -59,14 +59,15 @@ def test_stage2_stage3_adapter_parity_for_core_inputs() -> None:
         optimizer=VLAOptimizerConfig(lr=1e-4, weight_decay=0.0),
     )
 
-    oxe_batch = {
-        "frames": torch.randint(0, 255, (2, 2, 8, 8, 3), dtype=torch.uint8),
-        "language": ["pick", "place"],
-        "initial_state": torch.tensor([[3.0, 3.0], [1.0, -1.0]], dtype=torch.float32),
-        "action": torch.tensor([[3.0, 6.0], [1.0, 2.0]], dtype=torch.float32),
-        "action_is_pad": torch.zeros((2, 1), dtype=torch.bool),
-    }
-    module._loss_and_targets_from_oxe_batch(oxe_batch)
+    stage2_input = FoundationBatch(
+        image_streams={"primary": torch.randint(0, 255, (2, 2, 3, 8, 8), dtype=torch.uint8)},
+        image_padding_masks={"primary": torch.ones((2, 2), dtype=torch.bool)},
+        task_text=["pick", "place"],
+        state=torch.tensor([[[3.0, 3.0]], [[1.0, -1.0]]], dtype=torch.float32),
+        target_actions=torch.tensor([[[3.0, 6.0]], [[1.0, 2.0]]], dtype=torch.float32),
+        action_is_pad=torch.zeros((2, 1), dtype=torch.bool),
+    )
+    module._loss_and_targets_from_batch(stage2_input)
 
     assert backend.last_batch is not None
     stage2_batch = backend.last_batch
@@ -80,12 +81,12 @@ def test_stage2_stage3_adapter_parity_for_core_inputs() -> None:
     policy.core = torch.nn.Linear(1, 1)
 
     lerobot_batch = {
-        "observation.images.rgb": stage2_batch.image_streams["observation.images.rgb"],
+        "observation.images.rgb": stage2_batch.image_streams["primary"],
         "observation.images.rgb_is_pad": torch.zeros((2, 1), dtype=torch.bool),
-        "task": oxe_batch["language"],
-        "observation.state": oxe_batch["initial_state"],
-        "action": oxe_batch["action"],
-        "action_is_pad": oxe_batch["action_is_pad"],
+        "task": ["pick", "place"],
+        "observation.state": torch.tensor([[3.0, 3.0], [1.0, -1.0]], dtype=torch.float32),
+        "action": torch.tensor([[3.0, 6.0], [1.0, 2.0]], dtype=torch.float32),
+        "action_is_pad": torch.zeros((2, 1), dtype=torch.bool),
     }
     stage3_batch = HLRPSmolVLASharedPolicy._to_foundation_batch(
         policy,
@@ -97,12 +98,12 @@ def test_stage2_stage3_adapter_parity_for_core_inputs() -> None:
     stage3_action_target = HLRPSmolVLASharedPolicy._extract_action_target(policy, lerobot_batch)
 
     assert torch.equal(
-        stage2_batch.image_streams["observation.images.rgb"],
+        stage2_batch.image_streams["primary"][:, -1, ...],
         stage3_batch.image_streams["observation.images.rgb"],
     )
     assert torch.equal(stage2_batch.action_is_pad, stage3_batch.action_is_pad)
-    assert torch.allclose(stage2_batch.state, stage3_batch.state)
-    assert torch.allclose(stage2_batch.target_actions, stage3_action_target.squeeze(1))
+    assert torch.allclose(stage2_batch.state.squeeze(1), stage3_batch.state)
+    assert torch.allclose(stage2_batch.target_actions.squeeze(1), stage3_action_target.squeeze(1))
 
 
 def test_stage3_policy_accepts_actions_id_pad_alias() -> None:

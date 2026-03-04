@@ -6,7 +6,7 @@
 #
 # The config is automatically included (as optional) by experiment configs that need it.
 # You can also override via CLI:
-#   python scripts/2_train_laq.py experiment=laq_oxe_local logging.root_dir=/my/path
+#   python scripts/2_train_laq.py experiment=stage1_octo24_local logging.root_dir=/my/path
 
 # Logging paths (where to store run outputs)
 logging:
@@ -21,12 +21,6 @@ logging:
 # If relative, resolved against `logging.root_dir` if set, else project root.
 paths:
   cache_dir: cache
-
-# Optional: point the local OpenX indexed adapter at your OXE tar mirror root.
-data:
-  adapter:
-    openx_local:
-      root: /mnt/data/oxe
 
 # Optional: override cluster container image per user.
 # Most experiments include this file as optional `/user_config: local`,

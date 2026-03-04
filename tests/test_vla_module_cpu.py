@@ -74,7 +74,7 @@ def test_vla_module_training_step_cpu_smoke():
         frames_to_images=lambda frames: [object() for _ in range(frames.shape[0])],
     )
 
-    # Simulate an OXE-like batch: frames [B, 2, H, W, 3] uint8, language as list[str]
+    # Simulate a temporal-frame dict batch: frames [B, 2, H, W, 3] uint8, language as list[str]
     batch = {
         "frames": torch.randint(0, 256, (2, 2, 16, 16, 3), dtype=torch.uint8),
         "language": ["pick up block", "push button"],

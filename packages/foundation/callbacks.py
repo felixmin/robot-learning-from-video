@@ -19,7 +19,7 @@ from PIL import Image, ImageDraw, ImageFont
 from torchvision.transforms.functional import pil_to_tensor
 from torchvision.utils import flow_to_image
 
-from common.batch_utils import temporal_frames_to_bcthw
+from common.batch_utils import select_primary_image_stream, temporal_frames_to_bcthw
 
 logger = logging.getLogger(__name__)
 
@@ -1003,7 +1003,12 @@ class VLATrainSampleVisualizationCallback(Callback):
         step = int(getattr(trainer, "global_step", 0))
         if self.cfg.every_n_steps <= 0 or (step % self.cfg.every_n_steps) != 0:
             return
-        if not isinstance(batch, dict):
+        try:
+            from foundation.backends.interfaces import BackendMode, FoundationBatch
+        except Exception:
+            logger.debug("train sample viz: failed to import FoundationBatch", exc_info=True)
+            return
+        if not isinstance(batch, FoundationBatch):
             return
 
         action_tokens = getattr(pl_module, "action_tokens", None)
@@ -1015,39 +1020,10 @@ class VLATrainSampleVisualizationCallback(Callback):
         logger.debug("train sample viz: begin step=%d batch_idx=%d", step, int(batch_idx))
 
         try:
-            from foundation.backends.interfaces import BackendMode, FoundationBatch
             from foundation.backends.smolvla_shared.input_transform import normalize_vector_mean_std
-            from foundation.online_laq import (
-                extract_oxe_actions,
-                extract_oxe_initial_state,
-                extract_oxe_language,
-                oxe_frames_to_laq_video,
-            )
         except Exception:
             logger.debug("train sample viz: failed to import helpers", exc_info=True)
             return
-
-        def _policy_image_streams(frames_tensor: torch.Tensor) -> dict[str, torch.Tensor]:
-            if frames_tensor.ndim != 5:
-                raise ValueError(
-                    f"Expected OXE frames tensor [B,T,...], got shape {tuple(frames_tensor.shape)}"
-                )
-            if frames_tensor.shape[-1] == 3:
-                return {"observation.images.rgb": frames_tensor[:, 0, ...]}
-            if frames_tensor.shape[2] == 3:
-                return {"observation.images.rgb": frames_tensor[:, 0, ...]}
-            if frames_tensor.shape[1] == 3:
-                return {"observation.images.rgb": frames_tensor[:, :, 0, ...]}
-            raise ValueError(
-                "Unrecognized frames layout; expected last dim=3 (BTHWC), shape[2]=3 (BTCHW), "
-                f"or shape[1]=3 (BCTHW). Got {tuple(frames_tensor.shape)}"
-            )
-
-        def _policy_image_padding_masks(image_streams: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
-            masks: dict[str, torch.Tensor] = {}
-            for key, stream in image_streams.items():
-                masks[key] = torch.ones((int(stream.shape[0]),), dtype=torch.bool, device=stream.device)
-            return masks
 
         mode = getattr(pl_module, "backend_mode", BackendMode.CODES)
         if not isinstance(mode, BackendMode):
@@ -1056,25 +1032,22 @@ class VLATrainSampleVisualizationCallback(Callback):
             except Exception:
                 mode = BackendMode.CODES
 
-        frames = batch.get("frames")
-        if frames is None:
+        image_streams_all = batch.image_streams or {}
+        if not image_streams_all:
+            return
+        frames = select_primary_image_stream(image_streams_all)
+        if not isinstance(frames, torch.Tensor):
+            return
+        instructions = [str(x) for x in (batch.task_text or [])]
+        if not instructions:
             return
 
-        try:
-            instructions = extract_oxe_language(batch)
-        except Exception:
-            logger.debug("train sample viz: failed to extract language", exc_info=True)
-            return
-
-        episode_id = batch.get("episode_id")
-        if isinstance(episode_id, list):
-            episode_id_list = episode_id
-        else:
-            episode_id_list = None
-
-        frame_idx = batch.get("frame_idx")
+        batch_meta = batch.meta if isinstance(batch.meta, dict) else {}
+        episode_id = batch_meta.get("episode_id")
+        episode_id_list = episode_id if isinstance(episode_id, list) else None
+        frame_idx = batch_meta.get("frame_idx")
         frame_idx_list = frame_idx if isinstance(frame_idx, list) else None
-        dataset_name = batch.get("dataset_name")
+        dataset_name = batch_meta.get("dataset_name")
         dataset_name_list = dataset_name if isinstance(dataset_name, list) else None
 
         # Select diverse samples from this batch.
@@ -1108,7 +1081,11 @@ class VLATrainSampleVisualizationCallback(Callback):
         gt_vectors_sel: list[list[float]] | None = None
         gt_actions_sel: list[list[float]] | None = None
         try:
-            video_sel = oxe_frames_to_laq_video(frames_sel)
+            video_sel = temporal_frames_to_bcthw(frames_sel)
+            if video_sel.dtype == torch.uint8:
+                video_sel = video_sel.float().div(255.0)
+            else:
+                video_sel = video_sel.float()
             if mode is BackendMode.CODES:
                 gt_codes_t = pl_module.code_provider.codes_from_video(video_sel)
                 gt_codes_sel = [row.tolist() for row in gt_codes_t.detach().cpu()]
@@ -1117,13 +1094,17 @@ class VLATrainSampleVisualizationCallback(Callback):
                 gt_codes_sel = [row.tolist() for row in gt_codes_t.detach().cpu()]
                 gt_vectors_sel = gt_vectors_t.detach().cpu().reshape(gt_vectors_t.shape[0], -1).tolist()
             elif mode is BackendMode.ACTIONS:
-                gt_actions_t = extract_oxe_actions(batch)
+                gt_actions_t = batch.target_actions
+                if gt_actions_t is None:
+                    return
                 gt_actions_sel = gt_actions_t[chosen].detach().cpu().tolist()
             elif mode is BackendMode.MULTITASK:
                 gt_codes_t, gt_vectors_t = pl_module.code_provider.codes_and_vectors_from_video(video_sel)
                 gt_codes_sel = [row.tolist() for row in gt_codes_t.detach().cpu()]
                 gt_vectors_sel = gt_vectors_t.detach().cpu().reshape(gt_vectors_t.shape[0], -1).tolist()
-                gt_actions_t = extract_oxe_actions(batch)
+                gt_actions_t = batch.target_actions
+                if gt_actions_t is None:
+                    return
                 gt_actions_sel = gt_actions_t[chosen].detach().cpu().tolist()
             else:
                 return
@@ -1136,8 +1117,8 @@ class VLATrainSampleVisualizationCallback(Callback):
         pred_actions_sel: list[list[float]] | None = None
         gen_debug: Optional[list[dict[str, Any]]] = None
         try:
-            image_streams = _policy_image_streams(frames_sel)
-            state = extract_oxe_initial_state(batch)
+            image_streams = pl_module._extract_policy_image_streams(frames_sel)
+            state = batch.state
             if state is not None:
                 state = state[chosen]
                 state = normalize_vector_mean_std(
@@ -1148,7 +1129,7 @@ class VLATrainSampleVisualizationCallback(Callback):
             latent = backend.latent_from_batch(
                 FoundationBatch(
                     image_streams=image_streams,
-                    image_padding_masks=_policy_image_padding_masks(image_streams),
+                    image_padding_masks=pl_module._extract_policy_image_padding_masks(image_streams),
                     task_text=instr_sel,
                     state=state,
                 ),

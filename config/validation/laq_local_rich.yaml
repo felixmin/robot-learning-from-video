@@ -1,6 +1,6 @@
 # @package _group_
 
-# Rich validation preset for local LAQ OXE runs.
+# Rich validation preset for local LAQ runs.
 
 check_interval: 1000
 limit_batches: 50

@@ -2,7 +2,7 @@
 Stage 2 (Foundation) LightningModule for token-based latent-action prediction.
 
 Training loop:
-1) Take an OXE/OpenX batch containing frame pairs + language.
+1) Take a dict batch containing frame pairs + language.
 2) Run frozen LAQ (Stage 1) to produce discrete codes [B, code_seq_len].
 3) Format codes into an action-token completion string.
 4) Use Qwen3-VL processor to build multimodal inputs + prompt-masked labels.
@@ -24,8 +24,7 @@ from foundation.action_tokens import ActionTokenConfig
 from foundation.constrained_decode import ActionTokenIds, make_prefix_allowed_tokens_fn
 from foundation.online_laq import (
     LatentCodeProvider,
-    extract_oxe_language,
-    oxe_frames_to_laq_video,
+    frames_to_laq_video,
 )
 from foundation.vla_inputs import (
     ChatConfig,
@@ -66,7 +65,7 @@ class VLATokenLightningModule(pl.LightningModule):
             train_teacher_forced_metrics_every_n_steps
         )
 
-        # Convert OXE batch frames into image objects for the VLM processor.
+        # Convert temporal frame tensors into image objects for the VLM processor.
         # In production this will likely return PIL Images; in tests we can inject a stub.
         self.frames_to_images = frames_to_images or (
             lambda frames: [object() for _ in range(frames.shape[0])]
@@ -179,13 +178,16 @@ class VLATokenLightningModule(pl.LightningModule):
     ]:
         if not isinstance(batch, dict):
             raise TypeError(
-                "Expected dict batch with keys from OXEDataModule (frames, language, ...)"
+                "Expected dict batch with keys including frames and language."
             )
 
         frames = batch["frames"]
-        instructions = extract_oxe_language(batch)
+        language = batch.get("language")
+        if not isinstance(language, list):
+            raise TypeError("Expected batch['language'] to be a list[str]")
+        instructions = [str(x) for x in language]
 
-        video = oxe_frames_to_laq_video(frames)
+        video = frames_to_laq_video(frames)
         codes = self.code_provider.codes_from_video(video)  # [B, S]
         if codes.shape[0] != frames.shape[0]:
             raise ValueError("Batch size mismatch between frames and codes")
