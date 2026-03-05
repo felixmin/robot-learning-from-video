@@ -19,17 +19,28 @@ validation:
   limit_batches: 50
   check_val_every_n_epoch: 1
   num_sanity_val_steps: null
-  visualization:
+  pipeline:
     enabled: true
-    num_samples: 4
-    every_n_val: 1
-    include_freeform_pred: false
-    freeform_max_new_tokens: 32
-    flow_decode:
-      enabled: true
-      num_samples: 4
-      every_n_val: 1
-      max_decode_batch_size: 2
+    max_cached_samples: 256
+    num_fixed_samples: 8
+    run_gc_after_validation: true
+    buckets: {}
+    checks:
+      sample_panels:
+        type: sample_panels
+        enabled: true
+        num_samples: 4
+        include_freeform_pred: false
+        freeform_max_new_tokens: 32
+      latent_flow_decode:
+        type: latent_flow_decode
+        enabled: true
+        laq_checkpoint_path: ${model.laq.checkpoint}
+        num_samples: 4
+        max_decode_batch_size: 2
+      token_distribution:
+        type: token_distribution
+        enabled: true
 
 train_visualization:
   enabled: true

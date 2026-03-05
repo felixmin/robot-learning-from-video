@@ -65,11 +65,11 @@ class LatentTransferStrategy(ValidationStrategy):
 
         # Skip if aux_decoder is disabled (required for decoding)
         if pl_module.model.aux_decoder is None:
-            return metrics
+            return self.no_output("aux_decoder_unavailable")
 
         all_frames = cache.get_all_frames()
         if all_frames is None or len(all_frames) < 4:
-            return metrics
+            return self.no_output("insufficient_frames")
 
         # Sample pairs
         n = min(self.num_pairs, len(all_frames) // 2)
@@ -142,7 +142,7 @@ class LatentTransferStrategy(ValidationStrategy):
                 metric_suffix=metric_suffix,
             )
 
-        return metrics
+        return self.success(produced=int(n), metrics=metrics)
     
     def _visualize_transfers(
         self,
@@ -280,7 +280,7 @@ class CodebookHistogramStrategy(ValidationStrategy):
         # Use all_codes for true distribution across all validation samples
         all_codes = cache.get_all_codes()
         if all_codes is None or len(all_codes) == 0:
-            return metrics
+            return self.no_output("no_cached_codes")
 
         # Flatten codes to get all codebook indices used
         # all_codes shape: [N, code_seq_len] where values are codebook indices
@@ -305,7 +305,7 @@ class CodebookHistogramStrategy(ValidationStrategy):
         if wandb_logger is not None:
             self._create_histogram(counts, wandb_logger, trainer.global_step, codebook_size, metric_suffix=metric_suffix)
 
-        return metrics
+        return self.success(produced=int(len(all_codes)), metrics=metrics)
 
     def _create_histogram(
         self,
@@ -396,7 +396,7 @@ class LatentSequenceHistogramStrategy(ValidationStrategy):
         # Use all_codes for true distribution across all validation samples
         all_codes = cache.get_all_codes()
         if all_codes is None or len(all_codes) == 0:
-            return metrics
+            return self.no_output("no_cached_codes")
 
         # all_codes shape: [N, code_seq_len]
         # Convert to list of tuples for counting
@@ -421,7 +421,7 @@ class LatentSequenceHistogramStrategy(ValidationStrategy):
         if wandb_logger is not None:
             self._create_histogram(counter, wandb_logger, trainer.global_step, metric_suffix=metric_suffix)
 
-        return metrics
+        return self.success(produced=int(len(all_codes)), metrics=metrics)
 
     def _create_histogram(
         self,
@@ -515,7 +515,7 @@ class AllSequencesHistogramStrategy(ValidationStrategy):
         # Use all_codes for true distribution across all validation samples
         all_codes = cache.get_all_codes()
         if all_codes is None or len(all_codes) == 0:
-            return metrics
+            return self.no_output("no_cached_codes")
 
         # all_codes shape: [N, code_seq_len]
         sequences = [tuple(c.tolist()) for c in all_codes]
@@ -534,7 +534,7 @@ class AllSequencesHistogramStrategy(ValidationStrategy):
                 metric_suffix=metric_suffix,
             )
 
-        return metrics
+        return self.success(produced=int(len(sorted_counts)), metrics=metrics)
 
     def _create_plot(
         self,
@@ -655,7 +655,7 @@ class CodebookEmbeddingStrategy(ValidationStrategy):
             embeddings_2d = self._reduce_dimensions(codebook, embedding_dim)
         except Exception as e:
             print(f"Warning: codebook_embedding dimensionality reduction failed: {e}")
-            return metrics
+            return self.no_output("dimensionality_reduction_failed")
 
         # Create visualization
         wandb_logger = self._get_wandb_logger(trainer)
@@ -669,7 +669,7 @@ class CodebookEmbeddingStrategy(ValidationStrategy):
                 metric_suffix=metric_suffix,
             )
 
-        return metrics
+        return self.success(produced=int(num_embeddings), metrics=metrics)
 
     def _reduce_dimensions(self, codebook, embedding_dim):
         """Apply t-SNE (or UMAP) with optional PCA preprocessing."""
@@ -855,10 +855,10 @@ class SequenceExamplesStrategy(ValidationStrategy):
         frames = cache.get_all_frames()
 
         if codes is None or frames is None:
-            return metrics
+            return self.no_output("missing_codes_or_frames")
 
         if len(codes) < self.min_samples:
-            return metrics
+            return self.no_output("insufficient_samples")
 
         # Convert codes to sequence tuples for exact matching
         # codes shape: [N, code_seq_len] where values are codebook indices
@@ -872,7 +872,7 @@ class SequenceExamplesStrategy(ValidationStrategy):
         top_sequences = counter.most_common(self.top_k_sequences)
 
         if not top_sequences:
-            return metrics
+            return self.no_output("no_top_sequences")
 
         # Visualize
         wandb_logger = self._get_wandb_logger(trainer)
@@ -886,7 +886,7 @@ class SequenceExamplesStrategy(ValidationStrategy):
                 metric_suffix=metric_suffix,
             )
 
-        return metrics
+        return self.success(produced=int(len(top_sequences)), metrics=metrics)
 
     def _visualize_sequences(
         self,

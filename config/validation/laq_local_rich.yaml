@@ -25,6 +25,7 @@ buckets:
 
 strategies:
   basic:
+    type: basic
     enabled: true
     every_n_validations: 1
     num_fixed_samples: 4
@@ -34,26 +35,32 @@ strategies:
     visualize_per_bucket: true
 
   flow_visualization:
+    type: flow_visualization
     enabled: true
     every_n_validations: 1
     num_samples: 8
 
   codebook_histogram:
+    type: codebook_histogram
     enabled: true
     every_n_validations: 1
   codebook_embedding:
+    type: codebook_embedding
     enabled: true
     every_n_validations: 1
     method: umap
     pca_components: 50
   sequence_histogram:
+    type: sequence_histogram
     enabled: true
     every_n_validations: 1
     num_top_sequences: 50
   all_sequences_histogram:
+    type: all_sequences_histogram
     enabled: true
     every_n_validations: 1
   sequence_examples:
+    type: sequence_examples
     enabled: true
     every_n_validations: 1
     top_k_sequences: 16

@@ -8,6 +8,7 @@ Includes:
 """
 
 import gc
+import logging
 from collections import deque
 from typing import Optional, List, Dict, Any, Deque
 
@@ -17,6 +18,8 @@ from lightning.pytorch.callbacks import Callback
 
 from common.batch_utils import select_primary_image_stream, temporal_frames_to_bcthw
 from common.lerobot_v3_types import Stage1Batch
+
+logger = logging.getLogger("laq.training")
 
 
 def _stage1_batch_to_frames(batch: Stage1Batch) -> torch.Tensor:
@@ -318,6 +321,18 @@ class ValidationStrategyCallback(Callback):
         cache.fixed_frames = all_frames[selected_indices]
         cache.fixed_metadata = [all_metadata[i] for i in selected_indices]
 
+    @staticmethod
+    def _result_is_no_output(result: Any) -> tuple[bool, str]:
+        if not isinstance(result, dict):
+            raise TypeError("Validation strategy must return dict result")
+        if "_produced" not in result:
+            raise KeyError("Validation strategy result missing required '_produced' field")
+        produced = int(result.get("_produced", 0))
+        if produced > 0:
+            return False, ""
+        reason = result.get("_reason")
+        return True, str(reason) if reason is not None else "no outputs produced"
+
     def on_validation_epoch_start(
         self,
         trainer: pl.Trainer,
@@ -397,11 +412,16 @@ class ValidationStrategyCallback(Callback):
 
             # Log cache stats
             global_count = self.global_cache.sample_count()
-            print(f"✓ Global cache: {global_count} samples")
+            logger.info("✓ Global cache: %d samples", global_count)
             for name, cache in self.bucket_caches.items():
                 count = cache.sample_count()
                 holdout_tag = " (holdout)" if cache.is_holdout else ""
-                print(f"  [{name}]{holdout_tag}: {count} samples")
+                logger.info("  [%s]%s: %d samples", name, holdout_tag, count)
+
+        due = 0
+        ran = 0
+        skipped = 0
+        soft_failed = 0
 
         # Run each strategy on its assigned buckets (read from strategy.buckets)
         for strategy in self.strategies:
@@ -412,28 +432,38 @@ class ValidationStrategyCallback(Callback):
 
             # No bucket bindings -> use global cache
             if not bucket_names:
+                due += 1
                 can_run, reason = strategy.can_run(self.global_cache)
                 if not can_run:
-                    print(f"⚠️ Skipping {strategy.name}: {reason}")
+                    skipped += 1
+                    logger.warning("[Stage1Validation] skip %s: %s", strategy.name, reason)
                     continue
                 try:
-                    strategy.run(self.global_cache, pl_module, trainer)
+                    result = strategy.run(self.global_cache, pl_module, trainer)
+                    no_output, reason = self._result_is_no_output(result)
+                    if no_output:
+                        skipped += 1
+                        logger.warning("[Stage1Validation] skip %s: %s", strategy.name, reason)
+                    else:
+                        ran += 1
                 except Exception as e:
-                    print(f"Warning: Strategy {strategy.name} failed: {e}")
+                    soft_failed += 1
+                    logger.warning("[Stage1Validation] %s failed: %s", strategy.name, e)
                 continue
 
             for bucket_name in bucket_names:
+                due += 1
                 if bucket_name not in self.bucket_caches:
-                    print(f"⚠️ Bucket '{bucket_name}' not found for {strategy.name}")
+                    skipped += 1
+                    logger.warning("[Stage1Validation] bucket '%s' not found for %s", bucket_name, strategy.name)
                     continue
                 
                 cache = self.bucket_caches[bucket_name]
                 can_run, reason = strategy.can_run(cache)
                 
                 if not can_run:
-                    # Only warn if verbose or if it's a critical single-bucket strategy
-                    if len(bucket_names) == 1:
-                        print(f"⚠️ Skipping {strategy.name} on {bucket_name}: {reason}")
+                    skipped += 1
+                    logger.warning("[Stage1Validation] skip %s on %s: %s", strategy.name, bucket_name, reason)
                     continue
 
                 # Always suffix bucket-bound metrics/images with bucket name to avoid
@@ -443,9 +473,24 @@ class ValidationStrategyCallback(Callback):
                     suffix += "_holdout"
                 
                 try:
-                    strategy.run(cache, pl_module, trainer, metric_suffix=suffix)
+                    result = strategy.run(cache, pl_module, trainer, metric_suffix=suffix)
+                    no_output, reason = self._result_is_no_output(result)
+                    if no_output:
+                        skipped += 1
+                        logger.warning("[Stage1Validation] skip %s%s: %s", strategy.name, suffix, reason)
+                    else:
+                        ran += 1
                 except Exception as e:
-                    print(f"Warning: Strategy {strategy.name} on {bucket_name} failed: {e}")
+                    soft_failed += 1
+                    logger.warning("[Stage1Validation] %s%s failed: %s", strategy.name, suffix, e)
+
+        logger.info(
+            "[Stage1Validation] due=%d ran=%d skipped=%d soft_failed=%d",
+            due,
+            ran,
+            skipped,
+            soft_failed,
+        )
 
         # Run garbage collection after validation to keep loader + viz memory stable.
         if self.run_gc_after_validation:

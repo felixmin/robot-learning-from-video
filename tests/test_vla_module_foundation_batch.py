@@ -391,10 +391,61 @@ def test_vla_module_validation_step_reads_foundation_batch_metadata() -> None:
         },
     )
 
+    module.reset_val_batch_payload_queue()
     loss = module.validation_step(batch, batch_idx=0)
 
     assert isinstance(loss, torch.Tensor)
-    assert module._last_val_sample is not None
-    assert module._last_val_sample["dataset_name"] == ["ds_a", "ds_b"]
-    assert module._last_val_sample["episode_id"] == [11, 12]
-    assert module._last_val_sample["frame_idx"] == [21, 22]
+    payload = module.consume_next_val_batch_payload()
+    assert isinstance(payload, dict)
+    records = payload.get("records")
+    assert isinstance(records, list)
+    assert len(records) == 2
+    assert records[0]["metadata"]["dataset_name"] == "ds_a"
+    assert records[1]["metadata"]["dataset_name"] == "ds_b"
+    assert records[0]["metadata"]["episode_id"] == 11
+    assert records[1]["metadata"]["episode_id"] == 12
+    assert records[0]["metadata"]["frame_idx"] == 21
+    assert records[1]["metadata"]["frame_idx"] == 22
+
+
+def test_vla_module_validation_step_enqueues_payload_for_all_batches() -> None:
+    backend = _CaptureBackend()
+    module = VLATokenBackendLightningModule(
+        backend=backend,
+        code_provider=_DummyCodeProvider(),
+        backend_mode=BackendMode.LATENT_FLOW,
+        normalization_stats={
+            "observation.state": {"mean": [0.0, 0.0], "std": [1.0, 1.0]},
+        },
+        optimizer=VLAOptimizerConfig(lr=1e-4, weight_decay=0.0),
+    )
+    module.log = lambda *args, **kwargs: None
+    module.__dict__["_trainer"] = SimpleNamespace(global_step=13)
+
+    batch = FoundationBatch(
+        image_streams={"primary": torch.randint(0, 255, (2, 2, 3, 8, 8), dtype=torch.uint8)},
+        image_padding_masks={"primary": torch.ones((2, 2), dtype=torch.bool)},
+        task_text=["pick", "place"],
+        state=torch.tensor([[[1.0, 2.0]], [[3.0, 4.0]]], dtype=torch.float32),
+        meta={
+            "dataset_name": ["ds_a", "ds_b"],
+            "episode_id": [11, 12],
+            "frame_idx": [21, 22],
+        },
+    )
+
+    module.reset_val_batch_payload_queue()
+    module.validation_step(batch, batch_idx=0)
+    module.validation_step(batch, batch_idx=1)
+
+    payload0 = module.consume_next_val_batch_payload()
+    payload1 = module.consume_next_val_batch_payload()
+    payload2 = module.consume_next_val_batch_payload()
+
+    assert isinstance(payload0, dict)
+    assert isinstance(payload1, dict)
+    assert payload2 is None
+    assert isinstance(payload0.get("records"), list)
+    assert isinstance(payload1.get("records"), list)
+    assert len(payload0["records"]) == 2
+    assert len(payload1["records"]) == 2

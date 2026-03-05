@@ -52,15 +52,26 @@ def test_vla_train_visualization_callback_writes_files(tmp_path):
             Image.new("RGB", (16, 16), color=(10, 20, 30)) for _ in range(frames.shape[0])
         ],
         code_provider=DummyCodeProvider(),
+        backend_mode=BackendMode.CODES,
+        normalization_stats=None,
+        _extract_policy_image_streams=lambda frames: {"observation.images.rgb": frames[:, 0, ...]},
+        _extract_policy_image_padding_masks=lambda image_streams: {
+            "observation.images.rgb": torch.ones(
+                (int(image_streams["observation.images.rgb"].shape[0]),), dtype=torch.bool
+            )
+        },
     )
 
-    batch = {
-        "frames": torch.randint(0, 256, (2, 2, 16, 16, 3), dtype=torch.uint8),
-        "language": ["pick up block", "push button"],
-        "initial_state": torch.tensor([[1.0, -1.0], [2.0, -2.0]], dtype=torch.float32),
-        "episode_id": ["ep1", "ep2"],
-        "frame_idx": [0, 5],
-    }
+    batch = FoundationBatch(
+        image_streams={"primary": torch.randint(0, 256, (2, 2, 16, 16, 3), dtype=torch.uint8)},
+        image_padding_masks={"primary": torch.ones((2, 2), dtype=torch.bool)},
+        task_text=["pick up block", "push button"],
+        state=torch.tensor([[1.0, -1.0], [2.0, -2.0]], dtype=torch.float32),
+        meta={
+            "episode_id": ["ep1", "ep2"],
+            "frame_idx": [0, 5],
+        },
+    )
 
     callback.on_train_batch_end(trainer, pl_module, outputs=None, batch=batch, batch_idx=0)
 

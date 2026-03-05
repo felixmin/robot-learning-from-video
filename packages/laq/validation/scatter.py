@@ -237,13 +237,11 @@ class ActionTokenScatterStrategy(MetadataScatterStrategy):
         metric_suffix: str = "",
     ) -> Dict[str, Any]:
         """Generate action-token scatter plot."""
-        metrics = {}
-
         # Filter samples with action metadata
         filtered_meta, codes_list, _ = self._filter_samples_with_metadata(cache, ["action"])
 
         if len(filtered_meta) < self.min_samples:
-            return metrics
+            return self.no_output("insufficient_action_metadata")
 
         # Extract actions and first token from codes
         actions = [meta["action"][:2] for meta in filtered_meta]
@@ -253,7 +251,7 @@ class ActionTokenScatterStrategy(MetadataScatterStrategy):
         actions, tokens = self._limit_samples(actions, tokens)
 
         if not actions:
-            return metrics
+            return self.no_output("no_actions_after_sampling")
 
         # Create scatter plot
         wandb_logger = self._get_wandb_logger(trainer)
@@ -281,7 +279,7 @@ class ActionTokenScatterStrategy(MetadataScatterStrategy):
                     caption=[f"Step {trainer.global_step}: 2D actions colored by assigned token"],
                 )
 
-        return metrics
+        return self.success(produced=int(len(actions)))
 
 
 class ActionSequenceScatterStrategy(MetadataScatterStrategy):
@@ -321,13 +319,11 @@ class ActionSequenceScatterStrategy(MetadataScatterStrategy):
         metric_suffix: str = "",
     ) -> Dict[str, Any]:
         """Generate action-sequence scatter plot."""
-        metrics = {}
-
         # Use base class filtering
         filtered_meta, codes_list, _ = self._filter_samples_with_metadata(cache, ["action"])
 
         if len(filtered_meta) < self.min_samples:
-            return metrics
+            return self.no_output("insufficient_action_metadata")
 
         # Map unique sequences to IDs
         sequences = [tuple(c.tolist()) for c in codes_list]
@@ -343,7 +339,7 @@ class ActionSequenceScatterStrategy(MetadataScatterStrategy):
         actions, seq_ids = self._limit_samples(actions, seq_ids)
 
         if not actions:
-            return metrics
+            return self.no_output("no_actions_after_sampling")
 
         # Create scatter plot
         wandb_logger = self._get_wandb_logger(trainer)
@@ -352,7 +348,7 @@ class ActionSequenceScatterStrategy(MetadataScatterStrategy):
                 actions, seq_ids, wandb_logger, trainer.global_step, num_unique_seqs
             )
 
-        return metrics
+        return self.success(produced=int(len(actions)))
 
     def _create_sequence_scatter(
         self,
@@ -458,13 +454,11 @@ class TopSequencesScatterStrategy(MetadataScatterStrategy):
         metric_suffix: str = "",
     ) -> Dict[str, Any]:
         """Generate top sequences scatter plot."""
-        metrics = {}
-
         # Use base class filtering
         filtered_meta, codes_list, _ = self._filter_samples_with_metadata(cache, ["action"])
 
         if len(filtered_meta) < self.min_samples:
-            return metrics
+            return self.no_output("insufficient_action_metadata")
 
         # Extract actions and sequences
         actions = [meta["action"][:2] for meta in filtered_meta]
@@ -483,14 +477,14 @@ class TopSequencesScatterStrategy(MetadataScatterStrategy):
         actions, categories = self._limit_samples(actions, categories)
 
         if not actions:
-            return metrics
+            return self.no_output("no_actions_after_sampling")
 
         wandb_logger = self._get_wandb_logger(trainer)
         if wandb_logger is not None:
             self._create_top_scatter(actions, categories, top_seqs_counts,
                                      wandb_logger, trainer.global_step)
 
-        return metrics
+        return self.success(produced=int(len(actions)))
 
     def _create_top_scatter(
         self,
@@ -589,13 +583,11 @@ class StateSequenceScatterStrategy(MetadataScatterStrategy):
         metric_suffix: str = "",
     ) -> Dict[str, Any]:
         """Generate state-sequence scatter plot."""
-        metrics = {}
-
         # Use base class filtering
         filtered_meta, codes_list, _ = self._filter_samples_with_metadata(cache, ["initial_state"])
 
         if len(filtered_meta) < self.min_samples:
-            return metrics
+            return self.no_output("insufficient_state_metadata")
 
         # Extract states and sequences
         states = [meta["initial_state"][:2] for meta in filtered_meta]
@@ -613,14 +605,14 @@ class StateSequenceScatterStrategy(MetadataScatterStrategy):
         states, categories = self._limit_samples(states, categories)
 
         if not states:
-            return metrics
+            return self.no_output("no_states_after_sampling")
 
         wandb_logger = self._get_wandb_logger(trainer)
         if wandb_logger is not None:
             self._create_state_scatter(states, categories, top_seqs_counts,
                                        wandb_logger, trainer.global_step)
 
-        return metrics
+        return self.success(produced=int(len(states)))
 
     def _create_state_scatter(
         self,

@@ -33,13 +33,10 @@ from foundation.action_tokens import ActionTokenConfig
 from foundation.callbacks import (
     ThroughputLoggingCallback,
     ThroughputLoggingConfig,
-    VLALatentFlowDecodeVizConfig,
-    VLALatentFlowDecodeVisualizationCallback,
     VLATrainSampleVizConfig,
     VLATrainSampleVisualizationCallback,
-    VLASampleVizConfig,
-    VLASampleVisualizationCallback,
 )
+from foundation.validation_pipeline_callback import Stage2ValidationPipelineCallback
 from foundation.backends.smolvla_shared.artifact import (
     SMOLVLA_SHARED_ARTIFACT_FILENAME,
     SMOLVLA_SHARED_ARTIFACT_SCHEMA_VERSION,
@@ -259,32 +256,34 @@ def main(cfg: DictConfig):
             verbose=True,
         ),
     ]
-    viz_cfg = cfg.training.validation.visualization
-    if viz_cfg and bool(viz_cfg.enabled):
+    pipeline_cfg = OmegaConf.select(cfg, "training.validation.pipeline")
+    if pipeline_cfg and bool(pipeline_cfg.enabled):
+        checks_cfg = OmegaConf.to_container(pipeline_cfg.checks, resolve=True)
+        buckets_cfg = OmegaConf.to_container(pipeline_cfg.buckets, resolve=True)
+        if not isinstance(checks_cfg, dict):
+            raise ValueError("training.validation.pipeline.checks must be a dict")
+        if buckets_cfg is None:
+            buckets_cfg = {}
+        if not isinstance(buckets_cfg, dict):
+            raise ValueError("training.validation.pipeline.buckets must be a dict")
+
+        if laq_provider is None:
+            for check_name, raw in checks_cfg.items():
+                if not isinstance(raw, dict):
+                    continue
+                check_type = str(raw.get("type", check_name))
+                if check_type == "latent_flow_decode":
+                    raw["enabled"] = False
+
         callbacks.append(
-            VLASampleVisualizationCallback(
-                VLASampleVizConfig(
-                    enabled=True,
-                    num_samples=int(viz_cfg.num_samples),
-                    every_n_val=int(viz_cfg.every_n_val),
-                    include_freeform_pred=bool(viz_cfg.include_freeform_pred),
-                    freeform_max_new_tokens=int(viz_cfg.freeform_max_new_tokens),
-                )
+            Stage2ValidationPipelineCallback(
+                checks_config=checks_cfg,
+                bucket_configs=buckets_cfg,
+                max_cached_samples=int(pipeline_cfg.max_cached_samples),
+                num_fixed_samples=int(pipeline_cfg.num_fixed_samples),
+                run_gc_after_validation=bool(pipeline_cfg.run_gc_after_validation),
             )
         )
-        flow_viz_cfg = OmegaConf.select(viz_cfg, "flow_decode")
-        if flow_viz_cfg and bool(flow_viz_cfg.enabled) and laq_provider is not None:
-            callbacks.append(
-                VLALatentFlowDecodeVisualizationCallback(
-                    laq_checkpoint_path=str(laq_ckpt),
-                    cfg=VLALatentFlowDecodeVizConfig(
-                        enabled=True,
-                        num_samples=int(flow_viz_cfg.num_samples),
-                        every_n_val=int(flow_viz_cfg.every_n_val),
-                        max_decode_batch_size=int(flow_viz_cfg.max_decode_batch_size),
-                    ),
-                )
-            )
     train_viz_cfg = cfg.training.train_visualization
     if train_viz_cfg and bool(train_viz_cfg.enabled):
         callbacks.append(

@@ -360,6 +360,20 @@ class ValidationStrategy(ABC):
         """
         return []
 
+    @staticmethod
+    def no_output(reason: str) -> Dict[str, Any]:
+        """Return structured no-output result for callback-level accounting."""
+        return {"_produced": 0, "_reason": str(reason)}
+
+    @staticmethod
+    def success(*, produced: int = 1, metrics: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Return structured success result for callback-level accounting."""
+        out = dict(metrics or {})
+        out["_produced"] = max(0, int(produced))
+        if out["_produced"] > 0:
+            out.pop("_reason", None)
+        return out
+
     def can_run(self, cache: ValidationCache) -> Tuple[bool, str]:
         """
         Check if strategy has sufficient applicable data in cache.

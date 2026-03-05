@@ -70,6 +70,7 @@ class BasicVisualizationStrategy(ValidationStrategy):
         """Generate reconstruction visualizations for both train and val."""
         metrics = {}
         wandb_logger = self._get_wandb_logger(trainer)
+        produced = 0
 
         # Use bucket name for prefixing if available
         bucket_name = cache.bucket_name or ""
@@ -77,13 +78,17 @@ class BasicVisualizationStrategy(ValidationStrategy):
 
         # === Training samples visualization ===
         if self.visualize_train and not bucket_name:  # Only for global cache
-            self._visualize_training_samples(cache, pl_module, trainer, wandb_logger)
+            produced += self._visualize_training_samples(cache, pl_module, trainer, wandb_logger)
 
         # === Validation samples visualization ===
         if self.visualize_val:
-            self._visualize_validation_samples(cache, pl_module, trainer, wandb_logger, prefix)
+            produced += self._visualize_validation_samples(cache, pl_module, trainer, wandb_logger, prefix)
 
-        return metrics
+        if produced <= 0:
+            if wandb_logger is None:
+                return self.no_output("wandb_logger_unavailable")
+            return self.no_output("no_visualizations_rendered")
+        return self.success(produced=produced, metrics=metrics)
 
     def _visualize_training_samples(
         self,
@@ -91,17 +96,18 @@ class BasicVisualizationStrategy(ValidationStrategy):
         pl_module: pl.LightningModule,
         trainer: pl.Trainer,
         wandb_logger,
-    ) -> None:
+    ) -> int:
         """Visualize training samples from non-intrusive train preview buffer."""
         if wandb_logger is None:
-            return
+            return 0
+        produced = 0
 
         train_frames, train_metadata = self._sample_from_train_preview_buffer(
             trainer, self.num_train_samples * 2  # Sample extra for both fixed and random
         )
 
         if train_frames is None or len(train_frames) == 0:
-            return
+            return produced
 
         # === Fixed training samples (same across validations for progress tracking) ===
         if cache.train_frames is None or len(cache.train_frames) == 0:
@@ -116,6 +122,7 @@ class BasicVisualizationStrategy(ValidationStrategy):
                 images=[fixed_grid],
                 caption=[f"Step {trainer.global_step} (fixed training samples)"],
             )
+            produced += 1
 
         # === Random training samples (different each validation for diversity) ===
         random_grid = self._create_recon_grid(train_frames[:self.num_train_samples], pl_module)
@@ -125,13 +132,15 @@ class BasicVisualizationStrategy(ValidationStrategy):
                 images=[random_grid],
                 caption=[f"Step {trainer.global_step} (random training samples)"],
             )
+            produced += 1
 
         # === Per-bucket training visualization ===
         if self.visualize_per_bucket and train_metadata:
-            self._visualize_buckets(
+            produced += self._visualize_buckets(
                 train_frames, train_metadata, cache, pl_module, trainer,
                 wandb_logger, prefix="train"
             )
+        return produced
 
     def _visualize_validation_samples(
         self,
@@ -140,13 +149,14 @@ class BasicVisualizationStrategy(ValidationStrategy):
         trainer: pl.Trainer,
         wandb_logger,
         prefix: str = "val",
-    ) -> None:
+    ) -> int:
         """Visualize validation samples from cache."""
+        produced = 0
         all_frames = cache.get_all_frames()
         all_metadata = cache.get_all_metadata()
 
         if all_frames is None or len(all_frames) == 0:
-            return
+            return produced
 
         # Log cache distribution for debugging
         distribution = cache.get_dataset_distribution()
@@ -164,6 +174,7 @@ class BasicVisualizationStrategy(ValidationStrategy):
                     images=[fixed_grid],
                     caption=[f"Step {trainer.global_step} (fixed diverse samples)"],
                 )
+                produced += 1
 
         # === Random samples (different each time) ===
         n_random = min(self.num_random_samples, len(all_frames))
@@ -177,13 +188,15 @@ class BasicVisualizationStrategy(ValidationStrategy):
                     images=[random_grid],
                     caption=[f"Step {trainer.global_step} (random samples)"],
                 )
+                produced += 1
 
         # === Per-bucket visualization ===
         if self.visualize_per_bucket and all_metadata:
-            self._visualize_buckets(
+            produced += self._visualize_buckets(
                 all_frames, all_metadata, cache, pl_module, trainer,
                 wandb_logger, prefix="val"
             )
+        return produced
 
     def _visualize_buckets(
         self,
@@ -194,17 +207,18 @@ class BasicVisualizationStrategy(ValidationStrategy):
         trainer: pl.Trainer,
         wandb_logger,
         prefix: str = "val",
-    ) -> None:
+    ) -> int:
         """Visualize samples grouped by buckets using side dataloaders or cache."""
         if wandb_logger is None:
-            return
+            return 0
+        produced = 0
 
         # Check if DataModule supports side dataloaders
         datamodule = getattr(trainer, "datamodule", None)
         use_dataloaders = datamodule is not None
 
         if not self.bucket_filters:
-            return
+            return produced
 
         for bucket_name, filters in self.bucket_filters.items():
                 bucket_frames = None
@@ -254,6 +268,8 @@ class BasicVisualizationStrategy(ValidationStrategy):
                             images=[bucket_grid],
                             caption=[f"Step {trainer.global_step} ({bucket_name})"],
                         )
+                        produced += 1
+        return produced
 
     def _sample_from_train_preview_buffer(
         self,

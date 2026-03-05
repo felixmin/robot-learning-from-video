@@ -64,12 +64,16 @@ def create_validation_strategies(
         if not instance_config.get("enabled", True):
             continue
 
-        # Strategy type defaults to the instance name (common when instance_name == type).
-        strategy_type = instance_config.get("type", instance_name)
+        if "type" not in instance_config:
+            raise ValueError(
+                f"Validation strategy '{instance_name}' must define an explicit 'type'."
+            )
+        strategy_type = instance_config["type"]
 
         if strategy_type not in STRATEGY_REGISTRY:
-            print(f"Warning: Unknown strategy type '{strategy_type}' for instance '{instance_name}', skipping")
-            continue
+            raise ValueError(
+                f"Unknown strategy type '{strategy_type}' for instance '{instance_name}'."
+            )
 
         strategy_class = STRATEGY_REGISTRY[strategy_type]
 
@@ -84,6 +88,8 @@ def create_validation_strategies(
         try:
             strategies.append(strategy_class(**kwargs))
         except TypeError as e:
-            print(f"Error creating strategy '{instance_name}' ({strategy_type}): {e}")
+            raise TypeError(
+                f"Error creating strategy '{instance_name}' ({strategy_type}): {e}"
+            ) from e
 
     return strategies

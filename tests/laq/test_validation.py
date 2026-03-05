@@ -2,6 +2,7 @@
 Tests for LAQ validation strategies.
 """
 
+import logging
 import pytest
 import torch
 from unittest.mock import MagicMock, patch
@@ -144,9 +145,9 @@ class TestCreateValidationStrategies:
     def test_create_all_strategies(self):
         """Test creating all strategy types."""
         config = {
-            "basic": {"enabled": True},
-            "latent_transfer": {"enabled": True, "every_n_validations": 5},
-            "sequence_examples": {"enabled": True, "every_n_validations": 3},
+            "basic": {"type": "basic", "enabled": True},
+            "latent_transfer": {"type": "latent_transfer", "enabled": True, "every_n_validations": 5},
+            "sequence_examples": {"type": "sequence_examples", "enabled": True, "every_n_validations": 3},
         }
         strategies = create_validation_strategies(config)
 
@@ -160,9 +161,9 @@ class TestCreateValidationStrategies:
     def test_create_only_basic(self):
         """Test creating only basic strategy."""
         config = {
-            "basic": {"enabled": True},
-            "latent_transfer": {"enabled": False},
-            "sequence_examples": {"enabled": False},
+            "basic": {"type": "basic", "enabled": True},
+            "latent_transfer": {"type": "latent_transfer", "enabled": False},
+            "sequence_examples": {"type": "sequence_examples", "enabled": False},
         }
         strategies = create_validation_strategies(config)
 
@@ -194,7 +195,8 @@ class TestBasicVisualizationStrategy:
         trainer.loggers = []
 
         metrics = strategy.run(cache, pl_module, trainer)
-        assert metrics == {}
+        assert metrics.get("_produced") == 0
+        assert metrics.get("_reason") == "wandb_logger_unavailable"
 
     def test_train_visualization_uses_preview_buffer_callback(self):
         strategy = BasicVisualizationStrategy(
@@ -333,7 +335,7 @@ class TestLatentTransferStrategy:
         assert strategy.needs_caching()
 
     def test_run_with_insufficient_data(self):
-        """Test run with insufficient data returns empty metrics."""
+        """Test run with insufficient data returns structured no-output result."""
         strategy = LatentTransferStrategy(num_pairs=10)
         cache = ValidationCache()
 
@@ -345,7 +347,8 @@ class TestLatentTransferStrategy:
         trainer.loggers = []
 
         metrics = strategy.run(cache, pl_module, trainer)
-        assert metrics == {}
+        assert metrics.get("_produced") == 0
+        assert metrics.get("_reason") == "insufficient_frames"
 
 
 class TestCodebookEmbeddingStrategy:
@@ -388,7 +391,7 @@ class TestValidationStrategyCallbackBucketSuffix:
 
             def run(self, cache, pl_module, trainer, metric_suffix: str = ""):
                 self.seen_suffix = metric_suffix
-                return {}
+                return self.success(produced=1)
 
         strategy = DummyBucketStrategy()
         cb = ValidationStrategyCallback(
@@ -425,7 +428,7 @@ class TestValidationStrategyCallbackBucketSuffix:
 
             def run(self, cache, pl_module, trainer, metric_suffix: str = ""):
                 self.seen_suffix = metric_suffix
-                return {}
+                return self.success(produced=1)
 
         strategy = DummyBucketStrategy()
         cb = ValidationStrategyCallback(
@@ -484,7 +487,7 @@ class TestSequenceExamplesStrategy:
         assert strategy.every_n_validations == 3
 
     def test_run_with_insufficient_data(self):
-        """Test run with insufficient data returns empty metrics."""
+        """Test run with insufficient data returns structured no-output result."""
         strategy = SequenceExamplesStrategy(min_samples=16)
         cache = ValidationCache()
 
@@ -497,7 +500,8 @@ class TestSequenceExamplesStrategy:
         trainer.loggers = []
 
         metrics = strategy.run(cache, pl_module, trainer)
-        assert metrics == {}
+        assert metrics.get("_produced") == 0
+        assert metrics.get("_reason") == "insufficient_samples"
 
     def test_run_forwards_metric_suffix_to_visualizer(self):
         """Test metric suffix is forwarded to _visualize_sequences."""
@@ -541,6 +545,80 @@ class TestAllSequencesHistogramStrategy:
 
         strategy._create_plot.assert_called_once()
         assert strategy._create_plot.call_args.kwargs["metric_suffix"] == "_bridge_holdout"
+
+
+class TestValidationStrategyCallbackAccounting:
+    def test_no_output_strategy_counted_as_skip(self, caplog):
+        class DummyNoOutputStrategy(ValidationStrategy):
+            def __init__(self):
+                super().__init__(
+                    name="dummy_no_output",
+                    enabled=True,
+                    every_n_validations=1,
+                    min_samples=0,
+                )
+
+            def needs_caching(self) -> bool:
+                return False
+
+            def run(self, cache, pl_module, trainer, metric_suffix: str = ""):
+                del cache, pl_module, trainer, metric_suffix
+                return self.no_output("test_no_output")
+
+        strategy = DummyNoOutputStrategy()
+        cb = ValidationStrategyCallback(
+            strategies=[strategy],
+            bucket_configs=None,
+            num_fixed_samples=0,
+            num_random_samples=0,
+            max_cached_samples=0,
+            run_gc_after_validation=False,
+        )
+
+        trainer = MagicMock()
+        pl_module = MagicMock()
+        with caplog.at_level(logging.INFO, logger="laq.training"):
+            cb.on_validation_epoch_end(trainer, pl_module)
+
+        text = caplog.text
+        assert "[Stage1Validation] due=1 ran=0 skipped=1 soft_failed=0" in text
+        assert "[Stage1Validation] skip dummy_no_output: test_no_output" in text
+
+    def test_strategy_missing_result_contract_soft_fails(self, caplog):
+        class DummyInvalidResultStrategy(ValidationStrategy):
+            def __init__(self):
+                super().__init__(
+                    name="dummy_invalid",
+                    enabled=True,
+                    every_n_validations=1,
+                    min_samples=0,
+                )
+
+            def needs_caching(self) -> bool:
+                return False
+
+            def run(self, cache, pl_module, trainer, metric_suffix: str = ""):
+                del cache, pl_module, trainer, metric_suffix
+                return {}
+
+        strategy = DummyInvalidResultStrategy()
+        cb = ValidationStrategyCallback(
+            strategies=[strategy],
+            bucket_configs=None,
+            num_fixed_samples=0,
+            num_random_samples=0,
+            max_cached_samples=0,
+            run_gc_after_validation=False,
+        )
+
+        trainer = MagicMock()
+        pl_module = MagicMock()
+        with caplog.at_level(logging.INFO, logger="laq.training"):
+            cb.on_validation_epoch_end(trainer, pl_module)
+
+        text = caplog.text
+        assert "[Stage1Validation] due=1 ran=0 skipped=0 soft_failed=1" in text
+        assert "dummy_invalid failed" in text
 
 
 class TestMetadataPruning:
@@ -684,19 +762,14 @@ class TestCompositionPattern:
         assert bridge_strategy.buckets == ["bridge"]
         assert bridge_strategy.every_n_validations == 5
 
-    def test_backwards_compat_no_type_field(self):
-        """Test backwards compatibility when type field is omitted."""
+    def test_missing_type_field_raises(self):
+        """Test that missing type field fails fast."""
         config = {
             "basic": {"enabled": True},
             "latent_transfer": {"enabled": True, "every_n_validations": 3},
         }
-        strategies = create_validation_strategies(config)
-
-        assert len(strategies) == 2
-        # When no type field, instance name is used as type
-        names = {s.name for s in strategies}
-        assert "basic" in names
-        assert "latent_transfer" in names
+        with pytest.raises(ValueError, match="must define an explicit 'type'"):
+            create_validation_strategies(config)
 
     def test_skip_disabled_strategies(self):
         """Test that disabled strategies are skipped."""
@@ -715,18 +788,15 @@ class TestCompositionPattern:
         assert len(strategies) == 1
         assert strategies[0].name == "transfer_bridge"
 
-    def test_unknown_type_warning(self, capsys):
-        """Test that unknown strategy type prints warning."""
+    def test_unknown_type_raises(self):
+        """Test that unknown strategy type fails fast."""
         config = {
             "my_custom": {
                 "type": "nonexistent_strategy",
             },
         }
-        strategies = create_validation_strategies(config)
-
-        assert len(strategies) == 0
-        captured = capsys.readouterr()
-        assert "Unknown strategy type" in captured.out
+        with pytest.raises(ValueError, match="Unknown strategy type"):
+            create_validation_strategies(config)
 
     def test_strategy_registry_completeness(self):
         """Test that all expected strategy types are in registry."""

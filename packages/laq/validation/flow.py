@@ -61,21 +61,20 @@ class FlowVisualizationStrategy(ValidationStrategy):
         metric_suffix: str = "",
     ) -> Dict[str, Any]:
         """Generate flow visualization comparing predicted vs ground-truth."""
-        metrics = {}
         wandb_logger = self._get_wandb_logger(trainer)
 
         if wandb_logger is None:
-            return metrics
+            return self.no_output("wandb_logger_unavailable")
 
         # Check if model has flow decoder
         model = pl_module.model
         if model.flow_decoder is None or model.flow_teacher is None:
-            return metrics
+            return self.no_output("flow_decoder_or_teacher_unavailable")
 
         # Get frames from cache
         all_frames = cache.get_all_frames()
         if all_frames is None or len(all_frames) == 0:
-            return metrics
+            return self.no_output("no_cached_frames")
 
         # Sample frames
         n_samples = min(self.num_samples, len(all_frames))
@@ -84,17 +83,17 @@ class FlowVisualizationStrategy(ValidationStrategy):
 
         # Generate flow visualization
         flow_grid = self._create_flow_grid(frames, pl_module)
+        if flow_grid is None:
+            return self.no_output("flow_grid_creation_failed")
 
-        if flow_grid is not None:
-            bucket_name = cache.bucket_name or ""
-            prefix = f"val/{bucket_name}" if bucket_name else "val"
-            wandb_logger.log_image(
-                key=f"{prefix}/flow_comparison{metric_suffix}",
-                images=[flow_grid],
-                caption=[f"Step {trainer.global_step} (GT flow | Pred flow | mean-flow direction)"],
-            )
-
-        return metrics
+        bucket_name = cache.bucket_name or ""
+        prefix = f"val/{bucket_name}" if bucket_name else "val"
+        wandb_logger.log_image(
+            key=f"{prefix}/flow_comparison{metric_suffix}",
+            images=[flow_grid],
+            caption=[f"Step {trainer.global_step} (GT flow | Pred flow | mean-flow direction)"],
+        )
+        return self.success(produced=1)
 
     def _create_flow_grid(
         self,

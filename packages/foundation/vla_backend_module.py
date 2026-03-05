@@ -9,7 +9,7 @@ Flow:
 
 from __future__ import annotations
 
-from collections import Counter
+from collections import Counter, deque
 from dataclasses import dataclass
 from typing import Any
 
@@ -61,8 +61,7 @@ class VLATokenBackendLightningModule(pl.LightningModule):
         self.action_token_ids = action_token_ids
         self.train_teacher_forced_metrics_every_n_steps = train_teacher_forced_metrics_every_n_steps
 
-        # Stashed for visualization callback (rank0 only reads it).
-        self._last_val_sample: dict[str, Any] | None = None
+        self._val_batch_payload_queue: deque[dict[str, Any]] = deque()
 
     def _require_code_provider(self) -> LatentCodeProvider:
         if self.code_provider is None:
@@ -176,6 +175,96 @@ class VLATokenBackendLightningModule(pl.LightningModule):
             self.log(f"{prefix}/{key}", value, prog_bar=False, sync_dist=True)
         return stats
 
+    @staticmethod
+    def _metadata_value_at(values: Any, idx: int) -> Any:
+        if values is None:
+            return None
+        if isinstance(values, (list, tuple)):
+            if idx >= len(values):
+                return None
+            return values[idx]
+        if isinstance(values, torch.Tensor):
+            if values.ndim == 0:
+                return values.item()
+            if idx >= int(values.shape[0]):
+                return None
+            item = values[idx]
+            if isinstance(item, torch.Tensor):
+                if item.ndim == 0:
+                    return item.item()
+                return item.detach().cpu().tolist()
+            return item
+        return values
+
+    def _build_val_batch_payload(
+        self,
+        *,
+        batch: FoundationBatch,
+        frames: torch.Tensor,
+        instructions: list[str],
+        codes: torch.Tensor | None,
+        vectors: torch.Tensor | None,
+        actions: torch.Tensor | None,
+        pred_tokens: torch.Tensor | None,
+        pred_vectors: torch.Tensor | None,
+        pred_actions: torch.Tensor | None,
+        gen_debug: list[dict[str, Any]] | None,
+    ) -> dict[str, Any]:
+        max_items = min(64, len(instructions), int(frames.shape[0]))
+        if codes is not None:
+            max_items = min(max_items, int(codes.shape[0]))
+        if vectors is not None:
+            max_items = min(max_items, int(vectors.shape[0]))
+        if actions is not None:
+            max_items = min(max_items, int(actions.shape[0]))
+        if pred_tokens is not None:
+            max_items = min(max_items, int(pred_tokens.shape[0]))
+        if pred_vectors is not None:
+            max_items = min(max_items, int(pred_vectors.shape[0]))
+        if pred_actions is not None:
+            max_items = min(max_items, int(pred_actions.shape[0]))
+
+        batch_meta = batch.meta if isinstance(batch.meta, dict) else {}
+        episode_id = batch_meta.get("episode_id")
+        frame_idx = batch_meta.get("frame_idx")
+        dataset_name = batch_meta.get("dataset_name")
+        language = batch_meta.get("language")
+        task = batch_meta.get("task")
+
+        records: list[dict[str, Any]] = []
+        for i in range(max_items):
+            rec = {
+                "index": int(i),
+                "mode": self.backend_mode.value,
+                "frame": frames[i].detach().cpu(),
+                "instruction": str(instructions[i]),
+                "gt_codes": codes[i].detach().cpu().tolist() if codes is not None else None,
+                "pred_codes": pred_tokens[i].to(torch.long).detach().cpu().tolist() if pred_tokens is not None else None,
+                "gt_vector": vectors[i].detach().cpu().reshape(-1).tolist() if vectors is not None else None,
+                "pred_vector": pred_vectors[i].detach().cpu().reshape(-1).tolist() if pred_vectors is not None else None,
+                "gt_action": actions[i].detach().cpu().tolist() if actions is not None else None,
+                "pred_action": pred_actions[i].detach().cpu().tolist() if pred_actions is not None else None,
+                "gen_debug": gen_debug[i] if isinstance(gen_debug, list) and i < len(gen_debug) else None,
+                "metadata": {
+                    "episode_id": self._metadata_value_at(episode_id, i),
+                    "frame_idx": self._metadata_value_at(frame_idx, i),
+                    "dataset_name": self._metadata_value_at(dataset_name, i),
+                    "language": self._metadata_value_at(language, i),
+                    "task": self._metadata_value_at(task, i),
+                },
+            }
+            records.append(rec)
+
+        return {"records": records}
+
+    def consume_next_val_batch_payload(self) -> dict[str, Any] | None:
+        if not self._val_batch_payload_queue:
+            return None
+        return self._val_batch_payload_queue.popleft()
+
+    def reset_val_batch_payload_queue(self) -> None:
+        self._val_batch_payload_queue.clear()
+
     def training_step(self, batch: Any, batch_idx: int) -> torch.Tensor:
         out, _codes, _vectors, _actions, _frames, _instructions = self._loss_and_targets_from_batch(batch)
         self.log("train/loss", out.loss, prog_bar=True, sync_dist=True)
@@ -193,28 +282,39 @@ class VLATokenBackendLightningModule(pl.LightningModule):
                 continue
             self.log(f"val/{key}", float(value), prog_bar=False, sync_dist=True)
 
+        if not isinstance(batch, FoundationBatch):
+            raise TypeError("Stage 2 validation expects FoundationBatch.")
+
+        image_streams = self._extract_policy_image_streams(frames)
+        state = batch.state
+        if state is None:
+            raise ValueError("FoundationBatch must include state for validation.")
+        state = normalize_vector_mean_std(
+            value=state,
+            stats=self.normalization_stats,
+            key_candidates=["observation.state", "initial_state", "state"],
+        )
+        latent = self.backend.latent_from_batch(
+            FoundationBatch(
+                image_streams=image_streams,
+                image_padding_masks=self._extract_policy_image_padding_masks(image_streams),
+                task_text=instructions,
+                state=state,
+            ),
+            mode=self.backend_mode,
+        )
+        pred = latent.tokens
+        pred_vector = latent.vector
+        pred_actions = latent.actions
+
+        vector_stats: dict[str, float] | None = None
+        action_stats: dict[str, float] | None = None
+        dataset_mix: dict[str, int] | None = None
+
+        meta = latent.meta if isinstance(latent.meta, dict) else {}
+        gen_debug = meta.get("parse_debug") if isinstance(meta.get("parse_debug"), list) else None
+
         if batch_idx == 0:
-            image_streams = self._extract_policy_image_streams(frames)
-            if not isinstance(batch, FoundationBatch):
-                raise TypeError("Stage 2 validation expects FoundationBatch.")
-            state = batch.state
-            if state is None:
-                raise ValueError("FoundationBatch must include state for validation.")
-            state = normalize_vector_mean_std(
-                value=state,
-                stats=self.normalization_stats,
-                key_candidates=["observation.state", "initial_state", "state"],
-            )
-            latent = self.backend.latent_from_batch(
-                FoundationBatch(
-                    image_streams=image_streams,
-                    image_padding_masks=self._extract_policy_image_padding_masks(image_streams),
-                    task_text=instructions,
-                    state=state,
-                ),
-                mode=self.backend_mode,
-            )
-            pred = latent.tokens
             if pred is not None and codes is not None:
                 gt = codes.to(device=pred.device, dtype=torch.long)
                 pred = pred.to(torch.long)
@@ -233,8 +333,6 @@ class VLATokenBackendLightningModule(pl.LightningModule):
                         sync_dist=True,
                     )
 
-            pred_vector = latent.vector
-            vector_stats: dict[str, float] | None = None
             if pred_vector is not None and vectors is not None:
                 gt_vec = vectors.reshape(vectors.shape[0], -1).to(device=pred_vector.device, dtype=pred_vector.dtype)
                 if pred_vector.shape == gt_vec.shape and pred_vector.numel() > 0:
@@ -242,8 +340,6 @@ class VLATokenBackendLightningModule(pl.LightningModule):
                     self.log("val/latent_vector_mse", vec_mse.to(self.device), prog_bar=True, sync_dist=True)
                     vector_stats = self._log_vector_stats(prefix="val/latent_vector_stats", pred=pred_vector, gt=gt_vec)
 
-            pred_actions = latent.actions
-            action_stats: dict[str, float] | None = None
             if pred_actions is not None and actions is not None:
                 gt_actions = actions.to(device=pred_actions.device, dtype=pred_actions.dtype)
                 if pred_actions.shape == gt_actions.shape and pred_actions.numel() > 0:
@@ -253,8 +349,6 @@ class VLATokenBackendLightningModule(pl.LightningModule):
                         prefix="val/action_stats", pred=pred_actions, gt=gt_actions
                     )
 
-            meta = latent.meta if isinstance(latent.meta, dict) else {}
-            gen_debug = meta.get("parse_debug") if isinstance(meta.get("parse_debug"), list) else None
             if gen_debug:
                 start_frac = torch.tensor(
                     sum(1 for r in gen_debug if isinstance(r, dict) and r.get("has_action_start"))
@@ -278,13 +372,8 @@ class VLATokenBackendLightningModule(pl.LightningModule):
                 self.log("val/gen_has_action_end_frac", end_frac, prog_bar=False, sync_dist=True)
                 self.log("val/gen_num_codes_parsed_mean", mean_codes, prog_bar=False, sync_dist=True)
 
-            dataset_mix: dict[str, int] | None = None
-            batch_meta = batch.meta if isinstance(batch, FoundationBatch) and isinstance(batch.meta, dict) else None
-            dataset_names = (
-                batch.get("dataset_name")
-                if isinstance(batch, dict)
-                else batch_meta.get("dataset_name") if batch_meta is not None else None
-            )
+            batch_meta = batch.meta if isinstance(batch.meta, dict) else None
+            dataset_names = batch_meta.get("dataset_name") if batch_meta is not None else None
             if isinstance(dataset_names, list) and dataset_names:
                 counts = Counter(str(x) if x is not None else "None" for x in dataset_names)
                 total = float(len(dataset_names))
@@ -321,67 +410,22 @@ class VLATokenBackendLightningModule(pl.LightningModule):
                     f"batch_total={int(total)} unique={len(counts)} {details}"
                 )
 
-            # Save a small sample for visualization callbacks.
-            try:
-                max_items = min(64, len(instructions))
-                if codes is not None:
-                    max_items = min(max_items, int(codes.shape[0]))
-                if vectors is not None:
-                    max_items = min(max_items, int(vectors.shape[0]))
-                if actions is not None:
-                    max_items = min(max_items, int(actions.shape[0]))
-                episode_id = (
-                    batch.get("episode_id")
-                    if isinstance(batch, dict)
-                    else batch_meta.get("episode_id") if batch_meta is not None else None
-                )
-                frame_idx = (
-                    batch.get("frame_idx")
-                    if isinstance(batch, dict)
-                    else batch_meta.get("frame_idx") if batch_meta is not None else None
-                )
-                dataset_name = (
-                    batch.get("dataset_name")
-                    if isinstance(batch, dict)
-                    else batch_meta.get("dataset_name") if batch_meta is not None else None
-                )
-                pred_list: list[list[int]] | None = None
-                if isinstance(pred, torch.Tensor):
-                    pred_list = pred[:max_items].detach().cpu().tolist()
-                pred_vector_list: list[list[float]] | None = None
-                if isinstance(pred_vector, torch.Tensor):
-                    pred_vector_list = (
-                        pred_vector[:max_items].detach().cpu().reshape(max_items, -1).tolist()
-                    )
-                gt_vector_list: list[list[float]] | None = None
-                if isinstance(vectors, torch.Tensor):
-                    gt_vector_list = vectors[:max_items].detach().cpu().reshape(max_items, -1).tolist()
-                pred_action_list: list[list[float]] | None = None
-                if isinstance(pred_actions, torch.Tensor):
-                    pred_action_list = pred_actions[:max_items].detach().cpu().tolist()
-                gt_action_list: list[list[float]] | None = None
-                if isinstance(actions, torch.Tensor):
-                    gt_action_list = actions[:max_items].detach().cpu().tolist()
-                self._last_val_sample = {
-                    "frames": frames[:max_items].detach().cpu(),
-                    "instructions": list(instructions[:max_items]),
-                    "mode": self.backend_mode.value,
-                    "gt_codes": [row.tolist() for row in codes[:max_items].detach().cpu()] if codes is not None else None,
-                    "pred_codes": [list(row) for row in pred_list] if pred_list is not None else None,
-                    "gt_vectors": gt_vector_list,
-                    "pred_vectors": pred_vector_list,
-                    "gt_actions": gt_action_list,
-                    "pred_actions": pred_action_list,
-                    "gen_debug": gen_debug[:max_items] if isinstance(gen_debug, list) else None,
-                    "episode_id": list(episode_id[:max_items]) if episode_id is not None else None,
-                    "frame_idx": list(frame_idx[:max_items]) if frame_idx is not None else None,
-                    "dataset_name": list(dataset_name[:max_items]) if dataset_name is not None else None,
-                    "vector_stats": vector_stats,
-                    "action_stats": action_stats,
-                    "dataset_mix": dataset_mix,
-                }
-            except Exception:
-                self._last_val_sample = None
+        try:
+            payload = self._build_val_batch_payload(
+                batch=batch,
+                frames=frames,
+                instructions=instructions,
+                codes=codes,
+                vectors=vectors,
+                actions=actions,
+                pred_tokens=pred,
+                pred_vectors=pred_vector,
+                pred_actions=pred_actions,
+                gen_debug=gen_debug,
+            )
+            self._val_batch_payload_queue.append(payload)
+        except Exception:
+            pass
 
         return out.loss
 
