@@ -135,6 +135,7 @@ def test_single_source_get_sample_shapes_images_masks_and_metadata(monkeypatch) 
     assert sample.task_text == "rotate"
     assert sample.meta == {
         "dataset_name": "test/repo",
+        "dataset_short": "repo",
         "episode_id": 3,
         "frame_idx": 17,
     }
@@ -206,3 +207,39 @@ def test_single_source_uses_custom_action_key_pad_mask(monkeypatch) -> None:
     sample = source.get_sample(0)
 
     assert torch.equal(sample.action_is_pad, torch.tensor([False, True], dtype=torch.bool))
+
+
+def test_single_source_dataset_short_uses_repo_suffix_without_alias_mapping(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "common.lerobot_v3_source.load_lerobot_meta",
+        lambda repo_id, root, revision: make_test_meta(
+            repo_id=repo_id,
+            episodes=[{"episode_index": 0, "dataset_from_index": 0, "dataset_to_index": 8}],
+        ),
+    )
+    monkeypatch.setattr("common.lerobot_v3_source.LeRobotDataset", _FakeLeRobotDataset)
+
+    source = LeRobotSingleSource(
+        repo_id="FedorX8/bridge_v2_lerobot",
+        root=None,
+        revision=None,
+        weight=1.0,
+        camera_map={"primary": "observation.images.image"},
+        state_key="observation.state",
+        action_key="action",
+        video_backend="pyav",
+    )
+    source.compile(
+        make_test_request(
+            image_requests={"primary": (0, 1)},
+            state_deltas=(0,),
+            action_deltas=(0, 1),
+            image_size=(4, 4),
+        ),
+        train_episode_indices={0},
+        val_episode_indices={0},
+    )
+
+    sample = source.get_sample(0)
+    assert sample.meta is not None
+    assert sample.meta["dataset_short"] == "bridge_v2"

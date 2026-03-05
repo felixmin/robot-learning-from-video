@@ -305,33 +305,38 @@ class BasicVisualizationStrategy(ValidationStrategy):
     ) -> Optional[torch.Tensor]:
         """Create reconstruction grid.
 
-        Returns None if aux_decoder is disabled (no reconstructions available).
+        Returns:
+            - [frame_t, frame_t+offset, reconstruction] grid when aux decoder is available
+            - [frame_t, frame_t+offset] grid fallback otherwise
         """
         if len(frames) == 0:
             return None
 
-        # Generate reconstructions
-        was_training = pl_module.training
-        pl_module.eval()
-        with torch.no_grad():
-            recons = pl_module.model(
-                frames.to(pl_module.device),
-                return_recons_only=True,
-            )
-        pl_module.train(was_training)
+        # Create a lightweight fallback when aux decoder is disabled.
+        # This keeps sample visualization available without reconstruction overhead.
+        has_aux_decoder = getattr(getattr(pl_module, "model", None), "aux_decoder", None) is not None
+        recons = None
+        if has_aux_decoder:
+            was_training = pl_module.training
+            pl_module.eval()
+            with torch.no_grad():
+                recons = pl_module.model(
+                    frames.to(pl_module.device),
+                    return_recons_only=True,
+                )
+            pl_module.train(was_training)
 
-        # If aux_decoder is disabled, recons will be None
-        if recons is None:
-            return None
-
-        # Create grid: [frame_t, frame_t+offset, reconstruction]
+        # Create grid: [frame_t, frame_t+offset, reconstruction?]
         frame_t = frames[:, :, 0].cpu()
         frame_t_plus = frames[:, :, 1].cpu()
-        recons = recons.cpu()
-
-        # Stack and rearrange
-        imgs = torch.stack([frame_t, frame_t_plus, recons], dim=0)
+        if recons is None:
+            imgs = torch.stack([frame_t, frame_t_plus], dim=0)
+            nrow = 2
+        else:
+            recons = recons.cpu()
+            imgs = torch.stack([frame_t, frame_t_plus, recons], dim=0)
+            nrow = 3
         imgs = rearrange(imgs, 'r b c h w -> (b r) c h w')
         imgs = imgs.clamp(0.0, 1.0)
 
-        return make_grid(imgs, nrow=3, normalize=False)
+        return make_grid(imgs, nrow=nrow, normalize=False)

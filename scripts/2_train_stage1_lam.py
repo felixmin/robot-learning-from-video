@@ -31,7 +31,12 @@ from lightning.fabric.plugins.io.torch_io import TorchCheckpointIO
 
 
 from common.data_factory import create_datamodule
-from common.callbacks import DatasetUsageLoggerCallback, ProgressLoggerCallback
+from common.callbacks import (
+    DataSampleVisualizationCallback,
+    DataSampleVisualizationConfig,
+    DatasetUsageLoggerCallback,
+    ProgressLoggerCallback,
+)
 from common.run_context import setup_run_context
 from stage2.callbacks import ThroughputLoggingCallback, ThroughputLoggingConfig
 from common.logging import set_seed, count_parameters
@@ -235,6 +240,24 @@ def main(cfg: DictConfig):
         logger.info(f"  - samples_per_batch: {int(preview_cfg.samples_per_batch)}")
     else:
         logger.info("✓ Train preview buffer disabled")
+
+    # Lightweight data preview: logs raw train samples without model forward pass.
+    data_viz_cfg = OmegaConf.select(training_config, "data_visualization")
+    if data_viz_cfg and bool(data_viz_cfg.enabled):
+        callbacks.append(
+            DataSampleVisualizationCallback(
+                DataSampleVisualizationConfig(
+                    enabled=True,
+                    every_n_steps=int(data_viz_cfg.every_n_steps),
+                    num_samples=int(data_viz_cfg.num_samples),
+                    key=str(data_viz_cfg.key),
+                    mode="stage1",
+                )
+            )
+        )
+        logger.info("✓ Data sample visualization callback added")
+        logger.info(f"  - every_n_steps: {int(data_viz_cfg.every_n_steps)}")
+        logger.info(f"  - num_samples: {int(data_viz_cfg.num_samples)}")
 
     # Setup validation strategies
     val_config = cfg.validation

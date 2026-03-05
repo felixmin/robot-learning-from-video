@@ -11,6 +11,7 @@ from common.filters import matches_filters
 STAGE2_METADATA_KEYS = frozenset(
     {
         "dataset_name",
+        "dataset_short",
         "episode_id",
         "frame_idx",
         "language",

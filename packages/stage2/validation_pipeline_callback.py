@@ -97,7 +97,7 @@ class Stage2ValidationPipelineCallback(Callback):
         groups: dict[str, list[int]] = {}
         for i, rec in enumerate(records):
             meta = rec.get("metadata") if isinstance(rec.get("metadata"), dict) else {}
-            dname = str(meta.get("dataset_name", "unknown"))
+            dname = str(meta.get("dataset_short", "unknown"))
             groups.setdefault(dname, []).append(i)
 
         selected: list[int] = []

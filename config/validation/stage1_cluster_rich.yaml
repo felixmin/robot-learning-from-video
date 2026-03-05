@@ -12,34 +12,34 @@ num_random_samples: 8
 
 buckets:
   language_table:
-    filters: {dataset_name: "language_table"}
+    filters: {dataset_short: "language_table"}
     max_samples: 128
   bridge:
-    filters: {dataset_name: "bridge"}
+    filters: {dataset_short: "bridge_v2"}
     max_samples: 128
   rt1:
-    filters: {dataset_name: "rt1"}
+    filters: {dataset_short: "fractal20220817_data"}
     max_samples: 128
   robonet:
-    filters: {dataset_name: "robonet"}
+    filters: {dataset_short: "robonet"}
     max_samples: 128
   droid:
-    filters: {dataset_name: "droid"}
+    filters: {dataset_short: "droid"}
     max_samples: 128
   kuka:
-    filters: {dataset_name: "kuka"}
+    filters: {dataset_short: "kuka"}
     max_samples: 128
   taco_play:
-    filters: {dataset_name: "taco_play"}
+    filters: {dataset_short: "taco_play"}
     max_samples: 128
   roboturk:
-    filters: {dataset_name: "roboturk"}
+    filters: {dataset_short: "roboturk"}
     max_samples: 128
   jaco_play:
-    filters: {dataset_name: "jaco_play"}
+    filters: {dataset_short: "jaco_play"}
     max_samples: 128
   berkeley_autolab_ur5:
-    filters: {dataset_name: "berkeley_autolab_ur5"}
+    filters: {dataset_short: "berkeley_autolab_ur5"}
     max_samples: 128
 
 strategies:

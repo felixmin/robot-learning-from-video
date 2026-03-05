@@ -11,16 +11,16 @@ num_random_samples: 4
 
 buckets:
   language_table:
-    filters: {dataset_name: "language_table"}
+    filters: {dataset_short: "language_table"}
     max_samples: 20
   bridge:
-    filters: {dataset_name: "bridge"}
+    filters: {dataset_short: "bridge_v2"}
     max_samples: 20
   rt1:
-    filters: {dataset_name: "rt1"}
+    filters: {dataset_short: "fractal20220817_data"}
     max_samples: 20
   robonet:
-    filters: {dataset_name: "robonet"}
+    filters: {dataset_short: "robonet"}
     max_samples: 20
 
 strategies:

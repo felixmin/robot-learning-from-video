@@ -28,7 +28,7 @@ except ImportError:
 # Uses standardized keys from the unified batch interface
 ESSENTIAL_METADATA_KEYS = frozenset({
     "dataset_name",    # Primary source identifier (e.g., "youtube", "bridge", "language_table")
-    "dataset_type",    # Legacy identifier
+    "dataset_short",   # Source alias derived from repo_id
     "action",          # For action scatter strategies (only first 2 dims used)
     "initial_state",   # For state scatter strategies (only first 2 dims used)
     "language",        # Task descriptions/instructions
@@ -75,7 +75,7 @@ class ValidationCache:
     # Unbounded code storage for histogram strategies (lightweight - just indices)
     all_codes: List[torch.Tensor] = field(default_factory=list)
 
-    # Metadata for each sample (dataset_type, scene_id, etc.)
+    # Metadata for each sample (dataset_name, scene_id, etc.)
     metadata: List[Dict[str, Any]] = field(default_factory=list)
 
     # Fixed samples for consistent visualization (set once, reused)
@@ -295,9 +295,7 @@ class ValidationCache:
         all_metadata = self.get_all_metadata()
         distribution: Dict[str, int] = {}
         for meta in all_metadata:
-            dname = meta.get("dataset_name", "unknown")
-            if dname == "unknown":
-                dname = meta.get("dataset_type", "unknown")
+            dname = meta.get("dataset_short", "unknown")
             distribution[dname] = distribution.get(dname, 0) + 1
         return distribution
 

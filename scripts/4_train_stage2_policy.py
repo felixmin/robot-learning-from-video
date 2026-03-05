@@ -24,7 +24,12 @@ from omegaconf import DictConfig, OmegaConf
 workspace_root = Path(__file__).parent.parent
 sys.path.insert(0, str(workspace_root / "packages"))
 
-from common.callbacks import DatasetUsageLoggerCallback, ProgressLoggerCallback
+from common.callbacks import (
+    DataSampleVisualizationCallback,
+    DataSampleVisualizationConfig,
+    DatasetUsageLoggerCallback,
+    ProgressLoggerCallback,
+)
 from common.data_factory import create_datamodule
 from common.logging import set_seed
 from common.run_context import setup_run_context
@@ -294,6 +299,19 @@ def main(cfg: DictConfig):
                     every_n_steps=int(train_viz_cfg.every_n_steps),
                     include_freeform_pred=bool(train_viz_cfg.include_freeform_pred),
                     freeform_max_new_tokens=int(train_viz_cfg.freeform_max_new_tokens),
+                )
+            )
+        )
+    data_viz_cfg = OmegaConf.select(cfg.training, "data_visualization")
+    if data_viz_cfg and bool(data_viz_cfg.enabled):
+        callbacks.append(
+            DataSampleVisualizationCallback(
+                DataSampleVisualizationConfig(
+                    enabled=True,
+                    every_n_steps=int(data_viz_cfg.every_n_steps),
+                    num_samples=int(data_viz_cfg.num_samples),
+                    key=str(data_viz_cfg.key),
+                    mode="stage2",
                 )
             )
         )

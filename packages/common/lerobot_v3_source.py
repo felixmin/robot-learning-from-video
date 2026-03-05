@@ -13,6 +13,13 @@ from common.lerobot_v3_types import DatasetSample
 from lerobot.datasets.lerobot_dataset import LeRobotDataset, LeRobotDatasetMetadata
 
 
+def _dataset_short_from_repo_id(repo_id: str) -> str:
+    short = str(repo_id).split("/")[-1]
+    if short.endswith("_lerobot"):
+        short = short[: -len("_lerobot")]
+    return short
+
+
 @dataclass(frozen=True)
 class CompiledEpisodeIndex:
     episode_index: np.ndarray
@@ -340,6 +347,7 @@ class LeRobotSingleSource:
             subtask_text=str(raw["subtask"]) if "subtask" in raw else None,
             meta={
                 "dataset_name": self.repo_id,
+                "dataset_short": _dataset_short_from_repo_id(self.repo_id),
                 "episode_id": int(raw["episode_index"]) if "episode_index" in raw else None,
                 "frame_idx": int(raw["frame_index"]) if "frame_index" in raw else None,
             },

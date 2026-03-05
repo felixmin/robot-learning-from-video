@@ -228,6 +228,7 @@ class PolicyLightningModule(pl.LightningModule):
         episode_id = batch_meta.get("episode_id")
         frame_idx = batch_meta.get("frame_idx")
         dataset_name = batch_meta.get("dataset_name")
+        dataset_short = batch_meta.get("dataset_short")
         language = batch_meta.get("language")
         task = batch_meta.get("task")
 
@@ -249,6 +250,7 @@ class PolicyLightningModule(pl.LightningModule):
                     "episode_id": self._metadata_value_at(episode_id, i),
                     "frame_idx": self._metadata_value_at(frame_idx, i),
                     "dataset_name": self._metadata_value_at(dataset_name, i),
+                    "dataset_short": self._metadata_value_at(dataset_short, i),
                     "language": self._metadata_value_at(language, i),
                     "task": self._metadata_value_at(task, i),
                 },
@@ -373,7 +375,7 @@ class PolicyLightningModule(pl.LightningModule):
                 self.log("val/gen_num_codes_parsed_mean", mean_codes, prog_bar=False, sync_dist=True)
 
             batch_meta = batch.meta if isinstance(batch.meta, dict) else None
-            dataset_names = batch_meta.get("dataset_name") if batch_meta is not None else None
+            dataset_names = batch_meta.get("dataset_short") if batch_meta is not None else None
             if isinstance(dataset_names, list) and dataset_names:
                 counts = Counter(str(x) if x is not None else "None" for x in dataset_names)
                 total = float(len(dataset_names))

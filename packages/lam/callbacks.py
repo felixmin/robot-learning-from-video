@@ -81,7 +81,7 @@ class TrainPreviewBufferCallback(Callback):
         if metadata_keys is None:
             metadata_keys = [
                 "dataset_name",
-                "dataset_type",
+                "dataset_short",
                 "language",
                 "task",
                 "environment",
@@ -292,10 +292,10 @@ class ValidationStrategyCallback(Callback):
         if all_frames is None or len(all_frames) < num_samples:
             return
 
-        # Group by dataset_type for diversity
+        # Group by dataset identity for diversity.
         by_dataset: Dict[str, List[int]] = {}
         for i, meta in enumerate(all_metadata):
-            dtype = meta.get("dataset_type", "unknown")
+            dtype = meta.get("dataset_short", "unknown")
             if dtype not in by_dataset:
                 by_dataset[dtype] = []
             by_dataset[dtype].append(i)

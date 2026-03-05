@@ -51,6 +51,13 @@ train_visualization:
   include_freeform_pred: false
   freeform_max_new_tokens: 32
 
+# Lightweight input-only data visualization (no backend inference).
+data_visualization:
+  enabled: true
+  every_n_steps: 100
+  num_samples: 8
+  key: data/train_samples
+
 # Log throughput metrics (useful for WandB).
 throughput:
   enabled: true

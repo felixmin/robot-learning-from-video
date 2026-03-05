@@ -317,7 +317,7 @@ class SamplePanelsCheck(Stage2ValidationCheck):
             meta_parts: list[str] = []
             ep = meta.get("episode_id")
             fi = meta.get("frame_idx")
-            ds = meta.get("dataset_name")
+            ds = meta.get("dataset_short")
             if ep is not None and fi is not None:
                 meta_parts.append(f"episode_id: {ep}  frame_idx: {fi}")
             if ds is not None:
@@ -585,7 +585,7 @@ class LatentFlowDecodeCheck(Stage2ValidationCheck):
                 meta_parts: list[str] = []
                 ep = meta.get("episode_id")
                 fi = meta.get("frame_idx")
-                ds = meta.get("dataset_name")
+                ds = meta.get("dataset_short")
                 if ep is not None and fi is not None:
                     meta_parts.append(f"episode_id: {ep} frame_idx: {fi}")
                 if ds is not None:
