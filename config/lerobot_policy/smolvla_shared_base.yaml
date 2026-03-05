@@ -1,0 +1,37 @@
+# @package _group_
+
+type: hlrp_smolvla_shared
+device: cuda
+push_to_hub: false
+init_mode: scratch
+stage2_artifact: null
+action_loss_weight: 1.0
+latent_loss_weight: 1.0
+action_subset_key: episode_index
+model_name: ${stage2_policy_core.policy.model_name}
+load_vlm_weights: ${stage2_policy_core.policy.load_vlm_weights}
+train_expert_only: true
+freeze_vision_encoder: ${stage2_policy_core.policy.freeze_vision_encoder}
+attention_mode: ${stage2_policy_core.policy.attention_mode}
+num_expert_layers: ${stage2_policy_core.policy.num_expert_layers}
+num_vlm_layers: ${stage2_policy_core.policy.num_vlm_layers}
+self_attn_every_n_layers: ${stage2_policy_core.policy.self_attn_every_n_layers}
+expert_width_multiplier: ${stage2_policy_core.policy.expert_width_multiplier}
+add_image_special_tokens: ${stage2_policy_core.policy.add_image_special_tokens}
+max_state_dim: ${stage2_policy_core.policy.max_state_dim}
+prefix_length: ${stage2_policy_core.policy.prefix_length}
+use_gpu_preprocessing: ${stage2_policy_core.policy.use_gpu_preprocessing}
+image_size: ${stage2_policy_core.policy.image_size}
+empty_cameras: ${stage2_policy_core.policy.empty_cameras}
+latent_vector_dim: ${stage2_policy_core.latent.latent_vector_dim}
+max_action_dim: ${stage2_policy_core.flow.max_action_dim}
+flow_hidden_dim: ${stage2_policy_core.flow.flow_hidden_dim}
+flow_steps: ${stage2_policy_core.flow.flow_steps}
+chunk_size: ${stage2_policy_core.flow.chunk_size}
+tokenizer_max_length: ${stage2_policy_core.policy.tokenizer_max_length}
+pad_language_to: ${stage2_policy_core.policy.pad_language_to}
+n_action_steps: ${stage2_policy_core.flow.chunk_size}
+min_period: ${stage2_policy_core.flow.min_period}
+max_period: ${stage2_policy_core.flow.max_period}
+time_beta_alpha: ${stage2_policy_core.flow.time_beta_alpha}
+time_beta_beta: ${stage2_policy_core.flow.time_beta_beta}

@@ -8,7 +8,7 @@ defaults:
   - optional /user_config: local
 
 experiment:
-  name: stage3_hlrp_libero_rollout
+  name: stage3_rollout
   description: "Stage 3 rollout run (LeRobot eval + HLRP shared SmolVLA policy)"
 
 submit:

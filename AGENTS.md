@@ -104,8 +104,8 @@ Workstation capability reference (for local non-Slurm runs):
 
 ## Stage 3 (LeRobot) Config
 - Main train configs:
-  - `config/experiment/stage3_hlrp_libero_action_scratch.yaml`
-  - `config/experiment/stage3_hlrp_libero_multitask_scratch.yaml`
+  - `config/experiment/stage3_local.yaml` (override `stage3_profile=action_scratch|multitask_scratch`)
+  - `config/experiment/stage3_cluster.yaml` (override `stage3_profile=action_scratch|multitask_scratch`)
 - Uses LeRobot policy plugin editable install from:
   - `lerobot_policy_hlrp`
 
@@ -214,7 +214,7 @@ For short stage-3 train-only smoke or verification runs, do not use the cluster 
 For stage-3 smoke runs with eval enabled, `00:15:00` is too short and `00:30:00` is still tight. Use at least `cluster.compute.time_limit=00:45:00`.
 
 Example via submit script:
-- `python scripts/submit_job.py experiment=stage3_hlrp_libero_action_scratch cluster=lrz_x100 cluster.compute.time_limit=00:45:00 experiment.name=stage3_hlrp_libero_smoke_wandb lerobot.steps=50 lerobot.batch_size=2 lerobot.eval.freq=10 lerobot.eval.batch_size=1 lerobot.eval.n_episodes=1 lerobot.log_freq=10 lerobot.save_freq=1000 logging.use_wandb=true lerobot.wandb.enable=true`
+- `python scripts/submit_job.py experiment=stage3_cluster stage3_profile=action_scratch cluster=lrz_x100 cluster.compute.time_limit=00:45:00 experiment.name=stage3_hlrp_libero_smoke_wandb lerobot.steps=50 lerobot.batch_size=2 lerobot.eval.freq=10 lerobot.eval.batch_size=1 lerobot.eval.n_episodes=1 lerobot.log_freq=10 lerobot.save_freq=1000 logging.use_wandb=true lerobot.wandb.enable=true`
 
 ## Repo-local Skills
 

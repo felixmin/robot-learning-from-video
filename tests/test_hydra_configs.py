@@ -13,33 +13,33 @@ def config_dir():
 
 
 class TestExperimentConfigs:
-    def test_stage2_smol_flow_shared_config(self, config_dir):
+    def test_stage2_local_config(self, config_dir):
         with initialize_config_dir(version_base=None, config_dir=config_dir):
             cfg = compose(
-                config_name="config", overrides=["experiment=stage2_smol_flow"]
+                config_name="config", overrides=["experiment=stage2_local"]
             )
 
-            assert cfg.experiment.name == "latent_smolvla"
+            assert cfg.experiment.name == "stage2_local"
             assert cfg.model.training_mode == "latent_flow"
             assert cfg.data.backend == "lerobot_v3"
             assert cfg.data.output_format == "stage2"
 
-    def test_stage1_octo24_local_config(self, config_dir):
+    def test_stage1_local_config(self, config_dir):
         with initialize_config_dir(version_base=None, config_dir=config_dir):
-            cfg = compose(config_name="config", overrides=["experiment=stage1_octo24_local"])
+            cfg = compose(config_name="config", overrides=["experiment=stage1_local"])
 
-            assert cfg.experiment.name == "stage1_octo24_local"
+            assert cfg.experiment.name == "stage1_local"
             assert cfg.data.backend == "lerobot_v3"
             assert cfg.data.output_format == "stage1"
             assert len(cfg.data.dataset.lerobot.sources) == 24
             assert cfg.data.loader.batch_size == 64
             assert cfg.data.dataset.lerobot.sources[0].video_backend == "pyav"
 
-    def test_stage2_octo24_local_config(self, config_dir):
+    def test_stage2_local_octo24_config(self, config_dir):
         with initialize_config_dir(version_base=None, config_dir=config_dir):
-            cfg = compose(config_name="config", overrides=["experiment=stage2_octo24_local"])
+            cfg = compose(config_name="config", overrides=["experiment=stage2_local"])
 
-            assert cfg.experiment.name == "stage2_octo24_local"
+            assert cfg.experiment.name == "stage2_local"
             assert cfg.data.backend == "lerobot_v3"
             assert cfg.data.output_format == "stage2"
             assert len(cfg.data.dataset.lerobot.sources) == 24
@@ -50,7 +50,7 @@ class TestExperimentConfigs:
             cfg = compose(
                 config_name="config",
                 overrides=[
-                    "experiment=stage1_octo24_local",
+                    "experiment=stage1_local",
                     "data=octo24_libero",
                 ],
             )
@@ -64,7 +64,7 @@ class TestExperimentConfigs:
             cfg = compose(
                 config_name="config",
                 overrides=[
-                    "experiment=stage2_octo24_local",
+                    "experiment=stage2_local",
                     "data=octo24_libero",
                 ],
             )
@@ -81,7 +81,7 @@ class TestConfigComposition:
             cfg = compose(
                 config_name="config",
                 overrides=[
-                    "experiment=stage1_octo24_local",
+                    "experiment=stage1_local",
                     "data.loader.batch_size=16",
                     "training.optimizer.lr=5e-5",
                     "seed=123",
@@ -91,11 +91,11 @@ class TestConfigComposition:
             assert cfg.data.loader.batch_size == 16
             assert cfg.training.optimizer.lr == 5e-5
             assert cfg.seed == 123
-            assert cfg.experiment.name == "stage1_octo24_local"
+            assert cfg.experiment.name == "stage1_local"
 
     def test_config_is_valid_omegaconf(self, config_dir):
         with initialize_config_dir(version_base=None, config_dir=config_dir):
-            cfg = compose(config_name="config", overrides=["experiment=stage1_octo24_local"])
+            cfg = compose(config_name="config", overrides=["experiment=stage1_local"])
 
             assert OmegaConf.is_config(cfg)
             assert OmegaConf.is_dict(cfg)
@@ -105,9 +105,10 @@ class TestExperimentConsistency:
     @pytest.mark.parametrize(
         "experiment",
         [
-            "stage1_octo24_local",
-            "stage2_smol_flow",
-            "stage2_octo24_local",
+            "stage1_local",
+            "stage1_cluster",
+            "stage2_local",
+            "stage2_cluster",
         ],
     )
     def test_stage12_experiments_load(self, config_dir, experiment):
@@ -125,8 +126,8 @@ class TestExperimentConsistency:
     @pytest.mark.parametrize(
         "experiment",
         [
-            "stage3_hlrp_libero_action_scratch",
-            "stage3_hlrp_libero_multitask_scratch",
+            "stage3_local",
+            "stage3_cluster",
         ],
     )
     def test_lerobot_experiments_load(self, config_dir, experiment):
@@ -142,12 +143,40 @@ class TestExperimentConsistency:
             assert cfg.lerobot.policy.type is not None
             assert cfg.lerobot.policy.init_mode in {"artifact", "scratch"}
 
+    def test_stage3_rollout_experiment_loads(self, config_dir):
+        with initialize_config_dir(version_base=None, config_dir=config_dir):
+            cfg = compose(config_name="config", overrides=["experiment=stage3_rollout"])
+
+            assert hasattr(cfg, "experiment")
+            assert hasattr(cfg, "lerobot_eval")
+            assert hasattr(cfg, "cluster")
+            assert cfg.experiment.name == "stage3_rollout"
+            assert cfg.lerobot_eval.command is not None
+
+    def test_stage3_sweep_experiment_loads(self, config_dir):
+        with initialize_config_dir(version_base=None, config_dir=config_dir):
+            cfg = compose(
+                config_name="config",
+                overrides=[
+                    "experiment=stage3_latent_vs_multitask_sweep",
+                    "variant_id=mt10_lat100",
+                ],
+            )
+
+            assert hasattr(cfg, "experiment")
+            assert hasattr(cfg, "lerobot")
+            assert cfg.variant_id == "mt10_lat100"
+            assert cfg.lerobot.policy.stage3_training_mode == "multitask"
+            assert cfg.lerobot.policy.action_subset_ratio == 0.1
+            assert cfg.lerobot.policy.latent_scope == "all"
+
     def test_stage3_runtime_override_switches_gl_backend(self, config_dir):
         with initialize_config_dir(version_base=None, config_dir=config_dir):
             cfg = compose(
                 config_name="config",
                 overrides=[
-                    "experiment=stage3_hlrp_libero_multitask_scratch",
+                    "experiment=stage3_local",
+                    "stage3_profile=multitask_scratch",
                     "runtime=stage3_cluster",
                 ],
             )

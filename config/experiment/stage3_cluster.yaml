@@ -1,0 +1,11 @@
+# @package _global_
+
+defaults:
+  - _stage3_base
+  - /cluster@cluster: mcml_x100
+  - /runtime: stage3_cluster
+  - optional /user_config: local
+
+experiment:
+  name: stage3_cluster
+  description: "Cluster Stage 3 Libero training (HLRP shared SmolVLA policy)"

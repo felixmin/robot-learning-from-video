@@ -1,7 +1,7 @@
 # Stage 2 token-based policy model using Cosmos-Reason2 (Qwen3-VL).
 #
 # This variant is for Stage-1 LAM checkpoints with codebook_size=8 and code_seq_len=4
-# (e.g. from `stage1_octo24_local`).
+# (e.g. from `stage1_local`).
 
 name: stage2_policy_cosmos2_tokens
 

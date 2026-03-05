@@ -7,7 +7,7 @@ Train the Stage 2 policy model: image + language -> latent action tokens.
 
 Usage:
     # Debug (local / single GPU):
-    python scripts/4_train_stage2_policy.py experiment=stage2_octo24_local model.stage1.checkpoint=/path/to/stage1_lam.ckpt
+    python scripts/4_train_stage2_policy.py experiment=stage2_local model.stage1.checkpoint=/path/to/stage1_lam.ckpt
 """
 
 import sys

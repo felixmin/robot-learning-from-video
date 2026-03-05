@@ -12,13 +12,13 @@ Note:
 
 Usage:
     # Submit single job
-    python scripts/submit_job.py experiment=stage1_octo24_local
+    python scripts/submit_job.py experiment=stage1_local
 
     # Override parameters
-    python scripts/submit_job.py experiment=stage1_octo24_local training.max_steps=10000
+    python scripts/submit_job.py experiment=stage1_local training.max_steps=10000
 
     # Dry run (print script, don't submit)
-    python scripts/submit_job.py submit.dry_run=true experiment=stage1_octo24_local
+    python scripts/submit_job.py submit.dry_run=true experiment=stage1_local
 
     # Custom resources (Hydra overrides)
     python scripts/submit_job.py cluster.compute.time_limit=01:00:00 cluster.compute.gpus_per_node=2 experiment=lam_full

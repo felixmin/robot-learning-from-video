@@ -124,7 +124,7 @@ defaults:
 
 Override from CLI:
 ```bash
-python scripts/2_train_stage1_lam.py experiment=stage1_octo24_local data.loader.batch_size=32 training.optimizer.lr=5e-5
+python scripts/2_train_stage1_lam.py experiment=stage1_local data.loader.batch_size=32 training.optimizer.lr=5e-5
 ```
 
 ## Submit Workflow
@@ -142,7 +142,7 @@ python scripts/submit_job.py experiment=<sweep_experiment>
 
 Local non-Slurm runs (common on workstation and cluster interactive sessions):
 ```bash
-python scripts/2_train_stage1_lam.py experiment=stage1_octo24_local
+python scripts/2_train_stage1_lam.py experiment=stage1_local
 ```
 
 See `docs/job_submission.md` for full documentation.
@@ -189,13 +189,13 @@ pip install torch==2.9.1 torchvision==0.24.1 torchaudio==2.9.1 --index-url https
 ## Stage 3 Notes
 
 - Main train configs:
-  - `config/experiment/stage3_hlrp_libero_action_scratch.yaml`
-  - `config/experiment/stage3_hlrp_libero_multitask_scratch.yaml`
+  - `config/experiment/stage3_local.yaml` (override `stage3_profile=action_scratch|multitask_scratch`)
+  - `config/experiment/stage3_cluster.yaml` (override `stage3_profile=action_scratch|multitask_scratch`)
 - Uses LeRobot policy plugin from `lerobot_policy_hlrp/` (editable install).
 - Installer fallback order: `python -m pip` → `uv pip` → `pip` (all `--no-deps -e`). Supports different container layouts (with/without pip in active venv).
 - For short stage-3 train-only smoke or verification runs, use `cluster.compute.time_limit=00:15:00`.
 - For stage-3 eval-enabled smoke runs, use at least `cluster.compute.time_limit=00:45:00`; `00:30:00` is still tight.
-`python scripts/submit_job.py experiment=stage3_hlrp_libero_action_scratch cluster=lrz_x100 cluster.compute.time_limit=00:45:00 experiment.name=stage3_hlrp_libero_smoke_wandb lerobot.steps=50 lerobot.batch_size=2 lerobot.eval.freq=10 lerobot.eval.batch_size=1 lerobot.eval.n_episodes=1 lerobot.log_freq=10 lerobot.save_freq=1000 logging.use_wandb=true lerobot.wandb.enable=true`
+`python scripts/submit_job.py experiment=stage3_cluster stage3_profile=action_scratch cluster=lrz_x100 cluster.compute.time_limit=00:45:00 experiment.name=stage3_hlrp_libero_smoke_wandb lerobot.steps=50 lerobot.batch_size=2 lerobot.eval.freq=10 lerobot.eval.batch_size=1 lerobot.eval.n_episodes=1 lerobot.log_freq=10 lerobot.save_freq=1000 logging.use_wandb=true lerobot.wandb.enable=true`
 
 ## Containers
 

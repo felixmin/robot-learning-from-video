@@ -495,15 +495,15 @@ class TestHydraConfigWithFlow:
         from pathlib import Path
         return str(Path(__file__).parent.parent / "config")
 
-    def test_stage1_octo24_local_loads(self, config_dir):
-        """Test that stage1_octo24_local config loads correctly."""
+    def test_stage1_local_loads(self, config_dir):
+        """Test that stage1_local config loads correctly."""
         from hydra import compose, initialize_config_dir
 
         with initialize_config_dir(version_base=None, config_dir=config_dir):
-            cfg = compose(config_name="config", overrides=["experiment=stage1_octo24_local"])
+            cfg = compose(config_name="config", overrides=["experiment=stage1_local"])
 
             # Validate experiment
-            assert cfg.experiment.name == "stage1_octo24_local"
+            assert cfg.experiment.name == "stage1_local"
 
             # Validate flow config
             assert cfg.model.flow.model == "raft_large"

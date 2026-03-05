@@ -1,0 +1,13 @@
+# @package _global_
+
+defaults:
+  - _stage2_base
+  - /cluster@cluster: local_dev
+  - optional /user_config: local
+
+experiment:
+  name: stage2_local
+  description: "Local Stage 2 latent-flow training on the default Octo24 mix"
+
+logging:
+  tags: ["stage2", "lerobot_v3", "octo24", "latent_flow", "local"]

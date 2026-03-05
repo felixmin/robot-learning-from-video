@@ -1,0 +1,14 @@
+# @package _group_
+
+id: action_scratch
+logging_tags: ["stage3", "lerobot", "libero", "hlrp-policy", "smolvla", "scratch"]
+batch_size: 64
+
+policy:
+  repo_id: felixmin/hlrp_smolvla_shared_libero_scratch
+  stage3_training_mode: action
+  action_subset_ratio: 1.0
+  latent_scope: all
+  lam_checkpoint_path: null
+  lam_future_frames: null
+  lam_camera_keys: null

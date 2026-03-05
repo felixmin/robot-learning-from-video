@@ -73,16 +73,16 @@ python scripts/0_setup_environment.py
 
 ```bash
 # Stage 1 (LAM) local
-python scripts/2_train_stage1_lam.py experiment=stage1_octo24_local
+python scripts/2_train_stage1_lam.py experiment=stage1_local
 
 # Stage 2 (policy SmolVLA flow) local
-python scripts/4_train_stage2_policy.py experiment=stage2_smol_flow
+python scripts/4_train_stage2_policy.py experiment=stage2_local
 
 # Stage 3 (LeRobot action-only) local
-python scripts/6_train_lerobot.py experiment=stage3_hlrp_libero_action_scratch
+python scripts/6_train_lerobot.py experiment=stage3_local
 
 # Cluster submit (all stages)
-python scripts/submit_job.py experiment=stage3_hlrp_libero_action_scratch cluster=lrz_x100
+python scripts/submit_job.py experiment=stage3_cluster cluster=lrz_x100
 ```
 
 ## Configuration
@@ -91,7 +91,7 @@ Uses [Hydra](https://hydra.cc) for composable configuration. Experiments compose
 
 ```bash
 # Override from CLI
-python scripts/2_train_stage1_lam.py experiment=stage1_octo24_local data.loader.batch_size=32 training.optimizer.lr=5e-5
+python scripts/2_train_stage1_lam.py experiment=stage1_local data.loader.batch_size=32 training.optimizer.lr=5e-5
 ```
 
 See `CLAUDE.md` for architecture and config structure details.
@@ -99,7 +99,7 @@ See `CLAUDE.md` for architecture and config structure details.
 ## Dataset Sources and Downloads
 
 - Workstation/local training usually uses local dataset paths:
-  - Stage 1/2 LeRobot-v3 mix via Hydra data config (default in `stage1_octo24_local` / `stage2_octo24_local`)
+  - Stage 1/2 LeRobot-v3 mix via Hydra data config (default in `stage1_local` / `stage2_local`)
   - LeRobot cache root defaults to `${LEROBOT_HOME}` (set explicitly when needed)
   - Stage 3 Libero snapshot: `/mnt/data/workspace/hflibero/datasets--HuggingFaceVLA--libero/snapshots/<snapshot>`
 - Cluster training:

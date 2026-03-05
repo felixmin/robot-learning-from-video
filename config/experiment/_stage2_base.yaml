@@ -5,12 +5,6 @@ defaults:
   - /model@model: stage2_smol_flow_shared
   - /data@data: octo24
   - /training@training: stage2_policy_lightning
-  - /cluster@cluster: local_dev
-  - optional /user_config: local
-
-experiment:
-  name: stage2_octo24_local
-  description: "Local Stage 2 latent-flow training on the default Octo24 mix"
 
 submit:
   script: 4_train_stage2_policy
@@ -48,4 +42,3 @@ training:
 
 logging:
   use_wandb: true
-  tags: ["stage2", "lerobot_v3", "octo24", "latent_flow", "local"]

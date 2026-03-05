@@ -6,7 +6,7 @@
 #
 # The config is automatically included (as optional) by experiment configs that need it.
 # You can also override via CLI:
-#   python scripts/2_train_stage1_lam.py experiment=stage1_octo24_local logging.root_dir=/my/path
+#   python scripts/2_train_stage1_lam.py experiment=stage1_local logging.root_dir=/my/path
 
 # Logging paths (where to store run outputs)
 logging:

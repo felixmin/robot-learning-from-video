@@ -3,7 +3,7 @@
 
 defaults:
   - _self_
-  - experiment: stage1_octo24_local  # Default experiment (override with experiment=X)
+  - experiment: stage1_local  # Default experiment (override with experiment=X)
   - override hydra/hydra_logging: disabled  # Disable Hydra's own logging
   - override hydra/job_logging: none        # We handle logging ourselves
 

@@ -1,0 +1,72 @@
+# @package _global_
+
+defaults:
+  - /model/shared@stage2_policy_core: stage2_policy_core
+  - /lerobot_policy@lerobot.policy: smolvla_shared_base
+  - /stage3_profile@stage3_profile: action_scratch
+
+submit:
+  script: 6_train_lerobot
+
+cluster:
+  container:
+    image: /dss/dssmcmlfs01/pn57pi/pn57pi-dss-0001/felix_minzenmay/enroot/hlrp_stage3_lerobot.sqsh
+    python_bin: /opt/lerobot-venv/bin/python
+
+logging:
+  use_wandb: true
+  tags: ${stage3_profile.logging_tags}
+
+lerobot:
+  command: lerobot-train
+  install_editables: [lerobot, lerobot_policy_hlrp]
+  output_dir: ${logging.runs_dir}/lerobot
+  job_name: ${experiment.name}
+  steps: 100000
+  batch_size: ${stage3_profile.batch_size}
+  grad_accum_steps: 1
+  num_workers: 4
+  log_freq: 200
+  save_freq: 20000
+  use_policy_training_preset: false
+
+  wandb:
+    enable: true
+
+  policy:
+    repo_id: ${stage3_profile.policy.repo_id}
+    stage3_training_mode: ${stage3_profile.policy.stage3_training_mode}
+    action_subset_ratio: ${stage3_profile.policy.action_subset_ratio}
+    latent_scope: ${stage3_profile.policy.latent_scope}
+    lam_checkpoint_path: ${stage3_profile.policy.lam_checkpoint_path}
+    lam_future_frames: ${stage3_profile.policy.lam_future_frames}
+    lam_camera_keys: ${stage3_profile.policy.lam_camera_keys}
+
+  dataset:
+    repo_id: HuggingFaceVLA/libero
+    episodes: null
+    root: null
+    use_imagenet_stats: false
+    video_backend: pyav
+
+  env:
+    type: libero
+    task: libero_10
+    observation_height: 512
+    observation_width: 512
+
+  optimizer:
+    type: adamw
+    betas: [0.9, 0.95]
+
+  scheduler:
+    type: cosine_decay_with_warmup
+    num_warmup_steps: 100
+    num_decay_steps: 99900
+    peak_lr: 1e-4
+    decay_lr: 2.5e-6
+
+  eval:
+    freq: 20000
+    batch_size: 2
+    n_episodes: 10

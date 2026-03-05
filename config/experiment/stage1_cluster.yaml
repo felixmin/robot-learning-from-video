@@ -1,0 +1,14 @@
+# @package _global_
+
+defaults:
+  - _stage1_base
+  - /validation@validation: stage1_cluster_rich
+  - /cluster@cluster: mcml_x100
+  - optional /user_config: local
+
+experiment:
+  name: stage1_cluster
+  description: "Cluster Stage 1 training on the default Octo24 mix"
+
+logging:
+  tags: ["stage1", "lerobot_v3", "octo24", "cluster"]

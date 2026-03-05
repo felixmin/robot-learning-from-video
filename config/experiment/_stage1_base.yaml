@@ -4,13 +4,6 @@ defaults:
   - /model@model: lam
   - /data@data: octo24
   - /training@training: stage1_optimizer
-  - /validation@validation: stage1_local_rich
-  - /cluster@cluster: local_dev
-  - optional /user_config: local
-
-experiment:
-  name: stage1_octo24_local
-  description: "Local Stage 1 training on the default Octo24 mix"
 
 submit:
   script: 2_train_stage1_lam
@@ -29,4 +22,3 @@ training:
 
 logging:
   use_wandb: true
-  tags: ["stage1", "lerobot_v3", "octo24", "local"]
