@@ -623,7 +623,13 @@ class HLRPSmolVLASharedPolicy(PreTrainedPolicy):
         }
 
     def _zero_loss(self) -> torch.Tensor:
-        return next(self.core.parameters()).sum() * 0.0
+        for param in self.core.parameters():
+            if param.requires_grad:
+                return param.sum() * 0.0
+        param = next(self.core.parameters(), None)
+        if param is not None:
+            return torch.zeros((), device=param.device, dtype=param.dtype, requires_grad=True)
+        return torch.zeros((), requires_grad=True)
 
     def forward(self, batch: dict[str, torch.Tensor]) -> tuple[torch.Tensor, dict | None]:
         active_mode = self._training_mode_for_step()

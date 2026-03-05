@@ -246,3 +246,18 @@ def test_stage3_action_supervision_mask_ratio_one_selects_all() -> None:
         device=torch.device("cpu"),
     )
     assert torch.equal(mask, torch.tensor([True, True]))
+
+
+def test_stage3_zero_loss_uses_trainable_param_when_first_param_is_frozen() -> None:
+    policy = object.__new__(HLRPSmolVLASharedPolicy)
+    torch.nn.Module.__init__(policy)
+    policy.core = torch.nn.Sequential(torch.nn.Linear(1, 1), torch.nn.Linear(1, 1))
+    for param in policy.core[0].parameters():
+        param.requires_grad_(False)
+
+    loss = HLRPSmolVLASharedPolicy._zero_loss(policy)
+
+    assert loss.requires_grad
+    loss.backward()
+    assert policy.core[0].weight.grad is None
+    assert policy.core[1].weight.grad is not None
