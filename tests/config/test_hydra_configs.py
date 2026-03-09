@@ -141,6 +141,38 @@ class TestExperimentConsistency:
             assert cfg.lerobot.command is not None
             assert cfg.lerobot.policy.type is not None
             assert cfg.lerobot.policy.init_mode in {"artifact", "scratch"}
+            assert cfg.lerobot.dataset.id == "libero"
+            assert cfg.lerobot.dataset.repo_id == "HuggingFaceVLA/libero"
+
+    def test_stage3_dataset_override_loads(self, config_dir):
+        with initialize_config_dir(version_base=None, config_dir=config_dir):
+            cfg = compose(
+                config_name="config",
+                overrides=[
+                    "experiment=stage3_local",
+                    "stage3_dataset=libero_5pct",
+                ],
+            )
+
+            assert cfg.lerobot.dataset.id == "libero_5pct"
+            assert len(cfg.lerobot.dataset.episodes) == 84
+            assert cfg.lerobot.dataset.episodes[0] == 0
+            assert cfg.lerobot.dataset.episodes[-1] == 83
+
+    def test_stage3_random_dataset_override_loads(self, config_dir):
+        with initialize_config_dir(version_base=None, config_dir=config_dir):
+            cfg = compose(
+                config_name="config",
+                overrides=[
+                    "experiment=stage3_local",
+                    "stage3_dataset=libero_5pct_random",
+                ],
+            )
+
+            assert cfg.lerobot.dataset.id == "libero_5pct_random"
+            assert len(cfg.lerobot.dataset.episodes) == 84
+            assert cfg.lerobot.dataset.episodes[:5] == [13, 51, 54, 61, 65]
+            assert cfg.lerobot.dataset.episodes[-3:] == [1650, 1652, 1657]
 
     @pytest.mark.parametrize(
         ("experiment", "cluster_name", "mujoco_gl"),

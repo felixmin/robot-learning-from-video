@@ -1,0 +1,8 @@
+# @package lerobot.dataset
+
+id: libero
+repo_id: HuggingFaceVLA/libero
+episodes: null
+root: null
+use_imagenet_stats: false
+video_backend: pyav
