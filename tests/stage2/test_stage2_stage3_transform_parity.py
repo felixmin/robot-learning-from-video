@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from types import SimpleNamespace
-from pathlib import Path
-import sys
 
 import torch
 
@@ -15,9 +13,6 @@ from stage2.backends.interfaces import (
 )
 from stage2.policy_module import PolicyLightningModule, PolicyOptimizerConfig
 
-sys.path.insert(
-    0, str(Path(__file__).resolve().parents[1] / "lerobot_policy_hlrp" / "src")
-)
 from lerobot_policy_hlrp.policies.hlrp_smolvla_shared.modeling_hlrp_smolvla_shared import (
     HLRPSmolVLASharedPolicy,
 )

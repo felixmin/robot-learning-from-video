@@ -8,9 +8,10 @@ from pathlib import Path
 import pytest
 import torch
 
-# Add packages to path so all tests can import modules
-workspace_root = Path(__file__).parent.parent
+# Add repo-local packages to path so tests do not depend on editable installs.
+workspace_root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(workspace_root / "packages"))
+sys.path.insert(0, str(workspace_root / "lerobot_policy_hlrp" / "src"))
 
 
 @pytest.fixture(scope="session")
