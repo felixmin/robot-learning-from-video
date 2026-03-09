@@ -78,6 +78,23 @@ pip install torch torchvision torchaudio --index-url https://download.pytorch.or
 python -m pytest -q tests/test_hydra_configs.py
 ```
 
+#### PyTorch / CUDA troubleshooting
+
+On some newer GPUs, PyTorch may detect CUDA but still fail at runtime because the
+installed build does not support the GPU's SM architecture yet. Typical symptoms
+are warnings about unsupported compute capability such as `sm_120` or runtime
+errors like `CUDA error: no kernel image is available for execution on the device`.
+
+If that happens, reinstall PyTorch with a newer CUDA build. For example:
+
+```bash
+pip uninstall -y torch torchvision torchaudio
+pip3 install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu128
+```
+
+Check the official PyTorch install selector for the current recommended command:
+https://pytorch.org/get-started/locally/
+
 ### Running Training
 
 ```bash
