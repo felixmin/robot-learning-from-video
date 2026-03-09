@@ -6,11 +6,6 @@ submit:
   script: 7_rollout_lerobot
 
 cluster:
-  compute:
-    gpus_per_node: 1
-    cpus_per_task: 8
-    mem_gb: 32
-    time_limit: "00:30:00"
   container:
     image: /dss/dssmcmlfs01/pn57pi/pn57pi-dss-0001/felix_minzenmay/enroot/hlrp_stage3_lerobot.sqsh
     python_bin: /opt/lerobot-venv/bin/python
