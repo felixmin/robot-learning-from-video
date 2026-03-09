@@ -8,9 +8,12 @@ from lerobot.configs.types import FeatureType, PolicyFeature
 from lerobot_policy_hlrp.policies.hlrp_smolvla_shared.configuration_hlrp_smolvla_shared import (
     HLRPSmolVLASharedConfig,
 )
+from lerobot_policy_hlrp.policies.hlrp_smolvla_shared.checkpoint_stats import (
+    NORMALIZATION_STATS_FILENAME,
+    load_saved_normalization_stats,
+)
 from lerobot_policy_hlrp.policies.hlrp_smolvla_shared.modeling_hlrp_smolvla_shared import (
     HLRPSmolVLASharedPolicy,
-    NORMALIZATION_STATS_FILENAME,
 )
 
 
@@ -51,7 +54,7 @@ def test_save_pretrained_persists_normalization_stats(tmp_path: Path) -> None:
 
     stats_path = tmp_path / NORMALIZATION_STATS_FILENAME
     assert stats_path.is_file()
-    loaded = HLRPSmolVLASharedPolicy._load_saved_normalization_stats(tmp_path)
+    loaded = load_saved_normalization_stats(tmp_path)
     assert loaded == {
         "action": {"mean": [1.0, 2.0], "std": [3.0, 4.0]},
         "observation.state": {"mean": [0.5], "std": [2.5]},
