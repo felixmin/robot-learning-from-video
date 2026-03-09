@@ -40,7 +40,7 @@ def main(cfg: DictConfig):
     inputs = processor(text=[text], images=[[img]], return_tensors="pt", padding=True)
     print(f"  pixel_values shape: {inputs['pixel_values'].shape}")
     print(f"  pixel_attention_mask shape: {inputs.get('pixel_attention_mask', 'N/A')}")
-    if 'pixel_attention_mask' in inputs:
+    if "pixel_attention_mask" in inputs:
         print(f"  pixel_attention_mask shape: {inputs['pixel_attention_mask'].shape}")
     print(f"  input_ids shape: {inputs['input_ids'].shape}")
 
@@ -54,13 +54,17 @@ def main(cfg: DictConfig):
         processor.image_processor.do_image_splitting = False
         print("  Set do_image_splitting = False")
 
-        inputs2 = processor(text=[text], images=[[img]], return_tensors="pt", padding=True)
+        inputs2 = processor(
+            text=[text], images=[[img]], return_tensors="pt", padding=True
+        )
         print(f"  pixel_values shape: {inputs2['pixel_values'].shape}")
-        if 'pixel_attention_mask' in inputs2:
-            print(f"  pixel_attention_mask shape: {inputs2['pixel_attention_mask'].shape}")
+        if "pixel_attention_mask" in inputs2:
+            print(
+                f"  pixel_attention_mask shape: {inputs2['pixel_attention_mask'].shape}"
+            )
         print(f"  input_ids shape: {inputs2['input_ids'].shape}")
 
-        if inputs2['pixel_values'].shape != inputs['pixel_values'].shape:
+        if inputs2["pixel_values"].shape != inputs["pixel_values"].shape:
             print("  ✓ Image splitting was disabled!")
             print(f"    Before: {inputs['pixel_values'].shape}")
             print(f"    After: {inputs2['pixel_values'].shape}")
@@ -87,10 +91,14 @@ def main(cfg: DictConfig):
         print(f"  Set max_image_size = {{'longest_edge': 256}}")
         print(f"  Set do_image_splitting = False")
 
-        inputs3 = processor2(text=[text], images=[[img]], return_tensors="pt", padding=True)
+        inputs3 = processor2(
+            text=[text], images=[[img]], return_tensors="pt", padding=True
+        )
         print(f"  pixel_values shape: {inputs3['pixel_values'].shape}")
-        if 'pixel_attention_mask' in inputs3:
-            print(f"  pixel_attention_mask shape: {inputs3['pixel_attention_mask'].shape}")
+        if "pixel_attention_mask" in inputs3:
+            print(
+                f"  pixel_attention_mask shape: {inputs3['pixel_attention_mask'].shape}"
+            )
         print(f"  input_ids shape: {inputs3['input_ids'].shape}")
     except Exception as e:
         print(f"  Error: {e}")
@@ -101,6 +109,7 @@ def main(cfg: DictConfig):
     print("=" * 60)
 
     import inspect
+
     sig = inspect.signature(processor.__call__)
     print(f"  Processor __call__ parameters:")
     for name, param in sig.parameters.items():
@@ -128,11 +137,13 @@ def main(cfg: DictConfig):
             do_image_splitting=False,
         )
         print(f"  pixel_values shape: {inputs5['pixel_values'].shape}")
-        if 'pixel_attention_mask' in inputs5:
-            print(f"  pixel_attention_mask shape: {inputs5['pixel_attention_mask'].shape}")
+        if "pixel_attention_mask" in inputs5:
+            print(
+                f"  pixel_attention_mask shape: {inputs5['pixel_attention_mask'].shape}"
+            )
         print(f"  input_ids shape: {inputs5['input_ids'].shape}")
 
-        if inputs5['pixel_values'].shape[1] == 1:
+        if inputs5["pixel_values"].shape[1] == 1:
             print("  ✓ SUCCESS! do_image_splitting=False works as call argument!")
         else:
             print(f"  Still getting {inputs5['pixel_values'].shape[1]} patches")

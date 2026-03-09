@@ -5,7 +5,9 @@ import sys
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lerobot_policy_hlrp" / "src"))
+sys.path.insert(
+    0, str(Path(__file__).resolve().parents[1] / "lerobot_policy_hlrp" / "src")
+)
 from lerobot_policy_hlrp.policies.hlrp_smolvla_shared.configuration_hlrp_smolvla_shared import (
     HLRPSmolVLASharedConfig,
 )

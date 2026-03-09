@@ -5,18 +5,29 @@ from typing import Any
 
 import torch
 from torch import nn
-from transformers import AutoConfig, AutoModel, AutoModelForImageTextToText, AutoProcessor
+from transformers import (
+    AutoConfig,
+    AutoModel,
+    AutoModelForImageTextToText,
+    AutoProcessor,
+)
 
 
-def apply_rope(x: torch.Tensor, positions: torch.Tensor, max_wavelength: int = 10_000) -> torch.Tensor:
+def apply_rope(
+    x: torch.Tensor, positions: torch.Tensor, max_wavelength: int = 10_000
+) -> torch.Tensor:
     d_half = x.shape[-1] // 2
     device = x.device
     dtype = x.dtype
     x = x.to(torch.float32)
 
-    freq_exponents = (2.0 / x.shape[-1]) * torch.arange(d_half, dtype=torch.float32, device=device)
+    freq_exponents = (2.0 / x.shape[-1]) * torch.arange(
+        d_half, dtype=torch.float32, device=device
+    )
     timescale = max_wavelength**freq_exponents
-    radians = positions[..., None].to(torch.float32) / timescale[None, None, :].to(torch.float32)
+    radians = positions[..., None].to(torch.float32) / timescale[None, None, :].to(
+        torch.float32
+    )
     radians = radians[..., None, :]
 
     sin = torch.sin(radians)
@@ -29,7 +40,9 @@ def apply_rope(x: torch.Tensor, positions: torch.Tensor, max_wavelength: int = 1
     return res.to(dtype)
 
 
-def get_intermediate_size(hidden_dim: int, ffn_dim_multiplier: int = 4, multiple_of: int = 256) -> int:
+def get_intermediate_size(
+    hidden_dim: int, ffn_dim_multiplier: int = 4, multiple_of: int = 256
+) -> int:
     hidden_dim = int(2 * hidden_dim / 3)
     hidden_dim = int(ffn_dim_multiplier * hidden_dim)
     hidden_dim = multiple_of * ((hidden_dim + multiple_of - 1) // multiple_of)
@@ -65,7 +78,9 @@ class SmolVLMWithExpertModel(nn.Module):
                     low_cpu_mem_usage=True,
                 )
             else:
-                cfg = AutoConfig.from_pretrained(model_id, trust_remote_code=trust_remote_code)
+                cfg = AutoConfig.from_pretrained(
+                    model_id, trust_remote_code=trust_remote_code
+                )
                 try:
                     from transformers import SmolVLMForConditionalGeneration
                 except ImportError as exc:
@@ -87,7 +102,9 @@ class SmolVLMWithExpertModel(nn.Module):
             self.processor = processor
 
         if num_vlm_layers > 0:
-            self.get_vlm_model().text_model.layers = self.get_vlm_model().text_model.layers[:num_vlm_layers]
+            self.get_vlm_model().text_model.layers = (
+                self.get_vlm_model().text_model.layers[:num_vlm_layers]
+            )
 
         self.num_vlm_layers = len(self.get_vlm_model().text_model.layers)
         self.config = config
@@ -95,7 +112,9 @@ class SmolVLMWithExpertModel(nn.Module):
         lm_expert_config = copy.deepcopy(config.text_config)
         hidden_size = int(lm_expert_config.hidden_size)
         lm_expert_config.hidden_size = int(hidden_size * expert_width_multiplier)
-        lm_expert_config.intermediate_size = get_intermediate_size(int(hidden_size * expert_width_multiplier))
+        lm_expert_config.intermediate_size = get_intermediate_size(
+            int(hidden_size * expert_width_multiplier)
+        )
         lm_expert_config.num_hidden_layers = self.num_vlm_layers
 
         if num_expert_layers > 0:
@@ -113,15 +132,20 @@ class SmolVLMWithExpertModel(nn.Module):
 
         if "cross" in self.attention_mode:
             for layer_idx in range(len(self.lm_expert.layers)):
-                if self.self_attn_every_n_layers > 0 and layer_idx % self.self_attn_every_n_layers == 0:
+                if (
+                    self.self_attn_every_n_layers > 0
+                    and layer_idx % self.self_attn_every_n_layers == 0
+                ):
                     continue
                 self.lm_expert.layers[layer_idx].self_attn.k_proj = nn.Linear(
-                    config.text_config.num_key_value_heads * config.text_config.head_dim,
+                    config.text_config.num_key_value_heads
+                    * config.text_config.head_dim,
                     lm_expert_config.num_key_value_heads * lm_expert_config.head_dim,
                     bias=lm_expert_config.attention_bias,
                 )
                 self.lm_expert.layers[layer_idx].self_attn.v_proj = nn.Linear(
-                    config.text_config.num_key_value_heads * config.text_config.head_dim,
+                    config.text_config.num_key_value_heads
+                    * config.text_config.head_dim,
                     lm_expert_config.num_key_value_heads * lm_expert_config.head_dim,
                     bias=lm_expert_config.attention_bias,
                 )
@@ -137,7 +161,9 @@ class SmolVLMWithExpertModel(nn.Module):
 
     def get_vlm_model(self) -> nn.Module:
         if not hasattr(self.vlm, "model"):
-            raise AttributeError("Expected VLM to expose `.model` like SmolVLMForConditionalGeneration")
+            raise AttributeError(
+                "Expected VLM to expose `.model` like SmolVLMForConditionalGeneration"
+            )
         return self.vlm.model
 
     def set_requires_grad(self) -> None:
@@ -152,7 +178,10 @@ class SmolVLMWithExpertModel(nn.Module):
                 params.requires_grad = False
         else:
             last_layers = [self.num_vlm_layers - 1]
-            if self.num_vlm_layers != self.num_expert_layers and self.num_vlm_layers % self.num_expert_layers == 0:
+            if (
+                self.num_vlm_layers != self.num_expert_layers
+                and self.num_vlm_layers % self.num_expert_layers == 0
+            ):
                 last_layers.append(self.num_vlm_layers - 2)
             frozen_layers = [
                 "lm_head",
@@ -251,8 +280,12 @@ class SmolVLMWithExpertModel(nn.Module):
                     "value_states": value_states,
                 }
             else:
-                key_states = torch.cat([past_key_values[layer_idx]["key_states"], key_states], dim=1)
-                value_states = torch.cat([past_key_values[layer_idx]["value_states"], value_states], dim=1)
+                key_states = torch.cat(
+                    [past_key_values[layer_idx]["key_states"], key_states], dim=1
+                )
+                value_states = torch.cat(
+                    [past_key_values[layer_idx]["value_states"], value_states], dim=1
+                )
 
         att_output = self.get_attention_interface()(
             _attention_mask,
@@ -328,30 +361,41 @@ class SmolVLMWithExpertModel(nn.Module):
         if expert_layer is not None:
             expert_hidden_states = expert_layer.input_layernorm(inputs_embeds[1])
             expert_input_shape = expert_hidden_states.shape[:-1]
-            expert_hidden_shape = (*expert_input_shape, -1, expert_layer.self_attn.head_dim)
-
-            expert_hidden_states = expert_hidden_states.to(dtype=expert_layer.self_attn.q_proj.weight.dtype)
-            expert_query_state = expert_layer.self_attn.q_proj(expert_hidden_states).view(expert_hidden_shape)
-
-            _key_states = key_states.to(dtype=expert_layer.self_attn.k_proj.weight.dtype).view(
-                *key_states.shape[:2], -1
+            expert_hidden_shape = (
+                *expert_input_shape,
+                -1,
+                expert_layer.self_attn.head_dim,
             )
+
+            expert_hidden_states = expert_hidden_states.to(
+                dtype=expert_layer.self_attn.q_proj.weight.dtype
+            )
+            expert_query_state = expert_layer.self_attn.q_proj(
+                expert_hidden_states
+            ).view(expert_hidden_shape)
+
+            _key_states = key_states.to(
+                dtype=expert_layer.self_attn.k_proj.weight.dtype
+            ).view(*key_states.shape[:2], -1)
             expert_key_states = expert_layer.self_attn.k_proj(_key_states).view(
                 *_key_states.shape[:-1], -1, expert_layer.self_attn.head_dim
             )
 
-            _value_states = value_states.to(dtype=expert_layer.self_attn.v_proj.weight.dtype).view(
-                *value_states.shape[:2], -1
-            )
+            _value_states = value_states.to(
+                dtype=expert_layer.self_attn.v_proj.weight.dtype
+            ).view(*value_states.shape[:2], -1)
             expert_value_states = expert_layer.self_attn.v_proj(_value_states).view(
                 *_value_states.shape[:-1], -1, expert_layer.self_attn.head_dim
             )
 
-            expert_position_id = expert_position_id - torch.min(
-                expert_position_id,
-                dim=1,
-                keepdim=True,
-            ).values
+            expert_position_id = (
+                expert_position_id
+                - torch.min(
+                    expert_position_id,
+                    dim=1,
+                    keepdim=True,
+                ).values
+            )
             expert_attention_mask = attention_mask[
                 :, -inputs_embeds[1].shape[1] :, : expert_key_states.shape[1]
             ]
@@ -412,7 +456,10 @@ class SmolVLMWithExpertModel(nn.Module):
             if (
                 fill_kv_cache
                 or "cross" not in self.attention_mode
-                or (self.self_attn_every_n_layers > 0 and layer_idx % self.self_attn_every_n_layers == 0)
+                or (
+                    self.self_attn_every_n_layers > 0
+                    and layer_idx % self.self_attn_every_n_layers == 0
+                )
             ):
                 att_outputs, past_key_values = self.forward_attn_layer(
                     model_layers,
@@ -535,12 +582,16 @@ class SmolVLMWithExpertModel(nn.Module):
 
         att_weights = att_weights.to(dtype=torch.float32)
         big_neg = torch.finfo(att_weights.dtype).min
-        masked_att_weights = torch.where(attention_mask[:, None, :, :], att_weights, big_neg)
+        masked_att_weights = torch.where(
+            attention_mask[:, None, :, :], att_weights, big_neg
+        )
         probs = nn.functional.softmax(masked_att_weights, dim=-1)
         probs = probs.to(dtype=value_states.dtype)
 
         att_output = torch.matmul(probs, value_states.permute(0, 2, 1, 3))
 
         att_output = att_output.permute(0, 2, 1, 3)
-        att_output = att_output.reshape(batch_size, -1, num_key_value_heads * num_key_value_groups * head_dim)
+        att_output = att_output.reshape(
+            batch_size, -1, num_key_value_heads * num_key_value_groups * head_dim
+        )
         return att_output

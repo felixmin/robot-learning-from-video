@@ -26,7 +26,12 @@ from omegaconf import DictConfig, OmegaConf
 import torch
 import wandb
 import lightning.pytorch as pl
-from lightning.pytorch.callbacks import ModelCheckpoint, LearningRateMonitor, Callback, TQDMProgressBar
+from lightning.pytorch.callbacks import (
+    ModelCheckpoint,
+    LearningRateMonitor,
+    Callback,
+    TQDMProgressBar,
+)
 from lightning.fabric.plugins.io.torch_io import TorchCheckpointIO
 
 
@@ -118,7 +123,9 @@ def main(cfg: DictConfig):
             f"  - Estimated train batches/epoch: ~{est_batches:,} (~{est_samples:,} samples)"
         )
     else:
-        raise ValueError(f"Only data.backend='lerobot_v3' is supported, got {cfg.data.backend!r}")
+        raise ValueError(
+            f"Only data.backend='lerobot_v3' is supported, got {cfg.data.backend!r}"
+        )
 
     # Initialize Stage-1 LAM task
     logger.info("\n" + "=" * 80)
@@ -195,7 +202,9 @@ def main(cfg: DictConfig):
             )
         )
         logger.info("✓ Progress logger added")
-        logger.info(f"  - log_every_n_steps: {int(progress_logger_cfg.log_every_n_steps)}")
+        logger.info(
+            f"  - log_every_n_steps: {int(progress_logger_cfg.log_every_n_steps)}"
+        )
 
     # Throughput logging: logs perf/steps_per_sec and perf/samples_per_sec to wandb
     perf_cfg = training_config.throughput
@@ -271,7 +280,9 @@ def main(cfg: DictConfig):
     if bucket_configs is not None:
         bucket_filters = {name: cfg["filters"] for name, cfg in bucket_configs.items()}
 
-    strategies = create_validation_strategies(strategies_config, bucket_filters=bucket_filters)
+    strategies = create_validation_strategies(
+        strategies_config, bucket_filters=bucket_filters
+    )
 
     val_strategy_callback = ValidationStrategyCallback(
         strategies=strategies,
@@ -287,7 +298,9 @@ def main(cfg: DictConfig):
         logger.info(f"  - Buckets: {list(bucket_configs.keys())}")
     for strategy in strategies:
         bucket_info = f", buckets={strategy.buckets}" if strategy.buckets else ""
-        logger.info(f"  - {strategy.name}: every {strategy.every_n_validations} validations{bucket_info}")
+        logger.info(
+            f"  - {strategy.name}: every {strategy.every_n_validations} validations{bucket_info}"
+        )
 
     # Optional EMA
     if training_config.use_ema:
@@ -347,14 +360,17 @@ def main(cfg: DictConfig):
 
         if profiler_type == "simple":
             from lightning.pytorch.profilers import SimpleProfiler
+
             profiler = SimpleProfiler(dirpath=dirpath, filename=filename)
             logger.info(f"✓ SimpleProfiler enabled")
         elif profiler_type == "advanced":
             from lightning.pytorch.profilers import AdvancedProfiler
+
             profiler = AdvancedProfiler(dirpath=dirpath, filename=filename)
             logger.info(f"✓ AdvancedProfiler enabled")
         elif profiler_type == "pytorch":
             from lightning.pytorch.profilers import PyTorchProfiler
+
             profiler = PyTorchProfiler(
                 dirpath=dirpath,
                 filename=filename,
@@ -432,10 +448,16 @@ def main(cfg: DictConfig):
             task.model, weights_path, strict=False
         )
         if missing:
-            logger.warning(f"  - Missing keys: {missing[:5]}{'...' if len(missing) > 5 else ''}")
+            logger.warning(
+                f"  - Missing keys: {missing[:5]}{'...' if len(missing) > 5 else ''}"
+            )
         if unexpected:
-            logger.warning(f"  - Unexpected keys: {unexpected[:5]}{'...' if len(unexpected) > 5 else ''}")
-        logger.info(f"  - Loaded {loaded_count} weight tensors (fresh optimizer/scheduler)")
+            logger.warning(
+                f"  - Unexpected keys: {unexpected[:5]}{'...' if len(unexpected) > 5 else ''}"
+            )
+        logger.info(
+            f"  - Loaded {loaded_count} weight tensors (fresh optimizer/scheduler)"
+        )
 
     # Check for full resume (restores optimizer/scheduler state)
     if ckpt_path:
@@ -452,7 +474,9 @@ def main(cfg: DictConfig):
         logger.info(f"✓ Best checkpoint: {checkpoint_callback.best_model_path}")
         best_score = checkpoint_callback.best_model_score
         if best_score is None:
-            logger.warning("  - Best val/loss unavailable (no validation metric recorded in this run state)")
+            logger.warning(
+                "  - Best val/loss unavailable (no validation metric recorded in this run state)"
+            )
         else:
             logger.info(f"  - Best val/loss: {float(best_score):.4f}")
 

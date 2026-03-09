@@ -69,7 +69,9 @@ class LAMEncoderVQInference(torch.nn.Module):
         video = video.to(self.device)
         video = normalize_video_input(self._model, video)
         first_frame, rest_frames = video[:, :, :1], video[:, :, 1:]
-        _, _, first_tokens, last_tokens = self._model._encode_frames(first_frame, rest_frames)
+        _, _, first_tokens, last_tokens = self._model._encode_frames(
+            first_frame, rest_frames
+        )
         return self._model.vq.get_indices(first_tokens, last_tokens)
 
     @torch.no_grad()

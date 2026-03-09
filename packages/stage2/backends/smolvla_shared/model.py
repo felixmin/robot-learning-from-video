@@ -38,7 +38,9 @@ def make_att_2d_masks(pad_masks: torch.Tensor, att_masks: torch.Tensor) -> torch
     return att_2d_masks & pad_2d_masks
 
 
-def pad_tensor(tensor: torch.Tensor, max_len: int, pad_value: float = 0.0) -> torch.Tensor:
+def pad_tensor(
+    tensor: torch.Tensor, max_len: int, pad_value: float = 0.0
+) -> torch.Tensor:
     b, d = tensor.shape[:2]
     padded_tensor = torch.full(
         (b, max_len, *tensor.shape[2:]),
@@ -67,10 +69,14 @@ class SmolVLASharedCore(torch.nn.Module):
         self.codebook_size = int(self.cfg.action_tokens.codebook_size)
         self.code_seq_len = int(self.cfg.action_tokens.code_seq_len)
         if self.code_seq_len <= 0:
-            raise ValueError(f"action_tokens.code_seq_len must be > 0, got {self.code_seq_len}")
+            raise ValueError(
+                f"action_tokens.code_seq_len must be > 0, got {self.code_seq_len}"
+            )
         self.action_chunk_size = int(self.cfg.action_chunk_size)
         if self.action_chunk_size <= 0:
-            raise ValueError(f"action_chunk_size must be > 0, got {self.action_chunk_size}")
+            raise ValueError(
+                f"action_chunk_size must be > 0, got {self.action_chunk_size}"
+            )
         if int(self.cfg.latent_vector_dim) % self.code_seq_len != 0:
             raise ValueError(
                 "latent_vector_dim must be divisible by action_tokens.code_seq_len, "
@@ -85,7 +91,9 @@ class SmolVLASharedCore(torch.nn.Module):
         self._injected_processor = processor
 
         self.state_proj: torch.nn.Linear | None = None
-        self.action_in_proj: torch.nn.Linear | None = None  # latent-domain input projection
+        self.action_in_proj: torch.nn.Linear | None = (
+            None  # latent-domain input projection
+        )
         self.real_action_in_proj: torch.nn.Linear | None = None
         self.action_time_mlp_in: torch.nn.Linear | None = None
         self.action_time_mlp_out: torch.nn.Linear | None = None
@@ -122,15 +130,21 @@ class SmolVLASharedCore(torch.nn.Module):
         model_dtype = next(self.smol_model.parameters()).dtype
 
         if self.state_proj is None:
-            self.state_proj = torch.nn.Linear(int(self.cfg.max_state_dim), text_hidden).to(
+            self.state_proj = torch.nn.Linear(
+                int(self.cfg.max_state_dim), text_hidden
+            ).to(
                 device=device,
                 dtype=model_dtype,
             )
-            self.action_in_proj = torch.nn.Linear(self.latent_step_dim, expert_hidden).to(
+            self.action_in_proj = torch.nn.Linear(
+                self.latent_step_dim, expert_hidden
+            ).to(
                 device=device,
                 dtype=model_dtype,
             )
-            self.action_time_mlp_in = torch.nn.Linear(expert_hidden * 2, expert_hidden).to(
+            self.action_time_mlp_in = torch.nn.Linear(
+                expert_hidden * 2, expert_hidden
+            ).to(
                 device=device,
                 dtype=model_dtype,
             )
@@ -138,15 +152,21 @@ class SmolVLASharedCore(torch.nn.Module):
                 device=device,
                 dtype=model_dtype,
             )
-            self.latent_out_proj = torch.nn.Linear(expert_hidden, self.latent_step_dim).to(
+            self.latent_out_proj = torch.nn.Linear(
+                expert_hidden, self.latent_step_dim
+            ).to(
                 device=device,
                 dtype=model_dtype,
             )
-            self.real_action_in_proj = torch.nn.Linear(int(self.cfg.action_dim), expert_hidden).to(
+            self.real_action_in_proj = torch.nn.Linear(
+                int(self.cfg.action_dim), expert_hidden
+            ).to(
                 device=device,
                 dtype=model_dtype,
             )
-            self.action_out_proj = torch.nn.Linear(expert_hidden, int(self.cfg.action_dim)).to(
+            self.action_out_proj = torch.nn.Linear(
+                expert_hidden, int(self.cfg.action_dim)
+            ).to(
                 device=device,
                 dtype=model_dtype,
             )
@@ -154,7 +174,9 @@ class SmolVLASharedCore(torch.nn.Module):
         if self.cfg.add_image_special_tokens:
             tokenizer = getattr(self.processor, "tokenizer", None)
             if tokenizer is None:
-                raise RuntimeError("processor.tokenizer is required when add_image_special_tokens=true")
+                raise RuntimeError(
+                    "processor.tokenizer is required when add_image_special_tokens=true"
+                )
             fake_image_token = getattr(tokenizer, "fake_image_token_id", None)
             global_image_token = getattr(tokenizer, "global_image_token_id", None)
             if fake_image_token is None or global_image_token is None:
@@ -167,7 +189,9 @@ class SmolVLASharedCore(torch.nn.Module):
                 dtype=torch.long,
                 device=device,
             )
-            self.image_end_token = torch.tensor([int(fake_image_token)], dtype=torch.long, device=device)
+            self.image_end_token = torch.tensor(
+                [int(fake_image_token)], dtype=torch.long, device=device
+            )
 
     def train(self, mode: bool = True) -> SmolVLASharedCore:
         super().train(mode)
@@ -186,7 +210,13 @@ class SmolVLASharedCore(torch.nn.Module):
 
     def _require_heads(
         self,
-    ) -> tuple[torch.nn.Linear, torch.nn.Linear, torch.nn.Linear, torch.nn.Linear, torch.nn.Linear]:
+    ) -> tuple[
+        torch.nn.Linear,
+        torch.nn.Linear,
+        torch.nn.Linear,
+        torch.nn.Linear,
+        torch.nn.Linear,
+    ]:
         if (
             self.state_proj is None
             or self.action_in_proj is None
@@ -194,7 +224,9 @@ class SmolVLASharedCore(torch.nn.Module):
             or self.action_time_mlp_out is None
             or self.latent_out_proj is None
         ):
-            raise RuntimeError("Core projection heads are not initialized. Call setup(device=...) first.")
+            raise RuntimeError(
+                "Core projection heads are not initialized. Call setup(device=...) first."
+            )
         return (
             self.state_proj,
             self.action_in_proj,
@@ -212,7 +244,9 @@ class SmolVLASharedCore(torch.nn.Module):
             or self.action_time_mlp_out is None
             or self.action_out_proj is None
         ):
-            raise RuntimeError("Action projection heads are not initialized. Set action_dim and call setup(device=...).")
+            raise RuntimeError(
+                "Action projection heads are not initialized. Set action_dim and call setup(device=...)."
+            )
         return (
             self.real_action_in_proj,
             self.action_time_mlp_in,
@@ -269,7 +303,9 @@ class SmolVLASharedCore(torch.nn.Module):
             max_state_dim=int(self.cfg.max_state_dim),
         )
 
-    def _to_latent_sequence(self, x: torch.Tensor, *, device: torch.device, dtype: torch.dtype) -> torch.Tensor:
+    def _to_latent_sequence(
+        self, x: torch.Tensor, *, device: torch.device, dtype: torch.dtype
+    ) -> torch.Tensor:
         x = x.to(device=device, dtype=dtype)
         if x.ndim == 2:
             if int(x.shape[1]) != int(self.cfg.latent_vector_dim):
@@ -279,7 +315,10 @@ class SmolVLASharedCore(torch.nn.Module):
                 )
             return x.reshape(x.shape[0], self.code_seq_len, self.latent_step_dim)
         if x.ndim == 3:
-            if int(x.shape[1]) != self.code_seq_len or int(x.shape[2]) != self.latent_step_dim:
+            if (
+                int(x.shape[1]) != self.code_seq_len
+                or int(x.shape[2]) != self.latent_step_dim
+            ):
                 raise ValueError(
                     f"Expected latent tensor [B,{self.code_seq_len},{self.latent_step_dim}], got {tuple(x.shape)}"
                 )
@@ -299,7 +338,9 @@ class SmolVLASharedCore(torch.nn.Module):
         x = x.to(device=device, dtype=dtype)
         x = to_action_chunk(actions=x, chunk_size=int(self.action_chunk_size))
         if x.ndim != 3:
-            raise ValueError(f"Expected action tensor [B,T,A], got shape {tuple(x.shape)}")
+            raise ValueError(
+                f"Expected action tensor [B,T,A], got shape {tuple(x.shape)}"
+            )
         if int(x.shape[-1]) > int(self.cfg.action_dim):
             raise ValueError(
                 f"Action dim exceeds configured action_dim={int(self.cfg.action_dim)}: got {int(x.shape[-1])}"
@@ -327,7 +368,9 @@ class SmolVLASharedCore(torch.nn.Module):
                 if self.global_image_start_token is None:
                     raise RuntimeError("global_image_start_token is not initialized")
                 image_start_token = (
-                    smol_model.embed_language_tokens(self.global_image_start_token).unsqueeze(0).expand(img.shape[0], -1, -1)
+                    smol_model.embed_language_tokens(self.global_image_start_token)
+                    .unsqueeze(0)
+                    .expand(img.shape[0], -1, -1)
                 )
                 image_start_mask = torch.ones(
                     (img.shape[0], image_start_token.shape[1]),
@@ -339,7 +382,9 @@ class SmolVLASharedCore(torch.nn.Module):
                 att_masks += [0] * int(image_start_mask.shape[1])
 
             img_emb = smol_model.embed_image(img)
-            img_emb = img_emb * torch.tensor(img_emb.shape[-1] ** 0.5, dtype=img_emb.dtype, device=img_emb.device)
+            img_emb = img_emb * torch.tensor(
+                img_emb.shape[-1] ** 0.5, dtype=img_emb.dtype, device=img_emb.device
+            )
             bsize, num_img_embs = img_emb.shape[:2]
             img_mask = img_mask[:, None].expand(bsize, num_img_embs)
             embs.append(img_emb)
@@ -350,7 +395,9 @@ class SmolVLASharedCore(torch.nn.Module):
                 if self.image_end_token is None:
                     raise RuntimeError("image_end_token is not initialized")
                 image_end_token = (
-                    smol_model.embed_language_tokens(self.image_end_token).unsqueeze(0).expand(img.shape[0], -1, -1)
+                    smol_model.embed_language_tokens(self.image_end_token)
+                    .unsqueeze(0)
+                    .expand(img.shape[0], -1, -1)
                 )
                 image_end_mask = torch.ones(
                     (img.shape[0], image_end_token.shape[1]),
@@ -371,14 +418,20 @@ class SmolVLASharedCore(torch.nn.Module):
         if state_emb.ndim == 2:
             state_emb = state_emb[:, None, :]
         states_seq_len = int(state_emb.shape[1])
-        state_mask = torch.ones((state_emb.shape[0], states_seq_len), dtype=torch.bool, device=state_emb.device)
+        state_mask = torch.ones(
+            (state_emb.shape[0], states_seq_len),
+            dtype=torch.bool,
+            device=state_emb.device,
+        )
         embs.append(state_emb)
         pad_masks.append(state_mask)
         att_masks += [1] * states_seq_len
 
         out_embs = torch.cat(embs, dim=1)
         out_pad_masks = torch.cat(pad_masks, dim=1)
-        out_att_masks = torch.tensor(att_masks, dtype=torch.bool, device=out_pad_masks.device)[None, :]
+        out_att_masks = torch.tensor(
+            att_masks, dtype=torch.bool, device=out_pad_masks.device
+        )[None, :]
 
         prefix_length = int(self.cfg.prefix_length)
         if prefix_length > 0 and out_pad_masks.shape[1] < prefix_length:
@@ -395,7 +448,9 @@ class SmolVLASharedCore(torch.nn.Module):
         noisy_latents: torch.Tensor,
         timestep: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        _, action_in_proj, action_time_mlp_in, action_time_mlp_out, _ = self._require_heads()
+        _, action_in_proj, action_time_mlp_in, action_time_mlp_out, _ = (
+            self._require_heads()
+        )
 
         action_emb = action_in_proj(noisy_latents)
         bsize = action_emb.shape[0]
@@ -416,8 +471,12 @@ class SmolVLASharedCore(torch.nn.Module):
         action_time_emb = F.silu(action_time_emb)
         action_time_emb = action_time_mlp_out(action_time_emb)
 
-        action_mask = torch.ones((bsize, action_time_emb.shape[1]), dtype=torch.bool, device=device)
-        att_masks = torch.ones((bsize, action_time_emb.shape[1]), dtype=torch.bool, device=device)
+        action_mask = torch.ones(
+            (bsize, action_time_emb.shape[1]), dtype=torch.bool, device=device
+        )
+        att_masks = torch.ones(
+            (bsize, action_time_emb.shape[1]), dtype=torch.bool, device=device
+        )
         return action_time_emb, action_mask, att_masks
 
     def embed_action_suffix(
@@ -426,7 +485,9 @@ class SmolVLASharedCore(torch.nn.Module):
         noisy_actions: torch.Tensor,
         timestep: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        action_in_proj, action_time_mlp_in, action_time_mlp_out, _ = self._require_action_heads()
+        action_in_proj, action_time_mlp_in, action_time_mlp_out, _ = (
+            self._require_action_heads()
+        )
 
         action_emb = action_in_proj(noisy_actions)
         bsize = action_emb.shape[0]
@@ -447,8 +508,12 @@ class SmolVLASharedCore(torch.nn.Module):
         action_time_emb = F.silu(action_time_emb)
         action_time_emb = action_time_mlp_out(action_time_emb)
 
-        action_mask = torch.ones((bsize, action_time_emb.shape[1]), dtype=torch.bool, device=device)
-        att_masks = torch.ones((bsize, action_time_emb.shape[1]), dtype=torch.bool, device=device)
+        action_mask = torch.ones(
+            (bsize, action_time_emb.shape[1]), dtype=torch.bool, device=device
+        )
+        att_masks = torch.ones(
+            (bsize, action_time_emb.shape[1]), dtype=torch.bool, device=device
+        )
         return action_time_emb, action_mask, att_masks
 
     def _predict_from_suffix(
@@ -471,7 +536,9 @@ class SmolVLASharedCore(torch.nn.Module):
                 action_in = action_in.to(self.action_out_proj.weight.dtype)
             action_seq = self.action_out_proj(action_in)
 
-        return latent_seq[:, -seq_len:], action_seq[:, -seq_len:] if action_seq is not None else None
+        return latent_seq[:, -seq_len:], (
+            action_seq[:, -seq_len:] if action_seq is not None else None
+        )
 
     def _predict_actions_from_suffix(
         self,
@@ -608,11 +675,15 @@ class SmolVLASharedCore(torch.nn.Module):
         device, _, _ = self._require_ready()
         model_dtype = next(self.smol_model.parameters()).dtype
 
-        target_seq = self._to_latent_sequence(target_vectors, device=device, dtype=model_dtype)
+        target_seq = self._to_latent_sequence(
+            target_vectors, device=device, dtype=model_dtype
+        )
         if noise is None:
             noise_seq = torch.randn_like(target_seq)
         else:
-            noise_seq = self._to_latent_sequence(noise, device=device, dtype=model_dtype)
+            noise_seq = self._to_latent_sequence(
+                noise, device=device, dtype=model_dtype
+            )
 
         if time is None:
             time = sample_beta_time(
@@ -642,11 +713,15 @@ class SmolVLASharedCore(torch.nn.Module):
         device, _, _ = self._require_ready()
         model_dtype = next(self.smol_model.parameters()).dtype
 
-        target_seq = self._to_action_sequence(target_actions, device=device, dtype=model_dtype)
+        target_seq = self._to_action_sequence(
+            target_actions, device=device, dtype=model_dtype
+        )
         if noise is None:
             noise_seq = torch.randn_like(target_seq)
         else:
-            noise_seq = self._to_action_sequence(noise, device=device, dtype=model_dtype)
+            noise_seq = self._to_action_sequence(
+                noise, device=device, dtype=model_dtype
+            )
 
         if time is None:
             time = sample_beta_time(
@@ -678,7 +753,9 @@ class SmolVLASharedCore(torch.nn.Module):
         if reduction == "none":
             return per_sample
         if reduction != "mean":
-            raise ValueError(f"Unsupported reduction={reduction!r}; expected 'mean' or 'none'.")
+            raise ValueError(
+                f"Unsupported reduction={reduction!r}; expected 'mean' or 'none'."
+            )
         denom = valid_f.sum().clamp(min=1.0)
         return (losses * valid_f).sum() / denom
 
@@ -701,7 +778,9 @@ class SmolVLASharedCore(torch.nn.Module):
         batch_size = int(prefix_pad_masks.shape[0])
         prefix_len = int(prefix_pad_masks.shape[1])
 
-        prefix_pad_2d_masks = prefix_pad_masks[:, None, :].expand(batch_size, suffix_len, prefix_len)
+        prefix_pad_2d_masks = prefix_pad_masks[:, None, :].expand(
+            batch_size, suffix_len, prefix_len
+        )
         suffix_att_2d_masks = make_att_2d_masks(suffix_pad_masks, suffix_att_masks)
 
         full_att_2d_masks = torch.cat([prefix_pad_2d_masks, suffix_att_2d_masks], dim=2)
@@ -739,7 +818,9 @@ class SmolVLASharedCore(torch.nn.Module):
         batch_size = int(prefix_pad_masks.shape[0])
         prefix_len = int(prefix_pad_masks.shape[1])
 
-        prefix_pad_2d_masks = prefix_pad_masks[:, None, :].expand(batch_size, suffix_len, prefix_len)
+        prefix_pad_2d_masks = prefix_pad_masks[:, None, :].expand(
+            batch_size, suffix_len, prefix_len
+        )
         suffix_att_2d_masks = make_att_2d_masks(suffix_pad_masks, suffix_att_masks)
 
         full_att_2d_masks = torch.cat([prefix_pad_2d_masks, suffix_att_2d_masks], dim=2)
@@ -754,7 +835,9 @@ class SmolVLASharedCore(torch.nn.Module):
             use_cache=True,
             fill_kv_cache=False,
         )
-        suffix_out = outputs_embeds[1][:, -self.action_chunk_size :].to(dtype=torch.float32)
+        suffix_out = outputs_embeds[1][:, -self.action_chunk_size :].to(
+            dtype=torch.float32
+        )
         return self._predict_actions_from_suffix(suffix_out=suffix_out)
 
     @torch.no_grad()

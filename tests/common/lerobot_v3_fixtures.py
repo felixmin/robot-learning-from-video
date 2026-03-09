@@ -22,8 +22,16 @@ def make_test_request(
             role: TemporalFieldRequest(deltas_steps=tuple(deltas))
             for role, deltas in image_requests.items()
         },
-        state_request=None if state_deltas is None else TemporalFieldRequest(deltas_steps=tuple(state_deltas)),
-        action_request=None if action_deltas is None else TemporalFieldRequest(deltas_steps=tuple(action_deltas)),
+        state_request=(
+            None
+            if state_deltas is None
+            else TemporalFieldRequest(deltas_steps=tuple(state_deltas))
+        ),
+        action_request=(
+            None
+            if action_deltas is None
+            else TemporalFieldRequest(deltas_steps=tuple(action_deltas))
+        ),
         include_metadata=True,
         pad_missing_future=pad_missing_future,
         image_size=image_size,
@@ -62,8 +70,12 @@ def make_test_source_stats(
     state_std: list[float] | None = None,
     state_count: int = 100,
 ) -> dict[str, dict[str, np.ndarray]]:
-    action_min = action_min if action_min is not None else [m - 1.0 for m in action_mean]
-    action_max = action_max if action_max is not None else [m + 1.0 for m in action_mean]
+    action_min = (
+        action_min if action_min is not None else [m - 1.0 for m in action_mean]
+    )
+    action_max = (
+        action_max if action_max is not None else [m + 1.0 for m in action_mean]
+    )
     stats: dict[str, dict[str, np.ndarray]] = {
         "action": {
             "mean": np.asarray(action_mean, dtype=np.float64),

@@ -48,7 +48,9 @@ def test_resolve_request_to_delta_timestamps_converts_steps_using_fps() -> None:
 
 
 def test_resolve_request_to_delta_timestamps_omits_unrequested_modalities() -> None:
-    request = make_test_request(image_requests={"primary": (0,)}, state_deltas=None, action_deltas=None)
+    request = make_test_request(
+        image_requests={"primary": (0,)}, state_deltas=None, action_deltas=None
+    )
 
     out = resolve_request_to_delta_timestamps(
         request=request,
@@ -61,7 +63,9 @@ def test_resolve_request_to_delta_timestamps_omits_unrequested_modalities() -> N
     assert out == {"observation.images.rgb": [0.0]}
 
 
-def test_resolve_request_to_delta_timestamps_rejects_missing_required_camera_role() -> None:
+def test_resolve_request_to_delta_timestamps_rejects_missing_required_camera_role() -> (
+    None
+):
     request = make_test_request(image_requests={"primary": (0,), "wrist": (0,)})
 
     with pytest.raises(KeyError, match="wrist"):

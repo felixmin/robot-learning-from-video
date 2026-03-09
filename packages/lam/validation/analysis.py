@@ -73,7 +73,7 @@ class LatentTransferStrategy(ValidationStrategy):
 
         # Sample pairs
         n = min(self.num_pairs, len(all_frames) // 2)
-        indices = torch.randperm(len(all_frames))[:n * 2]
+        indices = torch.randperm(len(all_frames))[: n * 2]
 
         # Split into source and target pairs
         source_frames = all_frames[indices[:n]]  # (s_a, s_a')
@@ -88,7 +88,9 @@ class LatentTransferStrategy(ValidationStrategy):
 
             # Encode source pairs to get latent actions
             # Use task helper which handles raw pixels -> quantized latents
-            source_latents, source_indices = pl_module.encode_latents(source_frames)  # z_a
+            source_latents, source_indices = pl_module.encode_latents(
+                source_frames
+            )  # z_a
 
             # Get target initial frames
             target_s0 = target_frames[:, :, 0:1]  # s_b (keep dim for concat)
@@ -122,11 +124,13 @@ class LatentTransferStrategy(ValidationStrategy):
         # Use metric_suffix for bucket-specific logging
         metrics[f"val/latent_transfer_mse{metric_suffix}"] = transfer_mse.item()
         metrics[f"val/self_recon_mse{metric_suffix}"] = self_mse.item()
-        metrics[f"val/transfer_ratio{metric_suffix}"] = transfer_mse.item() / (self_mse.item() + 1e-8)
+        metrics[f"val/transfer_ratio{metric_suffix}"] = transfer_mse.item() / (
+            self_mse.item() + 1e-8
+        )
 
         # Log to trainer
         pl_module.log_dict(metrics, sync_dist=True)
-        
+
         # Visualize some transfers
         wandb_logger = self._get_wandb_logger(trainer)
         if wandb_logger is not None:
@@ -143,7 +147,7 @@ class LatentTransferStrategy(ValidationStrategy):
             )
 
         return self.success(produced=int(n), metrics=metrics)
-    
+
     def _visualize_transfers(
         self,
         source_frames: torch.Tensor,
@@ -167,11 +171,11 @@ class LatentTransferStrategy(ValidationStrategy):
         5. D(s_b, z_b): True reconstruction (using target's own latent)
         6. s_b': Target second frame (ground truth)
         """
-        s_a = source_frames[:, :, 0]          # Source first frame
-        s_a_prime = source_frames[:, :, 1]    # Source action result (GT)
-        s_b = target_frames[:, :, 0]          # Target first frame
-        s_b_recon_true = true_recon           # D(s_b, z_b) - true recon
-        s_b_recon_transfer = transferred      # D(s_b, z_a) - transfer recon
+        s_a = source_frames[:, :, 0]  # Source first frame
+        s_a_prime = source_frames[:, :, 1]  # Source action result (GT)
+        s_b = target_frames[:, :, 0]  # Target first frame
+        s_b_recon_true = true_recon  # D(s_b, z_b) - true recon
+        s_b_recon_transfer = transferred  # D(s_b, z_a) - transfer recon
         s_b_prime_true = target_frames[:, :, 1]  # Target GT
 
         num_samples = len(s_a)
@@ -180,55 +184,75 @@ class LatentTransferStrategy(ValidationStrategy):
 
         # Create figure
         # 6 columns of images
-        fig, axes = plt.subplots(num_samples, 6, figsize=(20, 3.5 * num_samples), squeeze=False)
-        
+        fig, axes = plt.subplots(
+            num_samples, 6, figsize=(20, 3.5 * num_samples), squeeze=False
+        )
+
         # Column titles
-        col_titles = ["s_a", "s_a'", "s_b", "D(s_b, z_a)\n(Transfer)", "D(s_b, z_b)\n(Self)", "s_b'"]
-        
+        col_titles = [
+            "s_a",
+            "s_a'",
+            "s_b",
+            "D(s_b, z_a)\n(Transfer)",
+            "D(s_b, z_b)\n(Self)",
+            "s_b'",
+        ]
+
         for i in range(num_samples):
             # Row images (swapped 4 and 5 as requested)
             # 4: Transfer (z_a applied to s_b)
             # 5: Self (z_b applied to s_b)
             imgs = [
-                s_a[i], 
-                s_a_prime[i], 
-                s_b[i], 
-                s_b_recon_transfer[i], 
-                s_b_recon_true[i], 
-                s_b_prime_true[i]
+                s_a[i],
+                s_a_prime[i],
+                s_b[i],
+                s_b_recon_transfer[i],
+                s_b_recon_true[i],
+                s_b_prime_true[i],
             ]
-            
+
             # Prepare token string
             tokens_a = str(source_indices[i].tolist())
             tokens_b = str(target_indices[i].tolist())
-            
-            row_text = f"Row {i}\nDet(a): {tokens_a}\nDet(b): {tokens_b}\nApp(b): {tokens_a}"
-            
+
+            row_text = (
+                f"Row {i}\nDet(a): {tokens_a}\nDet(b): {tokens_b}\nApp(b): {tokens_a}"
+            )
+
             for j, img in enumerate(imgs):
                 ax = axes[i, j]
-                
+
                 # Convert [C, H, W] to [H, W, C] for imshow and clamp
                 img_np = img.permute(1, 2, 0).clamp(0.0, 1.0).numpy()
-                
+
                 ax.imshow(img_np)
-                ax.axis('off')
-                
+                ax.axis("off")
+
                 if i == 0:
                     ax.set_title(col_titles[j], fontsize=12)
-                
+
                 if j == 0:
                     # Add text to the left of the first image of the row
-                    ax.text(-0.2, 0.5, row_text, transform=ax.transAxes, 
-                            va='center', ha='right', fontsize=10, rotation=0, family='monospace')
+                    ax.text(
+                        -0.2,
+                        0.5,
+                        row_text,
+                        transform=ax.transAxes,
+                        va="center",
+                        ha="right",
+                        fontsize=10,
+                        rotation=0,
+                        family="monospace",
+                    )
 
         plt.tight_layout()
-        
+
         # Save to buffer
         buf = io.BytesIO()
-        plt.savefig(buf, format='png', dpi=100, bbox_inches='tight')
+        plt.savefig(buf, format="png", dpi=100, bbox_inches="tight")
         buf.seek(0)
         img = Image.open(buf)
-        
+
         wandb_logger.log_image(
             key=f"val/latent_transfer{metric_suffix}",
             images=[img],
@@ -294,8 +318,12 @@ class CodebookHistogramStrategy(ValidationStrategy):
 
         # Compute metrics with suffix
         used_codes = (counts > 0).sum().item()
-        metrics[f"val/codebook_entry_utilization_val_cache_all{metric_suffix}"] = used_codes / codebook_size
-        metrics[f"val/codebook_usage_entropy_val_cache_all{metric_suffix}"] = compute_entropy(counts.float())
+        metrics[f"val/codebook_entry_utilization_val_cache_all{metric_suffix}"] = (
+            used_codes / codebook_size
+        )
+        metrics[f"val/codebook_usage_entropy_val_cache_all{metric_suffix}"] = (
+            compute_entropy(counts.float())
+        )
 
         # Log to trainer
         pl_module.log_dict(metrics, sync_dist=True)
@@ -303,7 +331,13 @@ class CodebookHistogramStrategy(ValidationStrategy):
         # Create histogram visualization
         wandb_logger = self._get_wandb_logger(trainer)
         if wandb_logger is not None:
-            self._create_histogram(counts, wandb_logger, trainer.global_step, codebook_size, metric_suffix=metric_suffix)
+            self._create_histogram(
+                counts,
+                wandb_logger,
+                trainer.global_step,
+                codebook_size,
+                metric_suffix=metric_suffix,
+            )
 
         return self.success(produced=int(len(all_codes)), metrics=metrics)
 
@@ -320,22 +354,29 @@ class CodebookHistogramStrategy(ValidationStrategy):
             fig, ax = plt.subplots(figsize=(10, 4))
 
             x = range(codebook_size)
-            ax.bar(x, counts.cpu().numpy(), color='steelblue', alpha=0.8)
-            ax.set_xlabel('Codebook Index')
-            ax.set_ylabel('Usage Count')
-            ax.set_title(f'Codebook Usage Distribution (Step {global_step})')
+            ax.bar(x, counts.cpu().numpy(), color="steelblue", alpha=0.8)
+            ax.set_xlabel("Codebook Index")
+            ax.set_ylabel("Usage Count")
+            ax.set_title(f"Codebook Usage Distribution (Step {global_step})")
 
             # Add statistics text
             used = (counts > 0).sum().item()
-            ax.text(0.95, 0.95, f'Used: {used}/{codebook_size}',
-                   transform=ax.transAxes, ha='right', va='top',
-                   fontsize=10, bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
+            ax.text(
+                0.95,
+                0.95,
+                f"Used: {used}/{codebook_size}",
+                transform=ax.transAxes,
+                ha="right",
+                va="top",
+                fontsize=10,
+                bbox=dict(boxstyle="round", facecolor="white", alpha=0.8),
+            )
 
             plt.tight_layout()
 
             # Convert to image
             buf = io.BytesIO()
-            plt.savefig(buf, format='png', dpi=100)
+            plt.savefig(buf, format="png", dpi=100)
             buf.seek(0)
             img = Image.open(buf)
 
@@ -410,16 +451,24 @@ class LatentSequenceHistogramStrategy(ValidationStrategy):
 
         # Calculate entropy of sequence distribution
         counts = torch.tensor(list(counter.values()), dtype=torch.float)
-        metrics[f"val/latent_sequence_entropy_val_cache_all{metric_suffix}"] = compute_entropy(counts)
-        metrics[f"val/latent_sequence_unique_count_val_cache_all{metric_suffix}"] = unique_seqs
-        metrics[f"val/latent_sequence_sample_count_val_cache_all{metric_suffix}"] = total_samples
+        metrics[f"val/latent_sequence_entropy_val_cache_all{metric_suffix}"] = (
+            compute_entropy(counts)
+        )
+        metrics[f"val/latent_sequence_unique_count_val_cache_all{metric_suffix}"] = (
+            unique_seqs
+        )
+        metrics[f"val/latent_sequence_sample_count_val_cache_all{metric_suffix}"] = (
+            total_samples
+        )
 
         pl_module.log_dict(metrics, sync_dist=True)
 
         # Visualize
         wandb_logger = self._get_wandb_logger(trainer)
         if wandb_logger is not None:
-            self._create_histogram(counter, wandb_logger, trainer.global_step, metric_suffix=metric_suffix)
+            self._create_histogram(
+                counter, wandb_logger, trainer.global_step, metric_suffix=metric_suffix
+            )
 
         return self.success(produced=int(len(all_codes)), metrics=metrics)
 
@@ -444,25 +493,27 @@ class LatentSequenceHistogramStrategy(ValidationStrategy):
             fig, ax = plt.subplots(figsize=(12, 6))
 
             x = range(len(values))
-            ax.bar(x, values, color='mediumpurple', alpha=0.8)
+            ax.bar(x, values, color="mediumpurple", alpha=0.8)
             ax.set_xticks(x)
             ax.set_xticklabels(str_labels, rotation=90, fontsize=8)
-            ax.set_xlabel('Token Sequence')
-            ax.set_ylabel('Count')
-            ax.set_title(f'Top {len(values)} Latent Sequences (Step {global_step})')
+            ax.set_xlabel("Token Sequence")
+            ax.set_ylabel("Count")
+            ax.set_title(f"Top {len(values)} Latent Sequences (Step {global_step})")
 
             plt.tight_layout()
 
             # Convert to image
             buf = io.BytesIO()
-            plt.savefig(buf, format='png', dpi=100)
+            plt.savefig(buf, format="png", dpi=100)
             buf.seek(0)
             img = Image.open(buf)
 
             wandb_logger.log_image(
                 key=f"val/sequence_histogram{metric_suffix}",
                 images=[img],
-                caption=[f"Step {global_step}: Distribution of top {len(values)} sequences"],
+                caption=[
+                    f"Step {global_step}: Distribution of top {len(values)} sequences"
+                ],
             )
 
             plt.close(fig)
@@ -548,26 +599,35 @@ class AllSequencesHistogramStrategy(ValidationStrategy):
             fig, ax = plt.subplots(figsize=(12, 6))
 
             x = range(len(counts))
-            ax.bar(x, counts, color='teal', width=1.0, alpha=0.8)
+            ax.bar(x, counts, color="teal", width=1.0, alpha=0.8)
             # Alternatively use plot/fill_between for very dense data
             # ax.plot(x, counts, color='teal')
             # ax.fill_between(x, counts, color='teal', alpha=0.3)
 
-            ax.set_xlabel('Sequence Rank')
-            ax.set_ylabel('Count')
-            ax.set_title(f'Distribution of All {len(counts)} Unique Sequences (Step {global_step})')
-            ax.set_yscale('log') # Log scale helps see the tail
+            ax.set_xlabel("Sequence Rank")
+            ax.set_ylabel("Count")
+            ax.set_title(
+                f"Distribution of All {len(counts)} Unique Sequences (Step {global_step})"
+            )
+            ax.set_yscale("log")  # Log scale helps see the tail
 
             # Add stats
-            ax.text(0.95, 0.95, f'Total Unique: {len(counts)}',
-                   transform=ax.transAxes, ha='right', va='top',
-                   fontsize=10, bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
+            ax.text(
+                0.95,
+                0.95,
+                f"Total Unique: {len(counts)}",
+                transform=ax.transAxes,
+                ha="right",
+                va="top",
+                fontsize=10,
+                bbox=dict(boxstyle="round", facecolor="white", alpha=0.8),
+            )
 
             plt.tight_layout()
 
             # Convert to image
             buf = io.BytesIO()
-            plt.savefig(buf, format='png', dpi=100)
+            plt.savefig(buf, format="png", dpi=100)
             buf.seek(0)
             img = Image.open(buf)
 
@@ -680,13 +740,16 @@ class CodebookEmbeddingStrategy(ValidationStrategy):
         # t-SNE requires at least 2 samples and perplexity < n_samples
         # Skip dimensionality reduction for very small codebooks
         if n_samples < 2:
-            raise ValueError(f"Codebook too small for visualization: {n_samples} entries")
+            raise ValueError(
+                f"Codebook too small for visualization: {n_samples} entries"
+            )
 
         data = codebook
 
         # PCA preprocessing for speed/stability when embedding_dim is large
         if self.pca_components > 0 and embedding_dim > self.pca_components:
             from sklearn.decomposition import PCA
+
             n_components = min(self.pca_components, n_samples - 1, embedding_dim)
             if n_components > 0:
                 pca = PCA(n_components=n_components, random_state=42)
@@ -694,6 +757,7 @@ class CodebookEmbeddingStrategy(ValidationStrategy):
 
         if self.method == "tsne":
             from sklearn.manifold import TSNE
+
             # t-SNE requires perplexity < n_samples and perplexity >= 1
             # For very small codebooks, fall back to PCA if t-SNE can't run
             max_perplexity = max(1, n_samples - 1)
@@ -701,6 +765,7 @@ class CodebookEmbeddingStrategy(ValidationStrategy):
             if effective_perplexity < 5 and n_samples < 10:
                 # t-SNE won't work well, use simple PCA projection
                 from sklearn.decomposition import PCA
+
                 pca = PCA(n_components=2, random_state=42)
                 embeddings_2d = pca.fit_transform(codebook)
             else:
@@ -715,15 +780,19 @@ class CodebookEmbeddingStrategy(ValidationStrategy):
         elif self.method == "umap":
             try:
                 from umap import UMAP
+
                 # UMAP also needs n_neighbors < n_samples
                 n_neighbors = min(15, n_samples - 1)
                 if n_neighbors < 2:
                     # Fall back to PCA
                     from sklearn.decomposition import PCA
+
                     pca = PCA(n_components=2, random_state=42)
                     embeddings_2d = pca.fit_transform(codebook)
                 else:
-                    reducer = UMAP(n_components=2, n_neighbors=n_neighbors, random_state=42)
+                    reducer = UMAP(
+                        n_components=2, n_neighbors=n_neighbors, random_state=42
+                    )
                     embeddings_2d = reducer.fit_transform(data)
             except ImportError:
                 print("Warning: umap-learn not installed, falling back to t-SNE")
@@ -945,7 +1014,8 @@ class SequenceExamplesStrategy(ValidationStrategy):
             # Each grid has shape [C, H, W] after make_grid
             # We'll create a subplot for each sequence
             fig, axes = plt.subplots(
-                n_rows, n_cols,
+                n_rows,
+                n_cols,
                 figsize=(5 * n_cols, 5 * n_rows),
                 squeeze=False,
             )

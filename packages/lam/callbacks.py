@@ -112,7 +112,9 @@ class TrainPreviewBufferCallback(Callback):
         if not isinstance(frames, torch.Tensor) or frames.ndim == 0:
             return
         if metadata_list is None:
-            metadata_list = [self._extract_metadata(batch, i) for i in range(int(frames.shape[0]))]
+            metadata_list = [
+                self._extract_metadata(batch, i) for i in range(int(frames.shape[0]))
+            ]
 
         batch_size = int(frames.shape[0])
         take = min(self.samples_per_batch, batch_size)
@@ -131,7 +133,9 @@ class TrainPreviewBufferCallback(Callback):
         num_samples: int,
     ) -> tuple[Optional[torch.Tensor], Optional[List[Dict[str, Any]]]]:
         if num_samples <= 0:
-            raise ValueError("TrainPreviewBufferCallback.sample(num_samples) expects > 0")
+            raise ValueError(
+                "TrainPreviewBufferCallback.sample(num_samples) expects > 0"
+            )
 
         available = len(self._frames)
         if available == 0:
@@ -261,7 +265,11 @@ class ValidationStrategyCallback(Callback):
                 val = batch[key]
 
                 # Special handling for 'action' and 'initial_state' which get transposed
-                if (key == "action" or key == "initial_state") and isinstance(val, (list, tuple)) and len(val) > 0:
+                if (
+                    (key == "action" or key == "initial_state")
+                    and isinstance(val, (list, tuple))
+                    and len(val) > 0
+                ):
                     if isinstance(val[0], torch.Tensor) and val[0].ndim > 0:
                         dims = [v[i].item() for v in val if i < len(v)]
                         meta[key] = dims
@@ -271,7 +279,9 @@ class ValidationStrategyCallback(Callback):
                     meta[key] = val[i] if i < len(val) else None
                 elif isinstance(val, torch.Tensor):
                     if val.ndim > 0 and i < len(val):
-                        meta[key] = val[i].item() if val[i].ndim == 0 else val[i].tolist()
+                        meta[key] = (
+                            val[i].item() if val[i].ndim == 0 else val[i].tolist()
+                        )
                     elif val.ndim == 0:
                         meta[key] = val.item()
                 else:
@@ -302,7 +312,9 @@ class ValidationStrategyCallback(Callback):
 
         selected_indices = []
         dataset_types = list(by_dataset.keys())
-        samples_per_dataset = max(1, num_samples // len(dataset_types)) if dataset_types else num_samples
+        samples_per_dataset = (
+            max(1, num_samples // len(dataset_types)) if dataset_types else num_samples
+        )
 
         for dtype in dataset_types:
             indices = by_dataset[dtype]
@@ -326,7 +338,9 @@ class ValidationStrategyCallback(Callback):
         if not isinstance(result, dict):
             raise TypeError("Validation strategy must return dict result")
         if "_produced" not in result:
-            raise KeyError("Validation strategy result missing required '_produced' field")
+            raise KeyError(
+                "Validation strategy result missing required '_produced' field"
+            )
         produced = int(result.get("_produced", 0))
         if produced > 0:
             return False, ""
@@ -378,9 +392,9 @@ class ValidationStrategyCallback(Callback):
         # Note: add_sample() internally handles is_full() for frame storage,
         # but always captures codes to history_codes for histogram strategies
         for i, meta in enumerate(metadata_list):
-            frame = frames[i:i+1].detach().cpu()
-            code = codes[i:i+1] if codes is not None else None
-            latent = latents[i:i+1] if latents is not None else None
+            frame = frames[i : i + 1].detach().cpu()
+            code = codes[i : i + 1] if codes is not None else None
+            latent = latents[i : i + 1] if latents is not None else None
 
             # Add to global cache
             self.global_cache.add_sample(frame, meta, code, latent)
@@ -405,9 +419,13 @@ class ValidationStrategyCallback(Callback):
 
         # Select fixed samples for global cache on first validation
         if not self._first_full_validation_done:
-            self._select_diverse_fixed_samples(self.global_cache, self.num_fixed_samples)
+            self._select_diverse_fixed_samples(
+                self.global_cache, self.num_fixed_samples
+            )
             for cache in self.bucket_caches.values():
-                self._select_diverse_fixed_samples(cache, min(4, self.num_fixed_samples))
+                self._select_diverse_fixed_samples(
+                    cache, min(4, self.num_fixed_samples)
+                )
             self._first_full_validation_done = True
 
             # Log cache stats
@@ -436,14 +454,18 @@ class ValidationStrategyCallback(Callback):
                 can_run, reason = strategy.can_run(self.global_cache)
                 if not can_run:
                     skipped += 1
-                    logger.warning("[Stage1Validation] skip %s: %s", strategy.name, reason)
+                    logger.warning(
+                        "[Stage1Validation] skip %s: %s", strategy.name, reason
+                    )
                     continue
                 try:
                     result = strategy.run(self.global_cache, pl_module, trainer)
                     no_output, reason = self._result_is_no_output(result)
                     if no_output:
                         skipped += 1
-                        logger.warning("[Stage1Validation] skip %s: %s", strategy.name, reason)
+                        logger.warning(
+                            "[Stage1Validation] skip %s: %s", strategy.name, reason
+                        )
                     else:
                         ran += 1
                 except Exception as e:
@@ -455,15 +477,24 @@ class ValidationStrategyCallback(Callback):
                 due += 1
                 if bucket_name not in self.bucket_caches:
                     skipped += 1
-                    logger.warning("[Stage1Validation] bucket '%s' not found for %s", bucket_name, strategy.name)
+                    logger.warning(
+                        "[Stage1Validation] bucket '%s' not found for %s",
+                        bucket_name,
+                        strategy.name,
+                    )
                     continue
-                
+
                 cache = self.bucket_caches[bucket_name]
                 can_run, reason = strategy.can_run(cache)
-                
+
                 if not can_run:
                     skipped += 1
-                    logger.warning("[Stage1Validation] skip %s on %s: %s", strategy.name, bucket_name, reason)
+                    logger.warning(
+                        "[Stage1Validation] skip %s on %s: %s",
+                        strategy.name,
+                        bucket_name,
+                        reason,
+                    )
                     continue
 
                 # Always suffix bucket-bound metrics/images with bucket name to avoid
@@ -471,18 +502,27 @@ class ValidationStrategyCallback(Callback):
                 suffix = f"_{bucket_name}"
                 if getattr(cache, "is_holdout", False):
                     suffix += "_holdout"
-                
+
                 try:
-                    result = strategy.run(cache, pl_module, trainer, metric_suffix=suffix)
+                    result = strategy.run(
+                        cache, pl_module, trainer, metric_suffix=suffix
+                    )
                     no_output, reason = self._result_is_no_output(result)
                     if no_output:
                         skipped += 1
-                        logger.warning("[Stage1Validation] skip %s%s: %s", strategy.name, suffix, reason)
+                        logger.warning(
+                            "[Stage1Validation] skip %s%s: %s",
+                            strategy.name,
+                            suffix,
+                            reason,
+                        )
                     else:
                         ran += 1
                 except Exception as e:
                     soft_failed += 1
-                    logger.warning("[Stage1Validation] %s%s failed: %s", strategy.name, suffix, e)
+                    logger.warning(
+                        "[Stage1Validation] %s%s failed: %s", strategy.name, suffix, e
+                    )
 
         logger.info(
             "[Stage1Validation] due=%d ran=%d skipped=%d soft_failed=%d",
@@ -531,10 +571,12 @@ class EMACallback(Callback):
         """Initialize EMA model."""
         # Clone model for EMA
         # Convert OmegaConf to dict if needed
-        model_config = dict(pl_module.model_config) if hasattr(pl_module.model_config, 'items') else pl_module.model_config
-        self.ema_model = type(pl_module.model)(
-            **model_config
-        ).to(pl_module.device)
+        model_config = (
+            dict(pl_module.model_config)
+            if hasattr(pl_module.model_config, "items")
+            else pl_module.model_config
+        )
+        self.ema_model = type(pl_module.model)(**model_config).to(pl_module.device)
         self.ema_model.load_state_dict(pl_module.model.state_dict())
         self.ema_model.eval()
 

@@ -47,7 +47,9 @@ class Stage2ValidationCheck:
         return {"_produced": 0, "_reason": str(reason)}
 
     @staticmethod
-    def success(*, produced: int = 1, metrics: Optional[dict[str, Any]] = None) -> dict[str, Any]:
+    def success(
+        *, produced: int = 1, metrics: Optional[dict[str, Any]] = None
+    ) -> dict[str, Any]:
         out = dict(metrics or {})
         out["_produced"] = max(0, int(produced))
         if out["_produced"] > 0:
@@ -56,7 +58,10 @@ class Stage2ValidationCheck:
 
     def can_run(self, cache: Stage2ValidationCache) -> tuple[bool, str]:
         if cache.sample_count() < self.min_samples:
-            return False, f"Only {cache.sample_count()} samples (need {self.min_samples})"
+            return (
+                False,
+                f"Only {cache.sample_count()} samples (need {self.min_samples})",
+            )
         required = self.required_metadata()
         if not required:
             return True, ""
@@ -70,7 +75,10 @@ class Stage2ValidationCheck:
                 count += 1
 
         if count < self.min_samples:
-            return False, f"Only {count} samples with {required} (need {self.min_samples})"
+            return (
+                False,
+                f"Only {count} samples with {required} (need {self.min_samples})",
+            )
         return True, ""
 
     def run(
@@ -108,7 +116,9 @@ class SamplePanelsCheck(Stage2ValidationCheck):
         self.include_freeform_pred = bool(include_freeform_pred)
         self.freeform_max_new_tokens = int(freeform_max_new_tokens)
 
-    def _choose_records(self, cache: Stage2ValidationCache) -> list[tuple[int, dict[str, Any]]]:
+    def _choose_records(
+        self, cache: Stage2ValidationCache
+    ) -> list[tuple[int, dict[str, Any]]]:
         records = cache.get_records()
         if not records:
             return []
@@ -135,11 +145,19 @@ class SamplePanelsCheck(Stage2ValidationCheck):
             return selected
 
         episode_id = [
-            rec.get("metadata", {}).get("episode_id") if isinstance(rec.get("metadata"), dict) else None
+            (
+                rec.get("metadata", {}).get("episode_id")
+                if isinstance(rec.get("metadata"), dict)
+                else None
+            )
             for rec in records
         ]
         frame_idx = [
-            rec.get("metadata", {}).get("frame_idx") if isinstance(rec.get("metadata"), dict) else None
+            (
+                rec.get("metadata", {}).get("frame_idx")
+                if isinstance(rec.get("metadata"), dict)
+                else None
+            )
             for rec in records
         ]
         instructions = [str(rec.get("instruction", "")) for rec in records]
@@ -225,7 +243,9 @@ class SamplePanelsCheck(Stage2ValidationCheck):
                 frames_batched=torch.stack(frames, dim=0),
             )
         except Exception as e:
-            raise RuntimeError(f"{self.name}: failed to convert frames to images") from e
+            raise RuntimeError(
+                f"{self.name}: failed to convert frames to images"
+            ) from e
         if not images:
             raise RuntimeError(f"{self.name}: no images produced for rendering")
 
@@ -240,9 +260,13 @@ class SamplePanelsCheck(Stage2ValidationCheck):
             policy_model = getattr(pl_module, "policy_model", None)
             if policy_model is not None and hasattr(policy_model, "generate"):
                 try:
-                    instructions = [str(rec.get("instruction", "")) for _, rec in chosen]
+                    instructions = [
+                        str(rec.get("instruction", "")) for _, rec in chosen
+                    ]
                     out = pl_module._predict_freeform_text(  # type: ignore[attr-defined]
-                        frames=torch.stack([rec.get("frame") for _, rec in chosen], dim=0),
+                        frames=torch.stack(
+                            [rec.get("frame") for _, rec in chosen], dim=0
+                        ),
                         instructions=instructions,
                         max_new_tokens=int(self.freeform_max_new_tokens),
                     )
@@ -266,7 +290,11 @@ class SamplePanelsCheck(Stage2ValidationCheck):
             gt_action = rec.get("gt_action")
             pred_action = rec.get("pred_action")
 
-            if mode == "codes" and action_tokens is not None and isinstance(gt_codes, list):
+            if (
+                mode == "codes"
+                and action_tokens is not None
+                and isinstance(gt_codes, list)
+            ):
                 gt_str = action_tokens.format_target(gt_codes)
                 if isinstance(pred_codes, list):
                     try:
@@ -294,10 +322,22 @@ class SamplePanelsCheck(Stage2ValidationCheck):
                 else:
                     pred_str = "action_pred: <MISSING>"
             elif mode == "multitask":
-                latent_gt = _vector_summary(gt_vector) if isinstance(gt_vector, list) else "n/a"
-                latent_pred = _vector_summary(pred_vector) if isinstance(pred_vector, list) else "n/a"
-                action_gt = _vector_summary(gt_action) if isinstance(gt_action, list) else "n/a"
-                action_pred = _vector_summary(pred_action) if isinstance(pred_action, list) else "n/a"
+                latent_gt = (
+                    _vector_summary(gt_vector) if isinstance(gt_vector, list) else "n/a"
+                )
+                latent_pred = (
+                    _vector_summary(pred_vector)
+                    if isinstance(pred_vector, list)
+                    else "n/a"
+                )
+                action_gt = (
+                    _vector_summary(gt_action) if isinstance(gt_action, list) else "n/a"
+                )
+                action_pred = (
+                    _vector_summary(pred_action)
+                    if isinstance(pred_action, list)
+                    else "n/a"
+                )
                 gt_str = f"latent_gt: {latent_gt} action_gt: {action_gt}"
                 pred_str = f"latent_pred: {latent_pred} action_pred: {action_pred}"
                 suffix: list[str] = []
@@ -323,7 +363,11 @@ class SamplePanelsCheck(Stage2ValidationCheck):
             if ds is not None:
                 meta_parts.append(f"dataset: {ds}")
 
-            freeform = freeform_texts[rank] if freeform_texts is not None and rank < len(freeform_texts) else None
+            freeform = (
+                freeform_texts[rank]
+                if freeform_texts is not None and rank < len(freeform_texts)
+                else None
+            )
             panels.append(
                 _render_panel(
                     image=image,
@@ -356,7 +400,9 @@ class SamplePanelsCheck(Stage2ValidationCheck):
             )
 
         prefix = "val_samples" if not metric_suffix else f"val_samples{metric_suffix}"
-        wandb_key = "val/samples" if not metric_suffix else f"val/samples{metric_suffix}"
+        wandb_key = (
+            "val/samples" if not metric_suffix else f"val/samples{metric_suffix}"
+        )
         _save_grid_and_records(
             panels=panels,
             records=records_out,
@@ -403,7 +449,9 @@ class LatentFlowDecodeCheck(Stage2ValidationCheck):
             from lam import load_lam_task_from_checkpoint
 
             try:
-                task = load_lam_task_from_checkpoint(self.lam_checkpoint_path, map_location="cpu", strict=True)
+                task = load_lam_task_from_checkpoint(
+                    self.lam_checkpoint_path, map_location="cpu", strict=True
+                )
             except Exception:
                 self._load_failed = True
                 return None
@@ -421,13 +469,17 @@ class LatentFlowDecodeCheck(Stage2ValidationCheck):
         return self._lam_model
 
     @staticmethod
-    def _vectors_to_actions(vectors_flat: torch.Tensor, *, lam_model: torch.nn.Module) -> torch.Tensor:
+    def _vectors_to_actions(
+        vectors_flat: torch.Tensor, *, lam_model: torch.nn.Module
+    ) -> torch.Tensor:
         bsz = int(vectors_flat.shape[0])
         code_seq_len = int(lam_model.code_seq_len)
         codebook_dim = int(lam_model.vq.codebooks.shape[1])
         expected = code_seq_len * codebook_dim
         if vectors_flat.shape[1] != expected:
-            raise ValueError(f"Unexpected latent vector dim={vectors_flat.shape[1]} (expected {expected})")
+            raise ValueError(
+                f"Unexpected latent vector dim={vectors_flat.shape[1]} (expected {expected})"
+            )
         vec = vectors_flat.reshape(bsz, code_seq_len, codebook_dim)
         act = lam_model.vq.project_out(vec)
         action_h, action_w = lam_model.action_shape
@@ -473,11 +525,19 @@ class LatentFlowDecodeCheck(Stage2ValidationCheck):
             return self.no_output("num_samples_zero")
 
         episode_id = [
-            rec.get("metadata", {}).get("episode_id") if isinstance(rec.get("metadata"), dict) else None
+            (
+                rec.get("metadata", {}).get("episode_id")
+                if isinstance(rec.get("metadata"), dict)
+                else None
+            )
             for rec in applicable
         ]
         frame_idx = [
-            rec.get("metadata", {}).get("frame_idx") if isinstance(rec.get("metadata"), dict) else None
+            (
+                rec.get("metadata", {}).get("frame_idx")
+                if isinstance(rec.get("metadata"), dict)
+                else None
+            )
             for rec in applicable
         ]
         instructions = [str(rec.get("instruction", "")) for rec in applicable]
@@ -498,8 +558,12 @@ class LatentFlowDecodeCheck(Stage2ValidationCheck):
         max_chunk = max(1, self.max_decode_batch_size)
         for start in range(0, len(selected), max_chunk):
             chunk_idx = selected[start : start + max_chunk]
-            frames_chunk = torch.stack([applicable[i]["frame"] for i in chunk_idx], dim=0)
-            frames_chunk = temporal_frames_to_bcthw(frames_chunk.to(pl_module.device), expected_time_steps=2)
+            frames_chunk = torch.stack(
+                [applicable[i]["frame"] for i in chunk_idx], dim=0
+            )
+            frames_chunk = temporal_frames_to_bcthw(
+                frames_chunk.to(pl_module.device), expected_time_steps=2
+            )
 
             try:
                 gt_chunk = torch.tensor(
@@ -528,15 +592,21 @@ class LatentFlowDecodeCheck(Stage2ValidationCheck):
 
             pixel_context = lam_model.decoder_context_projection(first_frame_f)
             h_dec, w_dec = lam_model.patch_height_width
-            attn_bias = lam_model.spatial_rel_pos_bias(h_dec, w_dec, device=pl_module.device)
+            attn_bias = lam_model.spatial_rel_pos_bias(
+                h_dec, w_dec, device=pl_module.device
+            )
             gt_actions = self._vectors_to_actions(gt_chunk, lam_model=lam_model)
             pred_actions = self._vectors_to_actions(pred_chunk, lam_model=lam_model)
 
             gt_flow = lam_model.flow_decoder(pixel_context, gt_actions, attn_bias)
             pred_flow = lam_model.flow_decoder(pixel_context, pred_actions, attn_bias)
-            static_eps = float(getattr(lam_model.flow_config, "summary_static_eps", 1e-6))
+            static_eps = float(
+                getattr(lam_model.flow_config, "summary_static_eps", 1e-6)
+            )
             gt_dx, gt_dy = compute_weighted_mean_flow(gt_flow, static_eps=static_eps)
-            pred_dx, pred_dy = compute_weighted_mean_flow(pred_flow, static_eps=static_eps)
+            pred_dx, pred_dy = compute_weighted_mean_flow(
+                pred_flow, static_eps=static_eps
+            )
 
             gt_flow_rgb = flow_to_image(gt_flow.detach().cpu()).float() / 255.0
             pred_flow_rgb = flow_to_image(pred_flow.detach().cpu()).float() / 255.0
@@ -581,7 +651,9 @@ class LatentFlowDecodeCheck(Stage2ValidationCheck):
                         _label_image(pred_dir_img, "dir_pred"),
                     ]
                 )
-                meta = rec.get("metadata") if isinstance(rec.get("metadata"), dict) else {}
+                meta = (
+                    rec.get("metadata") if isinstance(rec.get("metadata"), dict) else {}
+                )
                 meta_parts: list[str] = []
                 ep = meta.get("episode_id")
                 fi = meta.get("frame_idx")
@@ -607,17 +679,33 @@ class LatentFlowDecodeCheck(Stage2ValidationCheck):
                         "episode_id": ep,
                         "frame_idx": fi,
                         "dataset_name": ds,
-                        "gt_mean_flow": [float(gt_dx[local_i].item()), float(gt_dy[local_i].item())],
-                        "pred_mean_flow": [float(pred_dx[local_i].item()), float(pred_dy[local_i].item())],
-                        "latent_vector_mse": _safe_vector_mse(rec.get("gt_vector"), rec.get("pred_vector")),
+                        "gt_mean_flow": [
+                            float(gt_dx[local_i].item()),
+                            float(gt_dy[local_i].item()),
+                        ],
+                        "pred_mean_flow": [
+                            float(pred_dx[local_i].item()),
+                            float(pred_dy[local_i].item()),
+                        ],
+                        "latent_vector_mse": _safe_vector_mse(
+                            rec.get("gt_vector"), rec.get("pred_vector")
+                        ),
                     }
                 )
 
         if not panels:
             return self.no_output("no_panels_rendered")
 
-        prefix = "val_latent_flow_decode" if not metric_suffix else f"val_latent_flow_decode{metric_suffix}"
-        wandb_key = "val/latent_flow_decode" if not metric_suffix else f"val/latent_flow_decode{metric_suffix}"
+        prefix = (
+            "val_latent_flow_decode"
+            if not metric_suffix
+            else f"val_latent_flow_decode{metric_suffix}"
+        )
+        wandb_key = (
+            "val/latent_flow_decode"
+            if not metric_suffix
+            else f"val/latent_flow_decode{metric_suffix}"
+        )
         _save_grid_and_records(
             panels=panels,
             records=records_out,
@@ -659,7 +747,11 @@ class TokenDistributionCheck(Stage2ValidationCheck):
 
         codes_flat = all_codes.flatten().to(torch.long)
         action_tokens = getattr(pl_module, "action_tokens", None)
-        codebook_size = int(getattr(action_tokens, "codebook_size", 0)) if action_tokens is not None else 0
+        codebook_size = (
+            int(getattr(action_tokens, "codebook_size", 0))
+            if action_tokens is not None
+            else 0
+        )
         if codebook_size <= 0:
             codebook_size = int(torch.max(codes_flat).item()) + 1
 
@@ -671,8 +763,11 @@ class TokenDistributionCheck(Stage2ValidationCheck):
 
         metrics = {
             f"val/token_distribution_entropy{metric_suffix}": self._entropy(counts),
-            f"val/token_distribution_utilization{metric_suffix}": float(used) / float(max(1, codebook_size)),
-            f"val/token_distribution_unique_sequences{metric_suffix}": float(unique_seq_count),
+            f"val/token_distribution_utilization{metric_suffix}": float(used)
+            / float(max(1, codebook_size)),
+            f"val/token_distribution_unique_sequences{metric_suffix}": float(
+                unique_seq_count
+            ),
         }
         pl_module.log_dict(metrics, sync_dist=True)
         return self.success(produced=int(all_codes.shape[0]), metrics=metrics)

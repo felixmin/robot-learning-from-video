@@ -15,9 +15,7 @@ def config_dir():
 class TestExperimentConfigs:
     def test_stage2_local_config(self, config_dir):
         with initialize_config_dir(version_base=None, config_dir=config_dir):
-            cfg = compose(
-                config_name="config", overrides=["experiment=stage2_local"]
-            )
+            cfg = compose(config_name="config", overrides=["experiment=stage2_local"])
 
             assert cfg.experiment.name == "stage2_local"
             assert cfg.model.training_mode == "latent_flow"
@@ -57,7 +55,9 @@ class TestExperimentConfigs:
 
             assert cfg.data.output_format == "stage1"
             assert len(cfg.data.dataset.lerobot.sources) == 25
-            assert cfg.data.dataset.lerobot.sources[5].repo_id == "HuggingFaceVLA/libero"
+            assert (
+                cfg.data.dataset.lerobot.sources[5].repo_id == "HuggingFaceVLA/libero"
+            )
 
     def test_stage2_octo24_libero_data_override(self, config_dir):
         with initialize_config_dir(version_base=None, config_dir=config_dir):
@@ -151,7 +151,9 @@ class TestExperimentConsistency:
             ("stage3_rollout_cluster", "mcml_h100", "osmesa"),
         ],
     )
-    def test_stage3_rollout_experiments_load(self, config_dir, experiment, cluster_name, mujoco_gl):
+    def test_stage3_rollout_experiments_load(
+        self, config_dir, experiment, cluster_name, mujoco_gl
+    ):
         with initialize_config_dir(version_base=None, config_dir=config_dir):
             cfg = compose(config_name="config", overrides=[f"experiment={experiment}"])
 
@@ -162,7 +164,10 @@ class TestExperimentConsistency:
             assert cfg.cluster.name == cluster_name
             assert cfg.lerobot_eval.command is not None
             assert cfg.lerobot_eval.env.MUJOCO_GL == mujoco_gl
-            assert cfg.lerobot_eval.env_task == "libero_spatial,libero_object,libero_goal,libero_10"
+            assert (
+                cfg.lerobot_eval.env_task
+                == "libero_spatial,libero_object,libero_goal,libero_10"
+            )
             assert cfg.lerobot_eval.eval_batch_size == 1
             assert cfg.lerobot_eval.eval_n_episodes == 10
             assert cfg.lerobot_eval.extra_args == ["--env.max_parallel_tasks=1"]
@@ -196,4 +201,6 @@ class TestExperimentConsistency:
             )
 
             assert cfg.lerobot.shell_env.MUJOCO_GL == "osmesa"
-            assert str(cfg.lerobot.shell_env.LIBERO_CONFIG_PATH).endswith("/cache/libero_config")
+            assert str(cfg.lerobot.shell_env.LIBERO_CONFIG_PATH).endswith(
+                "/cache/libero_config"
+            )

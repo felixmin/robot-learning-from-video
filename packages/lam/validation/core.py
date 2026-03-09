@@ -18,6 +18,7 @@ from common.filters import matches_filters
 
 try:
     import wandb
+
     WANDB_AVAILABLE = True
 except ImportError:
     WANDB_AVAILABLE = False
@@ -26,16 +27,18 @@ except ImportError:
 # Essential metadata keys to cache (RAM safety - prevents Bridge metadata bloat)
 # Only these keys are retained when caching samples to buckets
 # Uses standardized keys from the unified batch interface
-ESSENTIAL_METADATA_KEYS = frozenset({
-    "dataset_name",    # Primary source identifier (e.g., "youtube", "bridge", "language_table")
-    "dataset_short",   # Source alias derived from repo_id
-    "action",          # For action scatter strategies (only first 2 dims used)
-    "initial_state",   # For state scatter strategies (only first 2 dims used)
-    "language",        # Task descriptions/instructions
-    "scene_id",        # Scene identifier
-    "environment",     # Environment identifier
-    "task",            # Task identifier
-})
+ESSENTIAL_METADATA_KEYS = frozenset(
+    {
+        "dataset_name",  # Primary source identifier (e.g., "youtube", "bridge", "language_table")
+        "dataset_short",  # Source alias derived from repo_id
+        "action",  # For action scatter strategies (only first 2 dims used)
+        "initial_state",  # For state scatter strategies (only first 2 dims used)
+        "language",  # Task descriptions/instructions
+        "scene_id",  # Scene identifier
+        "environment",  # Environment identifier
+        "task",  # Task identifier
+    }
+)
 
 
 def prune_metadata(metadata: Dict[str, Any]) -> Dict[str, Any]:
@@ -46,6 +49,7 @@ def prune_metadata(metadata: Dict[str, Any]) -> Dict[str, Any]:
 @dataclass
 class BucketConfig:
     """Configuration for a validation data bucket."""
+
     name: str
     filters: Dict[str, Any] = field(default_factory=dict)
     max_samples: int = 100
@@ -67,6 +71,7 @@ class ValidationCache:
     This allows histogram strategies to see the true distribution across all validation
     samples, while keeping frame storage bounded for memory safety.
     """
+
     frames: List[torch.Tensor] = field(default_factory=list)
     latents: List[torch.Tensor] = field(default_factory=list)
     codes: List[torch.Tensor] = field(default_factory=list)
@@ -136,7 +141,9 @@ class ValidationCache:
 
         self.frames.append(frame.cpu() if frame.is_cuda else frame)
         cached_meta = prune_metadata(meta) if prune else meta
-        self.metadata.append([cached_meta])  # Always store as list for consistency with add_batch
+        self.metadata.append(
+            [cached_meta]
+        )  # Always store as list for consistency with add_batch
         self._sample_count += 1
 
         if code is not None:
@@ -172,7 +179,9 @@ class ValidationCache:
 
         n_to_add = min(frames.shape[0], remaining)
 
-        self.frames.append(frames[:n_to_add].cpu() if frames.is_cuda else frames[:n_to_add])
+        self.frames.append(
+            frames[:n_to_add].cpu() if frames.is_cuda else frames[:n_to_add]
+        )
         if prune:
             cached_metadata = [prune_metadata(m) for m in metadata_list[:n_to_add]]
         else:
@@ -181,9 +190,13 @@ class ValidationCache:
         self._sample_count += n_to_add
 
         if codes is not None:
-            self.codes.append(codes[:n_to_add].cpu() if codes.is_cuda else codes[:n_to_add])
+            self.codes.append(
+                codes[:n_to_add].cpu() if codes.is_cuda else codes[:n_to_add]
+            )
         if latents is not None:
-            self.latents.append(latents[:n_to_add].cpu() if latents.is_cuda else latents[:n_to_add])
+            self.latents.append(
+                latents[:n_to_add].cpu() if latents.is_cuda else latents[:n_to_add]
+            )
 
     def sample_count(self) -> int:
         """Return current number of samples in cache."""
@@ -364,7 +377,9 @@ class ValidationStrategy(ABC):
         return {"_produced": 0, "_reason": str(reason)}
 
     @staticmethod
-    def success(*, produced: int = 1, metrics: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def success(
+        *, produced: int = 1, metrics: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """Return structured success result for callback-level accounting."""
         out = dict(metrics or {})
         out["_produced"] = max(0, int(produced))
@@ -389,7 +404,10 @@ class ValidationStrategy(ABC):
         if required:
             count_with_meta = cache.count_samples_with_metadata(required)
             if count_with_meta < self.min_samples:
-                return False, f"Only {count_with_meta} samples with {required} (need {self.min_samples})"
+                return (
+                    False,
+                    f"Only {count_with_meta} samples with {required} (need {self.min_samples})",
+                )
 
         return True, ""
 

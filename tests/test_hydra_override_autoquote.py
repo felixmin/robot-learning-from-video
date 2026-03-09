@@ -4,7 +4,9 @@ from common.hydra_overrides import autoquote_override_value, normalize_overrides
 
 
 def test_autoquote_override_value_no_change_without_equals():
-    assert autoquote_override_value("experiment=stage2_local") == "experiment=stage2_local"
+    assert (
+        autoquote_override_value("experiment=stage2_local") == "experiment=stage2_local"
+    )
     assert autoquote_override_value("seed=123") == "seed=123"
 
 

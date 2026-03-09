@@ -53,7 +53,14 @@ def matches_filters(
         if isinstance(condition, (list, tuple)) and len(condition) == 2:
             first_elem = condition[0]
             if isinstance(first_elem, str) and first_elem in (
-                ">", ">=", "<", "<=", "!=", "==", "in", "not_null"
+                ">",
+                ">=",
+                "<",
+                "<=",
+                "!=",
+                "==",
+                "in",
+                "not_null",
             ):
                 op, target = condition
                 if not _apply_operator(op, value, target):

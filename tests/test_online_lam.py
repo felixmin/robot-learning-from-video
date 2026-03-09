@@ -56,7 +56,9 @@ class _FakeEncoderVQ(torch.nn.Module):
     @torch.no_grad()
     def codes_from_video(self, video: torch.Tensor) -> torch.Tensor:
         batch_size = int(video.shape[0])
-        return torch.tensor([[0, 2]] * batch_size, dtype=torch.long, device=video.device)
+        return torch.tensor(
+            [[0, 2]] * batch_size, dtype=torch.long, device=video.device
+        )
 
     @torch.no_grad()
     def vectors_from_codes(self, codes: torch.Tensor) -> torch.Tensor:

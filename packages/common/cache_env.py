@@ -46,7 +46,14 @@ def configure_cache_env(*, cache_dir: Path, logger: Any | None = None) -> None:
     tfds_dir = cache_dir / "tfds"
     wandb_cache = cache_dir / "wandb_cache"
 
-    for p in (hf_hub_cache, hf_datasets_cache, hf_lerobot_home, torch_home, tfds_dir, wandb_cache):
+    for p in (
+        hf_hub_cache,
+        hf_datasets_cache,
+        hf_lerobot_home,
+        torch_home,
+        tfds_dir,
+        wandb_cache,
+    ):
         p.mkdir(parents=True, exist_ok=True)
 
     os.environ.setdefault("HF_HUB_CACHE", str(hf_hub_cache))
@@ -72,7 +79,12 @@ def configure_cache_env(*, cache_dir: Path, logger: Any | None = None) -> None:
 def hf_download_help_message(*, exc: BaseException) -> str | None:
     msg = str(exc)
     lowered = msg.lower()
-    if "401" in msg or "unauthorized" in lowered or "forbidden" in lowered or "gated" in lowered:
+    if (
+        "401" in msg
+        or "unauthorized" in lowered
+        or "forbidden" in lowered
+        or "gated" in lowered
+    ):
         return (
             "Hugging Face download/auth may have failed (gated repo or missing token).\n"
             "- Run `huggingface-cli login` once on this machine.\n"

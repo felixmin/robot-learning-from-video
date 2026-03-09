@@ -42,7 +42,9 @@ def _extract_configs_from_checkpoint(checkpoint: dict[str, Any]) -> tuple[Any, A
     if isinstance(training_config, dict):
         training_config = OmegaConf.create(training_config)
     if model_config is None or training_config is None:
-        raise KeyError("Checkpoint hyper_parameters missing model_config or training_config")
+        raise KeyError(
+            "Checkpoint hyper_parameters missing model_config or training_config"
+        )
     return model_config, training_config
 
 
@@ -53,7 +55,9 @@ def _extract_model_state_dict(checkpoint: dict[str, Any]) -> dict[str, Any]:
     return state_dict
 
 
-def _build_lam_model_from_configs(*, model_config: Any, training_config: Any) -> LatentActionQuantization:
+def _build_lam_model_from_configs(
+    *, model_config: Any, training_config: Any
+) -> LatentActionQuantization:
     flow_cfg = model_config.flow
     flow_enabled = bool(flow_cfg.enabled)
     flow_config = None
@@ -112,7 +116,9 @@ def _build_lam_model_from_configs(*, model_config: Any, training_config: Any) ->
         use_dinov3_encoder=model_config.use_dinov3_encoder,
         dinov3_model_name=model_config.dinov3_model_name,
         dinov3_pool_to_grid=model_config.dinov3_pool_to_grid,
-        metrics_num_unique_codes_every_n_steps=int(metrics_cfg.num_unique_codes_every_n_steps),
+        metrics_num_unique_codes_every_n_steps=int(
+            metrics_cfg.num_unique_codes_every_n_steps
+        ),
         dino_config=dino_config,
         use_dino_decoder=dino_enabled,
         use_pixel_decoder=model_config.use_pixel_decoder,
@@ -177,19 +183,24 @@ def load_lam_model_weights_only(
         load_kwargs["weights_only"] = False
 
     checkpoint = torch.load(str(checkpoint_path), **load_kwargs)
-    state_dict = checkpoint.get("state_dict", checkpoint) if isinstance(checkpoint, dict) else checkpoint
+    state_dict = (
+        checkpoint.get("state_dict", checkpoint)
+        if isinstance(checkpoint, dict)
+        else checkpoint
+    )
 
     if not isinstance(state_dict, dict):
         raise TypeError(f"Expected state_dict dict, got {type(state_dict)}")
 
     if drop_optimizer_keys:
         state_dict = {
-            k: v for k, v in state_dict.items()
+            k: v
+            for k, v in state_dict.items()
             if not k.startswith(("optimizer", "lr_scheduler"))
         }
     if strip_model_prefix:
         state_dict = {
-            k[len("model."):] if k.startswith("model.") else k: v
+            k[len("model.") :] if k.startswith("model.") else k: v
             for k, v in state_dict.items()
         }
 
@@ -212,10 +223,12 @@ def load_lam_encoder_vq_inference_from_checkpoint(
     """
     checkpoint = _load_checkpoint_dict(checkpoint_path, map_location=map_location)
     model_config, training_config = _extract_configs_from_checkpoint(checkpoint)
-    model = _build_lam_model_from_configs(model_config=model_config, training_config=training_config)
+    model = _build_lam_model_from_configs(
+        model_config=model_config, training_config=training_config
+    )
     state_dict = _extract_model_state_dict(checkpoint)
     model_state = {
-        k[len("model."):] if k.startswith("model.") else k: v
+        k[len("model.") :] if k.startswith("model.") else k: v
         for k, v in state_dict.items()
     }
     missing, unexpected = model.load_state_dict(model_state, strict=strict)

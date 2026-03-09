@@ -59,7 +59,7 @@ class TestValidationCache:
         cache.clear()
         assert len(cache.frames) == 0
         assert len(cache.latents) == 0
-    
+
     def test_cache_metadata(self):
         """Test metadata storage and retrieval."""
         cache = ValidationCache()
@@ -82,12 +82,14 @@ class TestValidationCache:
         # Add frames with metadata using standardized keys
         frames = torch.randn(4, 3, 2, 64, 64)
         cache.frames.append(frames)
-        cache.metadata.append([
-            {"dataset_name": "youtube"},
-            {"dataset_name": "bridge"},
-            {"dataset_name": "youtube"},
-            {"dataset_name": "bridge"},
-        ])
+        cache.metadata.append(
+            [
+                {"dataset_name": "youtube"},
+                {"dataset_name": "bridge"},
+                {"dataset_name": "youtube"},
+                {"dataset_name": "bridge"},
+            ]
+        )
 
         youtube_frames = cache.get_frames_by_dataset_name("youtube")
         bridge_frames = cache.get_frames_by_dataset_name("bridge")
@@ -146,8 +148,16 @@ class TestCreateValidationStrategies:
         """Test creating all strategy types."""
         config = {
             "basic": {"type": "basic", "enabled": True},
-            "latent_transfer": {"type": "latent_transfer", "enabled": True, "every_n_validations": 5},
-            "sequence_examples": {"type": "sequence_examples", "enabled": True, "every_n_validations": 3},
+            "latent_transfer": {
+                "type": "latent_transfer",
+                "enabled": True,
+                "every_n_validations": 5,
+            },
+            "sequence_examples": {
+                "type": "sequence_examples",
+                "enabled": True,
+                "every_n_validations": 3,
+            },
         }
         strategies = create_validation_strategies(config)
 
@@ -228,7 +238,9 @@ class TestBasicVisualizationStrategy:
 
         strategy.run(cache, pl_module, trainer)
 
-        logged_keys = [call.kwargs["key"] for call in wandb_logger.log_image.call_args_list]
+        logged_keys = [
+            call.kwargs["key"] for call in wandb_logger.log_image.call_args_list
+        ]
         assert "train/fixed_reconstructions" in logged_keys
         assert "train/random_reconstructions" in logged_keys
 
@@ -521,7 +533,10 @@ class TestSequenceExamplesStrategy:
         strategy.run(cache, pl_module, trainer, metric_suffix="_bridge_holdout")
 
         strategy._visualize_sequences.assert_called_once()
-        assert strategy._visualize_sequences.call_args.kwargs["metric_suffix"] == "_bridge_holdout"
+        assert (
+            strategy._visualize_sequences.call_args.kwargs["metric_suffix"]
+            == "_bridge_holdout"
+        )
 
 
 class TestAllSequencesHistogramStrategy:
@@ -544,7 +559,9 @@ class TestAllSequencesHistogramStrategy:
         strategy.run(cache, pl_module, trainer, metric_suffix="_bridge_holdout")
 
         strategy._create_plot.assert_called_once()
-        assert strategy._create_plot.call_args.kwargs["metric_suffix"] == "_bridge_holdout"
+        assert (
+            strategy._create_plot.call_args.kwargs["metric_suffix"] == "_bridge_holdout"
+        )
 
 
 class TestValidationStrategyCallbackAccounting:
@@ -821,9 +838,13 @@ class TestCompositionPattern:
 
 class TestStage1BatchValidationSupport:
     def test_train_preview_buffer_accepts_stage1_batch(self):
-        cb = TrainPreviewBufferCallback(enabled=True, max_samples=8, samples_per_batch=2)
+        cb = TrainPreviewBufferCallback(
+            enabled=True, max_samples=8, samples_per_batch=2
+        )
         batch = Stage1Batch(
-            image_streams={"primary": torch.randint(0, 255, (3, 2, 3, 8, 8), dtype=torch.uint8)},
+            image_streams={
+                "primary": torch.randint(0, 255, (3, 2, 3, 8, 8), dtype=torch.uint8)
+            },
             task_text=["pick", "place", "push"],
             meta={"dataset_name": ["a", "b", "c"], "frame_idx": [1, 2, 3]},
         )
@@ -837,7 +858,9 @@ class TestStage1BatchValidationSupport:
         assert all("dataset_name" in meta for meta in metadata)
 
     def test_validation_callback_accepts_stage1_batch(self):
-        cb = ValidationStrategyCallback(strategies=[], bucket_configs=None, num_fixed_samples=2)
+        cb = ValidationStrategyCallback(
+            strategies=[], bucket_configs=None, num_fixed_samples=2
+        )
         batch = Stage1Batch(
             image_streams={"primary": torch.randn(2, 2, 3, 8, 8)},
             task_text=["pick", "place"],

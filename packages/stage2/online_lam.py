@@ -42,7 +42,9 @@ class LatentCodeProvider(Protocol):
     def vectors_from_codes(self, codes: torch.Tensor) -> torch.Tensor:
         """Return codebook vectors [B, code_seq_len, codebook_dim] for LAM code ids."""
 
-    def codes_and_vectors_from_video(self, video: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    def codes_and_vectors_from_video(
+        self, video: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         """Return (code ids, codebook vectors)."""
 
 
@@ -81,6 +83,7 @@ class LAMTaskCodeProvider(torch.nn.Module):
         return self._encoder_vq.vectors_from_codes(codes)
 
     @torch.no_grad()
-    def codes_and_vectors_from_video(self, video: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    def codes_and_vectors_from_video(
+        self, video: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         return self._encoder_vq.codes_and_vectors_from_video(video)
-

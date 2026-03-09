@@ -33,38 +33,53 @@ class FlowConfig:
 
     All fields are required when flow supervision is enabled.
     """
+
     model: FlowModelType
     loss_weight: float
     decoder_depth: int
     warmup_steps: int = 0  # Steps to linearly ramp up flow loss (0 = no warmup)
     # RAFT teacher performance knobs
     teacher_num_flow_updates: int = 12  # RAFT refinement iterations (smaller = faster)
-    teacher_chunk_size: int = 64  # Teacher batch chunking (larger = faster, more memory)
+    teacher_chunk_size: int = (
+        64  # Teacher batch chunking (larger = faster, more memory)
+    )
     # Optional global flow-summary auxiliary loss (off by default)
     summary_loss_weight: float = 0.0
     summary_static_eps: float = 1e-6
 
     def __post_init__(self):
         if self.model not in ("raft_small", "raft_large"):
-            raise ValueError(f"flow.model must be 'raft_small' or 'raft_large', got '{self.model}'")
+            raise ValueError(
+                f"flow.model must be 'raft_small' or 'raft_large', got '{self.model}'"
+            )
         if self.loss_weight <= 0:
-            raise ValueError(f"flow.loss_weight must be positive, got {self.loss_weight}")
+            raise ValueError(
+                f"flow.loss_weight must be positive, got {self.loss_weight}"
+            )
         if self.decoder_depth <= 0:
-            raise ValueError(f"flow.decoder_depth must be positive, got {self.decoder_depth}")
+            raise ValueError(
+                f"flow.decoder_depth must be positive, got {self.decoder_depth}"
+            )
         if self.warmup_steps < 0:
-            raise ValueError(f"flow.warmup_steps must be non-negative, got {self.warmup_steps}")
+            raise ValueError(
+                f"flow.warmup_steps must be non-negative, got {self.warmup_steps}"
+            )
         if self.teacher_num_flow_updates <= 0:
             raise ValueError(
                 f"flow.teacher_num_flow_updates must be positive, got {self.teacher_num_flow_updates}"
             )
         if self.teacher_chunk_size <= 0:
-            raise ValueError(f"flow.teacher_chunk_size must be positive, got {self.teacher_chunk_size}")
+            raise ValueError(
+                f"flow.teacher_chunk_size must be positive, got {self.teacher_chunk_size}"
+            )
         if self.summary_loss_weight < 0:
             raise ValueError(
                 f"flow.summary_loss_weight must be non-negative, got {self.summary_loss_weight}"
             )
         if self.summary_static_eps <= 0:
-            raise ValueError(f"flow.summary_static_eps must be positive, got {self.summary_static_eps}")
+            raise ValueError(
+                f"flow.summary_static_eps must be positive, got {self.summary_static_eps}"
+            )
 
     def get_weight(self, step: int) -> float:
         """Get effective loss weight at given training step.
@@ -109,8 +124,10 @@ class RAFTTeacher(nn.Module):
         model = self.__dict__.get("_model", None)
         if model is None:
             from torchvision.models.optical_flow import (
-                raft_small, raft_large,
-                Raft_Small_Weights, Raft_Large_Weights,
+                raft_small,
+                raft_large,
+                Raft_Small_Weights,
+                Raft_Large_Weights,
             )
 
             if self._model_name == "raft_small":
@@ -183,12 +200,20 @@ class RAFTTeacher(nn.Module):
                 # Normalize like torchvision.transforms._presets.OpticalFlow:
                 # - Ensure float32
                 # - map [0, 1] -> [-1, 1]
-                img1_t = img1_chunk.to(dtype=torch.float32).mul(2.0).sub(1.0).contiguous()
-                img2_t = img2_chunk.to(dtype=torch.float32).mul(2.0).sub(1.0).contiguous()
+                img1_t = (
+                    img1_chunk.to(dtype=torch.float32).mul(2.0).sub(1.0).contiguous()
+                )
+                img2_t = (
+                    img2_chunk.to(dtype=torch.float32).mul(2.0).sub(1.0).contiguous()
+                )
 
                 # RAFT returns list of flow predictions at different refinement levels
                 # Take the last (most refined) prediction
-                updates = self._num_flow_updates if num_flow_updates is None else num_flow_updates
+                updates = (
+                    self._num_flow_updates
+                    if num_flow_updates is None
+                    else num_flow_updates
+                )
                 flow_predictions = model(img1_t, img2_t, num_flow_updates=updates)
                 flow_chunks.append(flow_predictions[-1].float())
 
@@ -268,9 +293,8 @@ class FlowDecoder(nn.Module):
         self.to_flow = nn.Sequential(
             nn.Linear(dim, 2 * patch_h * patch_w),
             Rearrange(
-                'b 1 h w (c p1 p2) -> b c 1 (h p1) (w p2)',
-                p1=patch_h, p2=patch_w, c=2
-            )
+                "b 1 h w (c p1 p2) -> b c 1 (h p1) (w p2)", p1=patch_h, p2=patch_w, c=2
+            ),
         )
 
     def forward(
@@ -296,8 +320,8 @@ class FlowDecoder(nn.Module):
         video_shape = tuple(context_tokens.shape[:-1])
 
         # Flatten for transformer
-        context_flat = rearrange(context_tokens, 'b t h w d -> (b t) (h w) d')
-        action_flat = rearrange(action_tokens, 'b t h w d -> (b t) (h w) d')
+        context_flat = rearrange(context_tokens, "b t h w d -> (b t) (h w) d")
+        action_flat = rearrange(action_tokens, "b t h w d -> (b t) (h w) d")
 
         # Run transformer with cross-attention
         out = self.transformer(
@@ -308,7 +332,7 @@ class FlowDecoder(nn.Module):
         )
 
         # Reshape and project to flow
-        out = rearrange(out, '(b t) (h w) d -> b t h w d', b=b, h=h, w=w)
+        out = rearrange(out, "(b t) (h w) d -> b t h w d", b=b, h=h, w=w)
         pred_flow = self.to_flow(out).squeeze(2)  # [B, 2, H, W]
 
         return pred_flow
@@ -402,7 +426,9 @@ def compute_flow_summary_loss(
         normalize=normalize,
     )
 
-    pred_mean_dx, pred_mean_dy = compute_weighted_mean_flow(pred_flow, static_eps=static_eps)
+    pred_mean_dx, pred_mean_dy = compute_weighted_mean_flow(
+        pred_flow, static_eps=static_eps
+    )
     gt_mean_dx, gt_mean_dy = compute_weighted_mean_flow(gt_flow, static_eps=static_eps)
 
     pred_mean = torch.stack((pred_mean_dx, pred_mean_dy), dim=1)

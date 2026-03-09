@@ -31,4 +31,3 @@ def test_progress_logger_callback_prints_val_metrics(capsys):
     out = capsys.readouterr().out
     assert "[Validation]" in out
     assert "val/loss=" in out
-

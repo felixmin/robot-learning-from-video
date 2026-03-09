@@ -13,7 +13,14 @@ from stage2.policy_inputs import ChatConfig
 
 
 class FakeTokenizer:
-    def __call__(self, texts, return_tensors: str, padding: str, truncation: bool, max_length: int):
+    def __call__(
+        self,
+        texts,
+        return_tensors: str,
+        padding: str,
+        truncation: bool,
+        max_length: int,
+    ):
         assert return_tensors == "pt"
         assert truncation is True
         bsize = len(texts)
@@ -66,7 +73,11 @@ class FakeSmolModel(torch.nn.Module):
     def embed_image(self, image: torch.Tensor) -> torch.Tensor:
         # image: [B, C, H, W] -> two visual tokens
         bsize = int(image.shape[0])
-        pooled = image.mean(dim=(2, 3)).transpose(1, 2) if image.ndim == 5 else image.mean(dim=(2, 3))
+        pooled = (
+            image.mean(dim=(2, 3)).transpose(1, 2)
+            if image.ndim == 5
+            else image.mean(dim=(2, 3))
+        )
         pooled = pooled.to(torch.float32)
         token = self.image_proj(pooled)
         return token[:, None, :].expand(bsize, 2, -1)
@@ -100,7 +111,9 @@ class FakeSmolModel(torch.nn.Module):
         if suffix is not None:
             suffix_out = self.suffix_proj(suffix)
             if ctx is not None:
-                suffix_out = suffix_out + self.prefix_to_suffix(ctx).to(dtype=suffix_out.dtype)
+                suffix_out = suffix_out + self.prefix_to_suffix(ctx).to(
+                    dtype=suffix_out.dtype
+                )
 
         return [prefix_out, suffix_out], cache
 
@@ -132,7 +145,9 @@ def _make_backend() -> SmolVLASharedBackend:
 def _make_batch() -> Stage2Batch:
     return Stage2Batch(
         image_streams={
-            "observation.images.rgb": torch.randint(0, 256, (2, 2, 16, 16, 3), dtype=torch.uint8),
+            "observation.images.rgb": torch.randint(
+                0, 256, (2, 2, 16, 16, 3), dtype=torch.uint8
+            ),
         },
         image_padding_masks={
             "observation.images.rgb": torch.ones((2, 2), dtype=torch.bool),
@@ -202,8 +217,14 @@ def test_action_flow_loss_mean_uses_global_masked_mean() -> None:
     mask[0, 1:] = True  # sample 0: only 1 valid step; sample 1: all 50 valid steps
 
     batch = Stage2Batch(
-        image_streams={"observation.images.rgb": torch.randint(0, 256, (b, 2, 16, 16, 3), dtype=torch.uint8)},
-        image_padding_masks={"observation.images.rgb": torch.ones((b, 2), dtype=torch.bool)},
+        image_streams={
+            "observation.images.rgb": torch.randint(
+                0, 256, (b, 2, 16, 16, 3), dtype=torch.uint8
+            )
+        },
+        image_padding_masks={
+            "observation.images.rgb": torch.ones((b, 2), dtype=torch.bool)
+        },
         task_text=["pick", "place"],
         state=torch.randn(b, 2),
         action_is_pad=mask,

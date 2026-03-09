@@ -30,7 +30,9 @@ class WeightedLeRobotTokenSampler(torch.utils.data.Sampler[SampleToken]):
         resample_each_epoch: bool,
     ) -> None:
         self.compiled_sources = compiled_sources
-        self.source_weights = normalize_weights(np.asarray(source_weights, dtype=np.float64))
+        self.source_weights = normalize_weights(
+            np.asarray(source_weights, dtype=np.float64)
+        )
         if len(compiled_sources) != int(self.source_weights.shape[0]):
             raise ValueError("compiled_sources and source_weights length mismatch")
         self.num_samples = int(num_samples)
@@ -53,8 +55,12 @@ class WeightedLeRobotTokenSampler(torch.utils.data.Sampler[SampleToken]):
         for source in self.compiled_sources:
             sampleable = np.asarray(source.sampleable_episode_ids, dtype=np.int32)
             if sampleable.size == 0:
-                raise ValueError(f"Source {source.repo_id!r} has no sampleable episodes")
-            order = np.asarray(sampleable[rng.permutation(sampleable.size)], dtype=np.int32)
+                raise ValueError(
+                    f"Source {source.repo_id!r} has no sampleable episodes"
+                )
+            order = np.asarray(
+                sampleable[rng.permutation(sampleable.size)], dtype=np.int32
+            )
             episode_row_by_id = {
                 int(ep_id): idx
                 for idx, ep_id in enumerate(source.episodes.episode_index.tolist())
@@ -76,7 +82,9 @@ class WeightedLeRobotTokenSampler(torch.utils.data.Sampler[SampleToken]):
         rng: np.random.Generator,
     ) -> int:
         if state.pointer >= int(state.order.shape[0]):
-            state.order = np.asarray(state.order[rng.permutation(state.order.shape[0])], dtype=np.int32)
+            state.order = np.asarray(
+                state.order[rng.permutation(state.order.shape[0])], dtype=np.int32
+            )
             state.pointer = 0
         episode_id = int(state.order[state.pointer])
         state.pointer += 1
@@ -99,14 +107,18 @@ class WeightedLeRobotTokenSampler(torch.utils.data.Sampler[SampleToken]):
                 f"Episode {episode_id} of source {source.repo_id!r} has no valid anchors: [{start}, {end})"
             )
         anchor = int(rng.integers(start, end))
-        return SampleToken(source_id=source_id, episode_id=episode_id, anchor_abs_index=anchor)
+        return SampleToken(
+            source_id=source_id, episode_id=episode_id, anchor_abs_index=anchor
+        )
 
     def _build_epoch_plan(self, total_samples: int) -> list[SampleToken]:
         rng = self._rng()
         source_states = self._build_source_states(rng)
         plan: list[SampleToken] = []
         for _ in range(int(total_samples)):
-            source_id = int(rng.choice(len(self.compiled_sources), p=self.source_weights))
+            source_id = int(
+                rng.choice(len(self.compiled_sources), p=self.source_weights)
+            )
             token = self._sample_token_from_source(
                 source_id=source_id,
                 state=source_states[source_id],

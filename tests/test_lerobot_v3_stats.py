@@ -20,8 +20,12 @@ def test_merge_weighted_stats_returns_single_source_stats_unchanged() -> None:
 
 
 def test_merge_weighted_stats_respects_source_weights_for_mean_and_std() -> None:
-    stats_a = make_test_source_stats(action_mean=[0.0], action_std=[1.0], action_min=[-2.0], action_max=[2.0])
-    stats_b = make_test_source_stats(action_mean=[10.0], action_std=[1.0], action_min=[8.0], action_max=[12.0])
+    stats_a = make_test_source_stats(
+        action_mean=[0.0], action_std=[1.0], action_min=[-2.0], action_max=[2.0]
+    )
+    stats_b = make_test_source_stats(
+        action_mean=[10.0], action_std=[1.0], action_min=[8.0], action_max=[12.0]
+    )
 
     out = merge_weighted_stats(
         [stats_a, stats_b],
@@ -33,8 +37,12 @@ def test_merge_weighted_stats_respects_source_weights_for_mean_and_std() -> None
 
 
 def test_merge_weighted_stats_keeps_global_min_and_max() -> None:
-    stats_a = make_test_source_stats(action_mean=[0.0], action_std=[1.0], action_min=[-5.0], action_max=[1.0])
-    stats_b = make_test_source_stats(action_mean=[1.0], action_std=[2.0], action_min=[-2.0], action_max=[9.0])
+    stats_a = make_test_source_stats(
+        action_mean=[0.0], action_std=[1.0], action_min=[-5.0], action_max=[1.0]
+    )
+    stats_b = make_test_source_stats(
+        action_mean=[1.0], action_std=[2.0], action_min=[-2.0], action_max=[9.0]
+    )
 
     out = merge_weighted_stats(
         [stats_a, stats_b],
@@ -45,9 +53,15 @@ def test_merge_weighted_stats_keeps_global_min_and_max() -> None:
     assert np.allclose(out["action"]["max"], np.asarray([9.0]))
 
 
-def test_merge_weighted_stats_matches_lerobot_aggregate_stats_for_equal_weights_and_counts() -> None:
-    stats_a = make_test_source_stats(action_mean=[0.0], action_std=[1.0], action_count=100)
-    stats_b = make_test_source_stats(action_mean=[10.0], action_std=[3.0], action_count=100)
+def test_merge_weighted_stats_matches_lerobot_aggregate_stats_for_equal_weights_and_counts() -> (
+    None
+):
+    stats_a = make_test_source_stats(
+        action_mean=[0.0], action_std=[1.0], action_count=100
+    )
+    stats_b = make_test_source_stats(
+        action_mean=[10.0], action_std=[3.0], action_count=100
+    )
 
     expected = aggregate_stats([stats_a, stats_b])
     out = merge_weighted_stats(
@@ -82,8 +96,12 @@ def test_build_run_normalization_stats_uses_selected_sources_only() -> None:
 
 
 def test_merge_weighted_stats_handles_sources_with_different_feature_dims() -> None:
-    stats_a = make_test_source_stats(action_mean=[0.0, 2.0], action_std=[1.0, 3.0], action_count=100)
-    stats_b = make_test_source_stats(action_mean=[10.0, 20.0, 30.0], action_std=[2.0, 4.0, 6.0], action_count=100)
+    stats_a = make_test_source_stats(
+        action_mean=[0.0, 2.0], action_std=[1.0, 3.0], action_count=100
+    )
+    stats_b = make_test_source_stats(
+        action_mean=[10.0, 20.0, 30.0], action_std=[2.0, 4.0, 6.0], action_count=100
+    )
 
     out = merge_weighted_stats(
         [stats_a, stats_b],
@@ -111,6 +129,10 @@ def test_build_run_normalization_stats_rejects_unsupported_weights_mode() -> Non
 
     with pytest.raises(NotImplementedError):
         build_run_normalization_stats(
-            sources=[_Source(make_test_source_stats(action_mean=[0.0], action_std=[1.0]), 1.0)],
+            sources=[
+                _Source(
+                    make_test_source_stats(action_mean=[0.0], action_std=[1.0]), 1.0
+                )
+            ],
             weights_mode="size_balanced",
         )

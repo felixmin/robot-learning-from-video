@@ -13,40 +13,40 @@ from lam.models.latent_action_quantization import DinoConfig, LatentActionQuanti
 def lam_model_config(device):
     """Small LAM configuration for fast testing."""
     return {
-        'dim': 256,
-        'quant_dim': 16,
-        'codebook_size': 8,
-        'image_size': 256,
-        'patch_size': 32,
-        'spatial_depth': 2,
-        'temporal_depth': 2,
-        'dim_head': 32,
-        'heads': 4,
-        'code_seq_len': 4,
-        'channels': 3,
-        'attn_dropout': 0.0,
-        'ff_dropout': 0.0,
-        'vq_discarding_threshold': 0.1,
-        'vq_discarding_threshold_schedule': None,
-        'latent_ablation': 'none',
-        'use_dinov3_encoder': False,
-        'dinov3_model_name': "facebook/dinov3-vits16-pretrain-lvd1689m",
-        'dinov3_pool_to_grid': None,
-        'dino_config': DinoConfig(loss_weight=1.0, warmup_steps=0),
-        'use_dino_decoder': True,
-        'use_pixel_decoder': False,
-        'use_aux_decoder': True,
-        'flow_config': None,
-        'codebook_replace_schedule': [(10, 100)],
-        'metrics_num_unique_codes_every_n_steps': 1,
-        'device': device,
+        "dim": 256,
+        "quant_dim": 16,
+        "codebook_size": 8,
+        "image_size": 256,
+        "patch_size": 32,
+        "spatial_depth": 2,
+        "temporal_depth": 2,
+        "dim_head": 32,
+        "heads": 4,
+        "code_seq_len": 4,
+        "channels": 3,
+        "attn_dropout": 0.0,
+        "ff_dropout": 0.0,
+        "vq_discarding_threshold": 0.1,
+        "vq_discarding_threshold_schedule": None,
+        "latent_ablation": "none",
+        "use_dinov3_encoder": False,
+        "dinov3_model_name": "facebook/dinov3-vits16-pretrain-lvd1689m",
+        "dinov3_pool_to_grid": None,
+        "dino_config": DinoConfig(loss_weight=1.0, warmup_steps=0),
+        "use_dino_decoder": True,
+        "use_pixel_decoder": False,
+        "use_aux_decoder": True,
+        "flow_config": None,
+        "codebook_replace_schedule": [(10, 100)],
+        "metrics_num_unique_codes_every_n_steps": 1,
+        "device": device,
     }
 
 
 @pytest.fixture
 def lam_model(lam_model_config):
     """Create LAM model instance."""
-    device = lam_model_config.pop('device')
+    device = lam_model_config.pop("device")
     model = LatentActionQuantization(**lam_model_config).to(device)
     return model
 
@@ -56,14 +56,14 @@ class TestLAMInitialization:
 
     def test_lam_model_creation(self, lam_model):
         """Test LAM model initializes correctly."""
-        assert hasattr(lam_model, 'encoder_projection')
-        assert hasattr(lam_model, 'enc_spatial_transformer')
-        assert hasattr(lam_model, 'enc_temporal_transformer')
-        assert hasattr(lam_model, 'vq')
+        assert hasattr(lam_model, "encoder_projection")
+        assert hasattr(lam_model, "enc_spatial_transformer")
+        assert hasattr(lam_model, "enc_temporal_transformer")
+        assert hasattr(lam_model, "vq")
         # Decoders are now conditional - check they exist as attributes
-        assert hasattr(lam_model, 'dino_decoder')
-        assert hasattr(lam_model, 'aux_decoder')
-        assert hasattr(lam_model, 'aux_to_pixels')
+        assert hasattr(lam_model, "dino_decoder")
+        assert hasattr(lam_model, "aux_decoder")
+        assert hasattr(lam_model, "aux_to_pixels")
 
         print(f"✓ LAM model initialized successfully")
 
@@ -174,9 +174,7 @@ class TestLAMGradients:
         """Test gradients flow through full model."""
         batch_size = 2
         video = torch.randn(
-            batch_size, 3, 2, 256, 256,
-            device=device,
-            requires_grad=True
+            batch_size, 3, 2, 256, 256, device=device, requires_grad=True
         )
 
         # Forward pass - returns (loss, metrics_dict)
@@ -195,8 +193,9 @@ class TestLAMGradients:
         total_params = sum(1 for p in lam_model.parameters())
 
         # At least 80% of parameters should have gradients
-        assert grad_params / total_params > 0.8, \
-            f"Only {grad_params}/{total_params} params have gradients"
+        assert (
+            grad_params / total_params > 0.8
+        ), f"Only {grad_params}/{total_params} params have gradients"
 
         print(f"✓ Gradients flow through full model")
         print(f"  - Input gradient mean: {video.grad.abs().mean():.8f}")
@@ -208,7 +207,7 @@ class TestLAMShapes:
 
     def test_different_batch_sizes(self, lam_model_config, device):
         """Test LAM with different batch sizes."""
-        lam_model_config.pop('device')
+        lam_model_config.pop("device")
         model = LatentActionQuantization(**lam_model_config).to(device)
 
         for batch_size in [1, 2, 4]:
@@ -240,7 +239,9 @@ class TestLAMCodebookManagement:
         # Run multiple forward passes
         for _ in range(5):
             video = torch.randn(2, 3, 2, 256, 256, device=device)
-            loss, metrics = lam_model(video, step=999)  # step=999 won't trigger replacement
+            loss, metrics = lam_model(
+                video, step=999
+            )  # step=999 won't trigger replacement
 
         # Check codebook usage
         codebook_used = lam_model.vq.codebooks_used
@@ -265,9 +266,9 @@ class TestLAMCodebookManagement:
 
     def test_vq_discarding_threshold_schedule(self, lam_model_config, device):
         """Test step-based replacement threshold schedule."""
-        lam_model_config.pop('device')
-        lam_model_config['vq_discarding_threshold'] = 0.02
-        lam_model_config['vq_discarding_threshold_schedule'] = [
+        lam_model_config.pop("device")
+        lam_model_config["vq_discarding_threshold"] = 0.02
+        lam_model_config["vq_discarding_threshold_schedule"] = [
             (0.1, 100),
             (0.01, 1000),
         ]
@@ -278,10 +279,12 @@ class TestLAMCodebookManagement:
         assert model._get_vq_discarding_threshold(100) == pytest.approx(0.01)
         assert model._get_vq_discarding_threshold(10000) == pytest.approx(0.01)
 
-    def test_vq_discarding_threshold_schedule_must_increase_until_step(self, lam_model_config, device):
+    def test_vq_discarding_threshold_schedule_must_increase_until_step(
+        self, lam_model_config, device
+    ):
         """Test threshold schedule validation fails on non-monotonic ranges."""
-        lam_model_config.pop('device')
-        lam_model_config['vq_discarding_threshold_schedule'] = [
+        lam_model_config.pop("device")
+        lam_model_config["vq_discarding_threshold_schedule"] = [
             (0.1, 200),
             (0.01, 100),
         ]
@@ -291,8 +294,8 @@ class TestLAMCodebookManagement:
 
     def test_dino_warmup_weight(self, lam_model_config, device):
         """Test DINO warmup weight follows configured schedule."""
-        lam_model_config.pop('device')
-        lam_model_config['dino_config'] = DinoConfig(loss_weight=2.0, warmup_steps=100)
+        lam_model_config.pop("device")
+        lam_model_config["dino_config"] = DinoConfig(loss_weight=2.0, warmup_steps=100)
         model = LatentActionQuantization(**lam_model_config).to(device)
 
         video = torch.randn(2, 3, 2, 256, 256, device=device)
@@ -319,7 +322,7 @@ class TestLAMStateDict:
 
     def test_load_from_checkpoint(self, lam_model_config, device, tmp_path):
         """Test model can load from checkpoint file."""
-        lam_model_config.pop('device')
+        lam_model_config.pop("device")
         model1 = LatentActionQuantization(**lam_model_config).to(device)
 
         # Save checkpoint
@@ -371,7 +374,9 @@ class TestCodeOnlyPath:
         with torch.no_grad():
             indices_forward = lam_model(video, return_only_codebook_ids=True)
             first_frame, rest_frames = video[:, :, :1], video[:, :, 1:]
-            _, _, first_tokens, last_tokens = lam_model._encode_frames(first_frame, rest_frames)
+            _, _, first_tokens, last_tokens = lam_model._encode_frames(
+                first_frame, rest_frames
+            )
             indices_direct = lam_model.vq.get_indices(first_tokens, last_tokens)
         assert torch.equal(indices_forward, indices_direct)
 

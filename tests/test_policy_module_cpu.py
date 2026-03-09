@@ -7,7 +7,10 @@ import torch
 
 from stage2.action_tokens import ActionTokenConfig
 from stage2.policy_inputs import ChatConfig
-from stage2.legacy.policy_module_legacy import PolicyTokenLightningModule, PolicyOptimizerConfig
+from stage2.legacy.policy_module_legacy import (
+    PolicyTokenLightningModule,
+    PolicyOptimizerConfig,
+)
 
 
 class DummyCodeProvider:

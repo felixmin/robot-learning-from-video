@@ -175,7 +175,7 @@ def generate_sbatch_script(
     if pre_commands:
         pre_lines = [
             "# Run optional pre-commands (e.g., editable policy install).",
-            "echo \"Running submit.pre_commands...\"",
+            'echo "Running submit.pre_commands..."',
         ]
         total = len(pre_commands)
         for idx, cmd in enumerate(pre_commands, start=1):
@@ -360,7 +360,9 @@ def main():
             print("  (Runs sequentially on the local machine)")
 
         base_env = os.environ.copy()
-        base_env["PYTHONPATH"] = f"{PROJECT_ROOT}/packages:" + base_env.get("PYTHONPATH", "")
+        base_env["PYTHONPATH"] = f"{PROJECT_ROOT}/packages:" + base_env.get(
+            "PYTHONPATH", ""
+        )
         base_env["HF_HUB_CACHE"] = str(cache_dir / "huggingface" / "hub")
         base_env["HF_DATASETS_CACHE"] = str(cache_dir / "huggingface" / "datasets")
         base_env["HF_LEROBOT_HOME"] = str(cache_dir / "huggingface" / "lerobot")
@@ -403,7 +405,11 @@ def main():
                 print("  " + " ".join(cmd))
                 continue
 
-            print(f"\nRunning {job_runs_dir.name}: {override_str}" if override_str else f"\nRunning {job_runs_dir.name}")
+            print(
+                f"\nRunning {job_runs_dir.name}: {override_str}"
+                if override_str
+                else f"\nRunning {job_runs_dir.name}"
+            )
             for pre_cmd in pre_commands:
                 print(f"  Running pre-command: {pre_cmd}")
                 subprocess.run(
@@ -446,7 +452,9 @@ def main():
             f"{container_image_path}\n"
             "Set `cluster.container.image=/path/to/container.sqsh` (or update your cluster config)."
         )
-    container_python_bin = str(OmegaConf.select(cfg, "cluster.container.python_bin") or "python")
+    container_python_bin = str(
+        OmegaConf.select(cfg, "cluster.container.python_bin") or "python"
+    )
 
     mem_value = OmegaConf.select(cfg, "cluster.compute.mem_gb")
     if mem_value is None:
@@ -500,7 +508,13 @@ def main():
             continue
         extra_mounts.append(mount_path)
 
-    mount_roots: list[Path] = [PROJECT_ROOT, runs_dir.parent, cache_dir, home_dir, *extra_mounts]
+    mount_roots: list[Path] = [
+        PROJECT_ROOT,
+        runs_dir.parent,
+        cache_dir,
+        home_dir,
+        *extra_mounts,
+    ]
 
     # Ensure unique mount roots while preserving order.
     seen: set[Path] = set()
@@ -616,28 +630,29 @@ def main():
 
         if dry_run:
             if is_sweep:
-                print(f"\n[DRY RUN] Job {i+1}/{len(sweep_combinations)}: {sweep_overrides}")
+                print(
+                    f"\n[DRY RUN] Job {i+1}/{len(sweep_combinations)}: {sweep_overrides}"
+                )
             print("-" * 60)
             print(sbatch_content)
             print("-" * 60)
             continue
 
         # Write and submit sbatch script
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.sbatch', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".sbatch", delete=False) as f:
             f.write(sbatch_content)
             sbatch_file = f.name
 
         try:
             if is_sweep:
-                print(f"\nSubmitting job {i+1}/{len(sweep_combinations)}: {sweep_overrides}")
+                print(
+                    f"\nSubmitting job {i+1}/{len(sweep_combinations)}: {sweep_overrides}"
+                )
             else:
                 print("\nSubmitting job...")
 
             result = subprocess.run(
-                ["sbatch", sbatch_file],
-                capture_output=True,
-                text=True,
-                check=True
+                ["sbatch", sbatch_file], capture_output=True, text=True, check=True
             )
 
             # Parse job ID from output like "Submitted batch job 12345"

@@ -44,7 +44,11 @@ def _repo_local_dir(root: Path, repo_id: str) -> Path:
 
 
 def _is_downloaded(path: Path) -> bool:
-    return (path / "meta" / "info.json").exists() and (path / "data").exists() and (path / "videos").exists()
+    return (
+        (path / "meta" / "info.json").exists()
+        and (path / "data").exists()
+        and (path / "videos").exists()
+    )
 
 
 def _resolve_explicit_root(cfg: DictConfig) -> Path | None:
@@ -56,7 +60,11 @@ def _resolve_explicit_root(cfg: DictConfig) -> Path | None:
     if root.is_absolute():
         return root
 
-    logging_root = Path(str(cfg.logging.root_dir)) if OmegaConf.select(cfg, "logging.root_dir") else workspace_root
+    logging_root = (
+        Path(str(cfg.logging.root_dir))
+        if OmegaConf.select(cfg, "logging.root_dir")
+        else workspace_root
+    )
     return logging_root / root
 
 
@@ -88,7 +96,9 @@ def main() -> None:
     print("=" * 80)
 
     if str(cfg.data.backend) != "lerobot_v3":
-        raise ValueError(f"Only data.backend='lerobot_v3' is supported, got {cfg.data.backend!r}")
+        raise ValueError(
+            f"Only data.backend='lerobot_v3' is supported, got {cfg.data.backend!r}"
+        )
 
     root, root_source = _resolve_download_root(cfg)
     root.mkdir(parents=True, exist_ok=True)
@@ -102,7 +112,9 @@ def main() -> None:
     start_from = OmegaConf.select(cfg, "download.start_from")
     if start_from not in (None, "", "null"):
         start_index = next(
-            i for i, source in enumerate(sources) if str(source["repo_id"]) == str(start_from)
+            i
+            for i, source in enumerate(sources)
+            if str(source["repo_id"]) == str(start_from)
         )
         sources = sources[start_index:]
 
@@ -131,7 +143,13 @@ def main() -> None:
             repo_type="dataset",
             revision=revision,
             local_dir=str(local_dir),
-            allow_patterns=["meta/*", "data/*", "videos/*", "README.md", ".gitattributes"],
+            allow_patterns=[
+                "meta/*",
+                "data/*",
+                "videos/*",
+                "README.md",
+                ".gitattributes",
+            ],
             max_workers=4,
         )
 

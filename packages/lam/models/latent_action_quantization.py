@@ -42,6 +42,7 @@ from lam.models.nsvq import NSVQ
 
 logger = logging.getLogger(__name__)
 
+
 def pair(val):
     ret = (val, val) if not isinstance(val, tuple) else val
     if len(ret) != 2:
@@ -58,15 +59,20 @@ class DinoConfig:
 
     def __post_init__(self):
         if self.loss_weight <= 0:
-            raise ValueError(f"dino.loss_weight must be positive, got {self.loss_weight}")
+            raise ValueError(
+                f"dino.loss_weight must be positive, got {self.loss_weight}"
+            )
         if self.warmup_steps < 0:
-            raise ValueError(f"dino.warmup_steps must be non-negative, got {self.warmup_steps}")
+            raise ValueError(
+                f"dino.warmup_steps must be non-negative, got {self.warmup_steps}"
+            )
 
     def get_weight(self, step: int) -> float:
         if self.warmup_steps == 0:
             return self.loss_weight
         warmup_factor = min(1.0, step / self.warmup_steps)
         return self.loss_weight * warmup_factor
+
 
 class LatentActionQuantization(nn.Module):
     """
@@ -88,6 +94,7 @@ class LatentActionQuantization(nn.Module):
     Returns:
         (loss, metrics_dict) where metrics_dict contains diagnostic values
     """
+
     def __init__(
         self,
         *,
@@ -140,9 +147,13 @@ class LatentActionQuantization(nn.Module):
                 f"latent_ablation must be one of ['none', 'permute_batch'], got {latent_ablation!r}"
             )
         self.latent_ablation = latent_ablation
-        self.metrics_num_unique_codes_every_n_steps = int(metrics_num_unique_codes_every_n_steps)
+        self.metrics_num_unique_codes_every_n_steps = int(
+            metrics_num_unique_codes_every_n_steps
+        )
         if self.metrics_num_unique_codes_every_n_steps <= 0:
-            raise ValueError("metrics_num_unique_codes_every_n_steps must be a positive integer")
+            raise ValueError(
+                "metrics_num_unique_codes_every_n_steps must be a positive integer"
+            )
         if float(vq_discarding_threshold) < 0.0:
             raise ValueError("vq_discarding_threshold must be >= 0")
 
@@ -176,15 +187,17 @@ class LatentActionQuantization(nn.Module):
 
         self.codebook_replace_schedule = list(codebook_replace_schedule or [])
         self.vq_discarding_threshold = float(vq_discarding_threshold)
-        self.vq_discarding_threshold_schedule = self._validate_vq_discarding_threshold_schedule(
-            vq_discarding_threshold_schedule
+        self.vq_discarding_threshold_schedule = (
+            self._validate_vq_discarding_threshold_schedule(
+                vq_discarding_threshold_schedule
+            )
         )
         self.code_seq_len = code_seq_len
         self.image_size = pair(image_size)
         self.patch_size = pair(patch_size)
         patch_height, patch_width = self.patch_size
 
-        self.spatial_rel_pos_bias = ContinuousPositionBias(dim = dim, heads = heads)
+        self.spatial_rel_pos_bias = ContinuousPositionBias(dim=dim, heads=heads)
 
         image_height, image_width = self.image_size
         assert (image_height % patch_height) == 0 and (image_width % patch_width) == 0
@@ -210,7 +223,10 @@ class LatentActionQuantization(nn.Module):
             self._effective_grid_size = (output_grid, output_grid)
             logger.info(f"  - Effective grid size: {self._effective_grid_size}")
         else:
-            self._effective_grid_size = (image_height // patch_height, image_width // patch_width)
+            self._effective_grid_size = (
+                image_height // patch_height,
+                image_width // patch_width,
+            )
             self.encoder_projection = None
 
         # Decoder Pixel Projection (Also used for Encoder if DINO is disabled)
@@ -218,45 +234,49 @@ class LatentActionQuantization(nn.Module):
         eff_h, eff_w = self._effective_grid_size
         pixel_p1 = image_height // eff_h
         pixel_p2 = image_width // eff_w
-        
+
         self.pixel_projection = nn.Sequential(
-            Rearrange('b c 1 (h p1) (w p2) -> b 1 h w (c p1 p2)', p1 = pixel_p1, p2 = pixel_p2),
+            Rearrange(
+                "b c 1 (h p1) (w p2) -> b 1 h w (c p1 p2)", p1=pixel_p1, p2=pixel_p2
+            ),
             nn.LayerNorm(channels * pixel_p1 * pixel_p2),
             nn.Linear(channels * pixel_p1 * pixel_p2, dim),
-            nn.LayerNorm(dim)
+            nn.LayerNorm(dim),
         )
-        
+
         self.decoder_context_projection = self.pixel_projection
 
         if self.encoder_projection is None:
             self.encoder_projection = self.pixel_projection
 
-
         transformer_kwargs = dict(
-            dim = dim,
-            dim_head = dim_head,
-            heads = heads,
-            attn_dropout = attn_dropout,
-            ff_dropout = ff_dropout,
-            peg = True,
-            peg_causal = True,
+            dim=dim,
+            dim_head=dim_head,
+            heads=heads,
+            attn_dropout=attn_dropout,
+            ff_dropout=ff_dropout,
+            peg=True,
+            peg_causal=True,
         )
-        
+
         transformer_with_action_kwargs = dict(
-            dim = dim,
-            dim_head = dim_head,
-            heads = heads,
-            attn_dropout = attn_dropout,
-            ff_dropout = ff_dropout,
-            peg = True,
-            peg_causal = True,
-            has_cross_attn = True,
-            dim_context = dim,
+            dim=dim,
+            dim_head=dim_head,
+            heads=heads,
+            attn_dropout=attn_dropout,
+            ff_dropout=ff_dropout,
+            peg=True,
+            peg_causal=True,
+            has_cross_attn=True,
+            dim_context=dim,
         )
 
-        self.enc_spatial_transformer = Transformer(depth = spatial_depth, **transformer_kwargs)
-        self.enc_temporal_transformer = Transformer(depth = temporal_depth, **transformer_kwargs)
-
+        self.enc_spatial_transformer = Transformer(
+            depth=spatial_depth, **transformer_kwargs
+        )
+        self.enc_temporal_transformer = Transformer(
+            depth=temporal_depth, **transformer_kwargs
+        )
 
         self.vq = NSVQ(
             dim=dim,
@@ -266,7 +286,7 @@ class LatentActionQuantization(nn.Module):
             code_seq_len=code_seq_len,
             patch_size=patch_size,
             image_size=image_size,
-            grid_size=self._effective_grid_size
+            grid_size=self._effective_grid_size,
         )
 
         # Compute pixel projection parameters (shared by pixel decoders)
@@ -277,17 +297,25 @@ class LatentActionQuantization(nn.Module):
         # --- DINO Decoder (Training) ---
         # Predicts next frame's DINO embeddings
         if self.use_dino_decoder:
-            self.dino_decoder = Transformer(depth=spatial_depth, **transformer_with_action_kwargs)
+            self.dino_decoder = Transformer(
+                depth=spatial_depth, **transformer_with_action_kwargs
+            )
         else:
             self.dino_decoder = None
 
         # --- Pixel Decoder (Training) ---
         # Predicts next frame's pixels with gradients flowing to encoder
         if use_pixel_decoder:
-            self.pixel_decoder = Transformer(depth=spatial_depth, **transformer_with_action_kwargs)
+            self.pixel_decoder = Transformer(
+                depth=spatial_depth, **transformer_with_action_kwargs
+            )
             self.pixel_to_pixels = nn.Sequential(
                 nn.Linear(dim, channels * eff_patch_h * eff_patch_w),
-                Rearrange('b 1 h w (c p1 p2) -> b c 1 (h p1) (w p2)', p1=eff_patch_h, p2=eff_patch_w)
+                Rearrange(
+                    "b 1 h w (c p1 p2) -> b c 1 (h p1) (w p2)",
+                    p1=eff_patch_h,
+                    p2=eff_patch_w,
+                ),
             )
         else:
             self.pixel_decoder = None
@@ -296,10 +324,16 @@ class LatentActionQuantization(nn.Module):
         # --- Aux Decoder (Interpretability) ---
         # Predicts next frame's pixels for visualization (gradients detached from encoder)
         if use_aux_decoder:
-            self.aux_decoder = Transformer(depth=spatial_depth, **transformer_with_action_kwargs)
+            self.aux_decoder = Transformer(
+                depth=spatial_depth, **transformer_with_action_kwargs
+            )
             self.aux_to_pixels = nn.Sequential(
                 nn.Linear(dim, channels * eff_patch_h * eff_patch_w),
-                Rearrange('b 1 h w (c p1 p2) -> b c 1 (h p1) (w p2)', p1=eff_patch_h, p2=eff_patch_w)
+                Rearrange(
+                    "b 1 h w (c p1 p2) -> b c 1 (h p1) (w p2)",
+                    p1=eff_patch_h,
+                    p2=eff_patch_w,
+                ),
             )
         else:
             self.aux_decoder = None
@@ -336,7 +370,10 @@ class LatentActionQuantization(nn.Module):
 
         # Pre-compute action shape from code_seq_len (used in forward/inference)
         if math.sqrt(code_seq_len) % 1 == 0:
-            self._action_shape = (int(math.sqrt(code_seq_len)), int(math.sqrt(code_seq_len)))
+            self._action_shape = (
+                int(math.sqrt(code_seq_len)),
+                int(math.sqrt(code_seq_len)),
+            )
         elif code_seq_len == 2:
             self._action_shape = (2, 1)
         else:
@@ -427,7 +464,7 @@ class LatentActionQuantization(nn.Module):
         if not path.exists():
             raise FileNotFoundError(f"Checkpoint not found: {path}")
         pt = torch.load(str(path), weights_only=False)
-        pt = {k.replace('module.', ''): v for k, v in pt.items()}
+        pt = {k.replace("module.", ""): v for k, v in pt.items()}
         self.load_state_dict(pt, strict=False)
 
     @property
@@ -459,15 +496,17 @@ class LatentActionQuantization(nn.Module):
 
         first_tokens, last_tokens = self.encode(enc_tokens)
 
-        first_tokens_packed, _ = pack([first_tokens], 'b * d')
-        last_tokens_packed, _ = pack([last_tokens], 'b * d')
+        first_tokens_packed, _ = pack([first_tokens], "b * d")
+        last_tokens_packed, _ = pack([last_tokens], "b * d")
 
-        return enc_first_frame_tokens, enc_rest_frames_tokens, first_tokens_packed, last_tokens_packed
+        return (
+            enc_first_frame_tokens,
+            enc_rest_frames_tokens,
+            first_tokens_packed,
+            last_tokens_packed,
+        )
 
-    def encode(
-        self,
-        tokens
-    ):
+    def encode(self, tokens):
         """
         Encodes continuous video tokens into latent representations.
 
@@ -486,27 +525,26 @@ class LatentActionQuantization(nn.Module):
 
         video_shape = tuple(tokens.shape[:-1])
 
-        tokens = rearrange(tokens, 'b t h w d -> (b t) (h w) d')
+        tokens = rearrange(tokens, "b t h w d -> (b t) (h w) d")
 
-        attn_bias = self.spatial_rel_pos_bias(h, w, device = tokens.device)
+        attn_bias = self.spatial_rel_pos_bias(h, w, device=tokens.device)
 
-        tokens = self.enc_spatial_transformer(tokens, attn_bias = attn_bias, video_shape = video_shape)
+        tokens = self.enc_spatial_transformer(
+            tokens, attn_bias=attn_bias, video_shape=video_shape
+        )
 
-        tokens = rearrange(tokens, '(b t) (h w) d -> b t h w d', b = b, h = h , w = w)
+        tokens = rearrange(tokens, "(b t) (h w) d -> b t h w d", b=b, h=h, w=w)
 
-        tokens = rearrange(tokens, 'b t h w d -> (b h w) t d')
+        tokens = rearrange(tokens, "b t h w d -> (b h w) t d")
 
-        tokens = self.enc_temporal_transformer(tokens, video_shape = video_shape)
+        tokens = self.enc_temporal_transformer(tokens, video_shape=video_shape)
 
-        tokens = rearrange(tokens, '(b h w) t d -> b t h w d', b = b, h = h, w = w)
+        tokens = rearrange(tokens, "(b h w) t d -> b t h w d", b=b, h=h, w=w)
 
-        
         first_tokens = tokens[:, :1]
         last_tokens = tokens[:, 1:]
-        
-        return first_tokens, last_tokens
 
-        
+        return first_tokens, last_tokens
 
     def decode(
         self,
@@ -533,25 +571,26 @@ class LatentActionQuantization(nn.Module):
         h, w = self.patch_height_width
 
         if tokens.ndim == 3:
-            tokens = rearrange(tokens, 'b (t h w) d -> b t h w d', h=h, w=w)
+            tokens = rearrange(tokens, "b (t h w) d -> b t h w d", h=h, w=w)
 
         video_shape = tuple(tokens.shape[:-1])
 
-        tokens = rearrange(tokens, 'b t h w d -> (b t) (h w) d')
-        actions = rearrange(actions, 'b t h w d -> (b t) (h w) d')
+        tokens = rearrange(tokens, "b t h w d -> (b t) (h w) d")
+        actions = rearrange(actions, "b t h w d -> (b t) (h w) d")
 
         attn_bias = self.spatial_rel_pos_bias(h, w, device=tokens.device)
 
         # Use AUX decoder for pixel reconstruction
-        tokens = self.aux_decoder(tokens, attn_bias=attn_bias, video_shape=video_shape, context=actions)
+        tokens = self.aux_decoder(
+            tokens, attn_bias=attn_bias, video_shape=video_shape, context=actions
+        )
 
-        tokens = rearrange(tokens, '(b t) (h w) d -> b t h w d', b=b, h=h, w=w)
+        tokens = rearrange(tokens, "(b t) (h w) d -> b t h w d", b=b, h=h, w=w)
 
         # Use AUX projector
         recon_video = self.aux_to_pixels(tokens)
 
         return recon_video
-
 
     def forward(
         self,
@@ -578,7 +617,9 @@ class LatentActionQuantization(nn.Module):
 
         if return_only_codebook_ids:
             first_frame, rest_frames = video[:, :, :1], video[:, :, 1:]
-            _, _, first_tokens, last_tokens = self._encode_frames(first_frame, rest_frames)
+            _, _, first_tokens, last_tokens = self._encode_frames(
+                first_frame, rest_frames
+            )
             return self.vq.get_indices(first_tokens, last_tokens)
 
         encoded = encode_and_quantize(self, video)
@@ -658,7 +699,6 @@ class LatentActionQuantization(nn.Module):
             total_loss = total_loss + flow_loss_term
 
         return total_loss, metrics
-        
 
     def inference(
         self,
@@ -700,12 +740,12 @@ class LatentActionQuantization(nn.Module):
             return None
 
         action_h, action_w = self.action_shape
-        tokens = rearrange(tokens, 'b (t h w) d -> b t h w d', h=action_h, w=action_w)
+        tokens = rearrange(tokens, "b (t h w) d -> b t h w d", h=action_h, w=action_w)
 
         # Decoder uses pixel projection context
         dec_first_frame_tokens = self.decoder_context_projection(first_frame)
 
         recon_video = self.decode(dec_first_frame_tokens, actions=tokens)
-        recon_frames = rearrange(recon_video, 'b c 1 h w -> b c h w')
+        recon_frames = rearrange(recon_video, "b c 1 h w -> b c h w")
 
         return recon_frames

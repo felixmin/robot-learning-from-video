@@ -25,7 +25,10 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     "Transformer": ("lam.models.attention", "Transformer"),
     "ContinuousPositionBias": ("lam.models.attention", "ContinuousPositionBias"),
     "PEG": ("lam.models.attention", "PEG"),
-    "LatentActionQuantization": ("lam.models.latent_action_quantization", "LatentActionQuantization"),
+    "LatentActionQuantization": (
+        "lam.models.latent_action_quantization",
+        "LatentActionQuantization",
+    ),
 }
 
 
@@ -41,4 +44,3 @@ def __getattr__(name: str) -> Any:
 
 def __dir__() -> list[str]:
     return sorted(list(globals().keys()) + list(_LAZY_IMPORTS.keys()))
-

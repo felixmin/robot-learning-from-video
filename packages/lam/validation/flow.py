@@ -91,7 +91,9 @@ class FlowVisualizationStrategy(ValidationStrategy):
         wandb_logger.log_image(
             key=f"{prefix}/flow_comparison{metric_suffix}",
             images=[flow_grid],
-            caption=[f"Step {trainer.global_step} (GT flow | Pred flow | mean-flow direction)"],
+            caption=[
+                f"Step {trainer.global_step} (GT flow | Pred flow | mean-flow direction)"
+            ],
         )
         return self.success(produced=1)
 
@@ -124,10 +126,14 @@ class FlowVisualizationStrategy(ValidationStrategy):
             enc_first_tokens, enc_rest_tokens, first_tokens, last_tokens = (
                 model._encode_frames(first_frame, rest_frames)
             )
-            tokens, _, _, _ = model.vq(first_tokens, last_tokens, codebook_training_only=False)
+            tokens, _, _, _ = model.vq(
+                first_tokens, last_tokens, codebook_training_only=False
+            )
 
             action_h, action_w = model.action_shape
-            tokens = rearrange(tokens, 'b (t h w) d -> b t h w d', h=action_h, w=action_w)
+            tokens = rearrange(
+                tokens, "b (t h w) d -> b t h w d", h=action_h, w=action_w
+            )
 
             # Get pixel context
             dec_first_frame_tokens = model.decoder_context_projection(first_frame)
@@ -153,8 +159,12 @@ class FlowVisualizationStrategy(ValidationStrategy):
         from lam.models.flow import compute_weighted_mean_flow
 
         static_eps = float(getattr(model.flow_config, "summary_static_eps", 1e-6))
-        gt_mean_dx, gt_mean_dy = compute_weighted_mean_flow(gt_flow, static_eps=static_eps)
-        pred_mean_dx, pred_mean_dy = compute_weighted_mean_flow(pred_flow, static_eps=static_eps)
+        gt_mean_dx, gt_mean_dy = compute_weighted_mean_flow(
+            gt_flow, static_eps=static_eps
+        )
+        pred_mean_dx, pred_mean_dy = compute_weighted_mean_flow(
+            pred_flow, static_eps=static_eps
+        )
 
         # Get source and target frames
         frame_t = frames[:, :, 0].cpu()  # [B, C, H, W]
@@ -182,8 +192,11 @@ class FlowVisualizationStrategy(ValidationStrategy):
         direction_panels_t = torch.stack(direction_panels, dim=0)
 
         # Stack: [frame_t, frame_t+k, gt_flow, pred_flow, direction_summary]
-        imgs = torch.stack([frame_t, frame_t_plus, gt_flow_rgb, pred_flow_rgb, direction_panels_t], dim=0)
-        imgs = rearrange(imgs, 'r b c h w -> (b r) c h w')
+        imgs = torch.stack(
+            [frame_t, frame_t_plus, gt_flow_rgb, pred_flow_rgb, direction_panels_t],
+            dim=0,
+        )
+        imgs = rearrange(imgs, "r b c h w -> (b r) c h w")
         imgs = imgs.clamp(0.0, 1.0)
 
         return make_grid(imgs, nrow=5, normalize=False)
@@ -219,8 +232,13 @@ class FlowVisualizationStrategy(ValidationStrategy):
 
         legend_top = max(2, int(height * 0.04))
         box = max(3, int(min(height, width) * 0.035))
-        draw.rectangle([(4, legend_top), (4 + box, legend_top + box)], fill=(80, 220, 80))
-        draw.rectangle([(4, legend_top + box + 3), (4 + box, legend_top + 2 * box + 3)], fill=(230, 90, 90))
+        draw.rectangle(
+            [(4, legend_top), (4 + box, legend_top + box)], fill=(80, 220, 80)
+        )
+        draw.rectangle(
+            [(4, legend_top + box + 3), (4 + box, legend_top + 2 * box + 3)],
+            fill=(230, 90, 90),
+        )
 
         return pil_to_tensor(panel).float() / 255.0
 

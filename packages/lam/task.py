@@ -17,7 +17,12 @@ from torch.optim.lr_scheduler import CosineAnnealingLR, LinearLR, SequentialLR
 import lightning.pytorch as pl
 from omegaconf import DictConfig, ListConfig
 
-from common.batch_utils import move_dataclass_tensors_to_device, select_primary_image_stream, temporal_frames_to_bcthw, uint8_image_streams_to_float32
+from common.batch_utils import (
+    move_dataclass_tensors_to_device,
+    select_primary_image_stream,
+    temporal_frames_to_bcthw,
+    uint8_image_streams_to_float32,
+)
 from lam.models.latent_action_quantization import LatentActionQuantization, DinoConfig
 from lam.models.flow import FlowConfig
 from common.lerobot_v3_types import Stage1Batch
@@ -45,7 +50,7 @@ def separate_weight_decayable_params(
     for param in params:
         if not param.requires_grad:
             continue
-            
+
         if param.ndim >= 2:
             wd_params.append(param)
         else:
@@ -142,7 +147,9 @@ class LAMTask(pl.LightningModule):
             use_dinov3_encoder=model_config.use_dinov3_encoder,
             dinov3_model_name=model_config.dinov3_model_name,
             dinov3_pool_to_grid=model_config.dinov3_pool_to_grid,
-            metrics_num_unique_codes_every_n_steps=int(metrics_cfg.num_unique_codes_every_n_steps),
+            metrics_num_unique_codes_every_n_steps=int(
+                metrics_cfg.num_unique_codes_every_n_steps
+            ),
             dino_config=dino_config,
             use_dino_decoder=dino_enabled,
             # Training decoder flags
@@ -299,7 +306,7 @@ class LAMTask(pl.LightningModule):
         # Log metrics (skip if no trainer attached, e.g., in unit tests)
         if self._trainer is not None:
             self.log("val/loss", loss, prog_bar=True, sync_dist=True)
-            
+
             # Dynamic logging of model metrics
             for k, v in metrics.items():
                 self.log(f"val/{k}", v, sync_dist=True)
@@ -377,11 +384,13 @@ class LAMTask(pl.LightningModule):
 
             if warmup_steps > 0:
                 if base_lr <= 0:
-                    raise ValueError("training.optimizer.lr must be > 0 when warmup is enabled")
+                    raise ValueError(
+                        "training.optimizer.lr must be > 0 when warmup is enabled"
+                    )
                 start_factor = warmup_start_lr / base_lr
                 if start_factor <= 0:
                     raise ValueError("training.scheduler.warmup_start_lr must be > 0")
-                
+
                 warmup = LinearLR(
                     optimizer,
                     start_factor=start_factor,
@@ -416,7 +425,9 @@ class LAMTask(pl.LightningModule):
                 },
             }
         else:
-            raise NotImplementedError(f"Scheduler type '{sched_config.type}' not implemented")
+            raise NotImplementedError(
+                f"Scheduler type '{sched_config.type}' not implemented"
+            )
 
     def encode_latents(
         self,
@@ -474,7 +485,9 @@ class LAMTask(pl.LightningModule):
 
             # Ensure correct shape
             if first_frames.ndim == 4:
-                first_frames = first_frames.unsqueeze(2)  # [B, C, H, W] -> [B, C, 1, H, W]
+                first_frames = first_frames.unsqueeze(
+                    2
+                )  # [B, C, H, W] -> [B, C, 1, H, W]
 
             # Get first frame tokens
             # Use decoder_context_projection to match model forward pass (handles DINO vs learned embeddings)
@@ -494,8 +507,7 @@ class LAMTask(pl.LightningModule):
             if latent_actions.ndim == 2:
                 latent_actions = latent_actions.unsqueeze(1)  # [B, dim] -> [B, 1, dim]
             latent_actions = rearrange(
-                latent_actions, 'b (t h w) d -> b t h w d',
-                t=1, h=action_h, w=action_w
+                latent_actions, "b (t h w) d -> b t h w d", t=1, h=action_h, w=action_w
             )
 
             # Decode

@@ -121,6 +121,7 @@ class MetadataScatterStrategy(ValidationStrategy):
 
         # Use numpy for random choice if not using torch tensors
         import torch
+
         indices = torch.randperm(total)[:n].tolist()
 
         result = []
@@ -166,30 +167,43 @@ class MetadataScatterStrategy(ValidationStrategy):
         try:
             fig, ax = plt.subplots(figsize=figsize)
 
-            cmap = plt.cm.get_cmap('tab20', num_colors)
+            cmap = plt.cm.get_cmap("tab20", num_colors)
             scatter = ax.scatter(
-                x, y, c=colors, cmap=cmap, alpha=0.6, s=20,
-                vmin=0, vmax=max(num_colors - 1, colors.max())
+                x,
+                y,
+                c=colors,
+                cmap=cmap,
+                alpha=0.6,
+                s=20,
+                vmin=0,
+                vmax=max(num_colors - 1, colors.max()),
             )
 
             ax.set_xlabel(xlabel)
             ax.set_ylabel(ylabel)
             ax.set_title(title)
-            ax.axhline(y=0, color='k', linestyle='-', linewidth=0.5, alpha=0.3)
-            ax.axvline(x=0, color='k', linestyle='-', linewidth=0.5, alpha=0.3)
-            ax.set_aspect('equal', adjustable='box')
+            ax.axhline(y=0, color="k", linestyle="-", linewidth=0.5, alpha=0.3)
+            ax.axvline(x=0, color="k", linestyle="-", linewidth=0.5, alpha=0.3)
+            ax.set_aspect("equal", adjustable="box")
 
             plt.colorbar(scatter, ax=ax, label=colorbar_label)
 
             if stats_text:
-                ax.text(0.02, 0.98, stats_text,
-                       transform=ax.transAxes, ha='left', va='top',
-                       fontsize=9, bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
+                ax.text(
+                    0.02,
+                    0.98,
+                    stats_text,
+                    transform=ax.transAxes,
+                    ha="left",
+                    va="top",
+                    fontsize=9,
+                    bbox=dict(boxstyle="round", facecolor="white", alpha=0.8),
+                )
 
             plt.tight_layout()
 
             buf = io.BytesIO()
-            plt.savefig(buf, format='png', dpi=100)
+            plt.savefig(buf, format="png", dpi=100)
             buf.seek(0)
             img = Image.open(buf)
 
@@ -238,7 +252,9 @@ class ActionTokenScatterStrategy(MetadataScatterStrategy):
     ) -> Dict[str, Any]:
         """Generate action-token scatter plot."""
         # Filter samples with action metadata
-        filtered_meta, codes_list, _ = self._filter_samples_with_metadata(cache, ["action"])
+        filtered_meta, codes_list, _ = self._filter_samples_with_metadata(
+            cache, ["action"]
+        )
 
         if len(filtered_meta) < self.min_samples:
             return self.no_output("insufficient_action_metadata")
@@ -264,19 +280,21 @@ class ActionTokenScatterStrategy(MetadataScatterStrategy):
                 x=actions_np[:, 0],
                 y=actions_np[:, 1],
                 colors=tokens_np,
-                title=f'2D Actions Colored by Codebook Token (Step {trainer.global_step})',
-                xlabel='Action X (cumulative dx)',
-                ylabel='Action Y (cumulative dy)',
-                colorbar_label='Token ID',
+                title=f"2D Actions Colored by Codebook Token (Step {trainer.global_step})",
+                xlabel="Action X (cumulative dx)",
+                ylabel="Action Y (cumulative dy)",
+                colorbar_label="Token ID",
                 num_colors=codebook_size,
-                stats_text=f'Samples: {len(actions)}\nUnique tokens: {len(set(tokens))}',
+                stats_text=f"Samples: {len(actions)}\nUnique tokens: {len(set(tokens))}",
             )
 
             if img:
                 wandb_logger.log_image(
                     key=f"val/action_token_scatter{metric_suffix}",
                     images=[img],
-                    caption=[f"Step {trainer.global_step}: 2D actions colored by assigned token"],
+                    caption=[
+                        f"Step {trainer.global_step}: 2D actions colored by assigned token"
+                    ],
                 )
 
         return self.success(produced=int(len(actions)))
@@ -320,7 +338,9 @@ class ActionSequenceScatterStrategy(MetadataScatterStrategy):
     ) -> Dict[str, Any]:
         """Generate action-sequence scatter plot."""
         # Use base class filtering
-        filtered_meta, codes_list, _ = self._filter_samples_with_metadata(cache, ["action"])
+        filtered_meta, codes_list, _ = self._filter_samples_with_metadata(
+            cache, ["action"]
+        )
 
         if len(filtered_meta) < self.min_samples:
             return self.no_output("insufficient_action_metadata")
@@ -361,44 +381,59 @@ class ActionSequenceScatterStrategy(MetadataScatterStrategy):
         """Create scatter plot colored by sequence ID."""
         try:
             if num_unique > 100:
-                warnings.warn(f"ActionSequenceScatterStrategy: {num_unique} unique sequences. Colors may be indistinguishable.")
+                warnings.warn(
+                    f"ActionSequenceScatterStrategy: {num_unique} unique sequences. Colors may be indistinguishable."
+                )
 
             actions_np = np.array(actions)
             ids_np = np.array(seq_ids)
 
             fig, ax = plt.subplots(figsize=(10, 8))
 
-            cmap = plt.cm.get_cmap('nipy_spectral', num_unique)
-            markers = ['o', 's', '^', 'D', 'v', '<', '>', 'p', '*', 'h', 'H', '+', 'x']
+            cmap = plt.cm.get_cmap("nipy_spectral", num_unique)
+            markers = ["o", "s", "^", "D", "v", "<", ">", "p", "*", "h", "H", "+", "x"]
 
             # Plot each sequence ID with unique marker and color
             for uid in np.unique(ids_np):
                 mask = ids_np == uid
                 marker = markers[uid % len(markers)]
                 color = cmap(uid / max(1, num_unique - 1))
-                ax.scatter(actions_np[mask, 0], actions_np[mask, 1],
-                          color=color, marker=marker, alpha=0.6, s=30)
+                ax.scatter(
+                    actions_np[mask, 0],
+                    actions_np[mask, 1],
+                    color=color,
+                    marker=marker,
+                    alpha=0.6,
+                    s=30,
+                )
 
-            ax.set_xlabel('Action X (cumulative dx)')
-            ax.set_ylabel('Action Y (cumulative dy)')
-            ax.set_title(f'2D Actions Colored by Full Sequence (Step {global_step})')
-            ax.axhline(y=0, color='k', linestyle='-', linewidth=0.5, alpha=0.3)
-            ax.axvline(x=0, color='k', linestyle='-', linewidth=0.5, alpha=0.3)
-            ax.set_aspect('equal', adjustable='box')
+            ax.set_xlabel("Action X (cumulative dx)")
+            ax.set_ylabel("Action Y (cumulative dy)")
+            ax.set_title(f"2D Actions Colored by Full Sequence (Step {global_step})")
+            ax.axhline(y=0, color="k", linestyle="-", linewidth=0.5, alpha=0.3)
+            ax.axvline(x=0, color="k", linestyle="-", linewidth=0.5, alpha=0.3)
+            ax.set_aspect("equal", adjustable="box")
 
-            norm = plt.Normalize(vmin=0, vmax=num_unique-1)
+            norm = plt.Normalize(vmin=0, vmax=num_unique - 1)
             sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
             sm.set_array([])
-            plt.colorbar(sm, ax=ax, label='Sequence ID')
+            plt.colorbar(sm, ax=ax, label="Sequence ID")
 
-            ax.text(0.02, 0.98, f'Samples: {len(actions)}\nUnique Seqs: {num_unique}',
-                   transform=ax.transAxes, ha='left', va='top',
-                   fontsize=9, bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
+            ax.text(
+                0.02,
+                0.98,
+                f"Samples: {len(actions)}\nUnique Seqs: {num_unique}",
+                transform=ax.transAxes,
+                ha="left",
+                va="top",
+                fontsize=9,
+                bbox=dict(boxstyle="round", facecolor="white", alpha=0.8),
+            )
 
             plt.tight_layout()
 
             buf = io.BytesIO()
-            plt.savefig(buf, format='png', dpi=100)
+            plt.savefig(buf, format="png", dpi=100)
             buf.seek(0)
             img = Image.open(buf)
 
@@ -455,7 +490,9 @@ class TopSequencesScatterStrategy(MetadataScatterStrategy):
     ) -> Dict[str, Any]:
         """Generate top sequences scatter plot."""
         # Use base class filtering
-        filtered_meta, codes_list, _ = self._filter_samples_with_metadata(cache, ["action"])
+        filtered_meta, codes_list, _ = self._filter_samples_with_metadata(
+            cache, ["action"]
+        )
 
         if len(filtered_meta) < self.min_samples:
             return self.no_output("insufficient_action_metadata")
@@ -481,8 +518,9 @@ class TopSequencesScatterStrategy(MetadataScatterStrategy):
 
         wandb_logger = self._get_wandb_logger(trainer)
         if wandb_logger is not None:
-            self._create_top_scatter(actions, categories, top_seqs_counts,
-                                     wandb_logger, trainer.global_step)
+            self._create_top_scatter(
+                actions, categories, top_seqs_counts, wandb_logger, trainer.global_step
+            )
 
         return self.success(produced=int(len(actions)))
 
@@ -504,38 +542,54 @@ class TopSequencesScatterStrategy(MetadataScatterStrategy):
             # Plot "Other" (Grey) first
             mask_other = cats_np == -1
             if np.any(mask_other):
-                ax.scatter(actions_np[mask_other, 0], actions_np[mask_other, 1],
-                          c='lightgrey', alpha=0.5, s=15,
-                          label=f'Others ({np.sum(mask_other)})', zorder=1)
+                ax.scatter(
+                    actions_np[mask_other, 0],
+                    actions_np[mask_other, 1],
+                    c="lightgrey",
+                    alpha=0.5,
+                    s=15,
+                    label=f"Others ({np.sum(mask_other)})",
+                    zorder=1,
+                )
 
             # Plot Top N with distinct colors
             colors = plt.cm.tab10.colors
             for i, (seq, count) in enumerate(top_seqs_counts):
                 mask = cats_np == i
                 if np.any(mask):
-                    ax.scatter(actions_np[mask, 0], actions_np[mask, 1],
-                              c=[colors[i % len(colors)]], alpha=0.9, s=30,
-                              label=f'{seq}: {count}', zorder=2)
+                    ax.scatter(
+                        actions_np[mask, 0],
+                        actions_np[mask, 1],
+                        c=[colors[i % len(colors)]],
+                        alpha=0.9,
+                        s=30,
+                        label=f"{seq}: {count}",
+                        zorder=2,
+                    )
 
-            ax.set_xlabel('Action X (cumulative dx)')
-            ax.set_ylabel('Action Y (cumulative dy)')
-            ax.set_title(f'Top {self.num_top_sequences} Sequences vs Action (Step {global_step})')
-            ax.axhline(y=0, color='k', linestyle='-', linewidth=0.5, alpha=0.3)
-            ax.axvline(x=0, color='k', linestyle='-', linewidth=0.5, alpha=0.3)
-            ax.set_aspect('equal', adjustable='box')
-            ax.legend(loc='upper right', fontsize=8, framealpha=0.9)
+            ax.set_xlabel("Action X (cumulative dx)")
+            ax.set_ylabel("Action Y (cumulative dy)")
+            ax.set_title(
+                f"Top {self.num_top_sequences} Sequences vs Action (Step {global_step})"
+            )
+            ax.axhline(y=0, color="k", linestyle="-", linewidth=0.5, alpha=0.3)
+            ax.axvline(x=0, color="k", linestyle="-", linewidth=0.5, alpha=0.3)
+            ax.set_aspect("equal", adjustable="box")
+            ax.legend(loc="upper right", fontsize=8, framealpha=0.9)
 
             plt.tight_layout()
 
             buf = io.BytesIO()
-            plt.savefig(buf, format='png', dpi=100)
+            plt.savefig(buf, format="png", dpi=100)
             buf.seek(0)
             img = Image.open(buf)
 
             wandb_logger.log_image(
                 key=f"val/top_sequences_scatter{metric_suffix}",
                 images=[img],
-                caption=[f"Step {global_step}: Top {self.num_top_sequences} sequences highlighted"],
+                caption=[
+                    f"Step {global_step}: Top {self.num_top_sequences} sequences highlighted"
+                ],
             )
 
             plt.close(fig)
@@ -584,7 +638,9 @@ class StateSequenceScatterStrategy(MetadataScatterStrategy):
     ) -> Dict[str, Any]:
         """Generate state-sequence scatter plot."""
         # Use base class filtering
-        filtered_meta, codes_list, _ = self._filter_samples_with_metadata(cache, ["initial_state"])
+        filtered_meta, codes_list, _ = self._filter_samples_with_metadata(
+            cache, ["initial_state"]
+        )
 
         if len(filtered_meta) < self.min_samples:
             return self.no_output("insufficient_state_metadata")
@@ -609,8 +665,9 @@ class StateSequenceScatterStrategy(MetadataScatterStrategy):
 
         wandb_logger = self._get_wandb_logger(trainer)
         if wandb_logger is not None:
-            self._create_state_scatter(states, categories, top_seqs_counts,
-                                       wandb_logger, trainer.global_step)
+            self._create_state_scatter(
+                states, categories, top_seqs_counts, wandb_logger, trainer.global_step
+            )
 
         return self.success(produced=int(len(states)))
 
@@ -632,41 +689,59 @@ class StateSequenceScatterStrategy(MetadataScatterStrategy):
 
             fig, ax = plt.subplots(figsize=(10, 8))
 
-            cmap = plt.cm.get_cmap('tab20', self.num_top_sequences)
-            markers = ['o', 's', '^', 'D', 'v', '<', '>', 'p', '*', 'h', 'H', '+', 'x']
+            cmap = plt.cm.get_cmap("tab20", self.num_top_sequences)
+            markers = ["o", "s", "^", "D", "v", "<", ">", "p", "*", "h", "H", "+", "x"]
 
             # Plot "Other" (Grey) first
             mask_other = cats_np == -1
             if np.any(mask_other):
-                ax.scatter(states_np[mask_other, 0], states_np[mask_other, 1],
-                          c='lightgrey', marker='.', alpha=0.3, s=15,
-                          label=f'Others ({np.sum(mask_other)})', zorder=1)
+                ax.scatter(
+                    states_np[mask_other, 0],
+                    states_np[mask_other, 1],
+                    c="lightgrey",
+                    marker=".",
+                    alpha=0.3,
+                    s=15,
+                    label=f"Others ({np.sum(mask_other)})",
+                    zorder=1,
+                )
 
             # Plot Top N with markers
             for i, (seq, count) in enumerate(top_seqs_counts):
                 mask = cats_np == i
                 if np.any(mask):
-                    ax.scatter(states_np[mask, 0], states_np[mask, 1],
-                              color=cmap(i), marker=markers[i % len(markers)],
-                              alpha=0.8, s=40, label=f'{seq}: {count}', zorder=2)
+                    ax.scatter(
+                        states_np[mask, 0],
+                        states_np[mask, 1],
+                        color=cmap(i),
+                        marker=markers[i % len(markers)],
+                        alpha=0.8,
+                        s=40,
+                        label=f"{seq}: {count}",
+                        zorder=2,
+                    )
 
-            ax.set_xlabel('State X')
-            ax.set_ylabel('State Y')
-            ax.set_title(f'State vs Top {self.num_top_sequences} Sequences (Step {global_step})')
+            ax.set_xlabel("State X")
+            ax.set_ylabel("State Y")
+            ax.set_title(
+                f"State vs Top {self.num_top_sequences} Sequences (Step {global_step})"
+            )
             ax.grid(True, alpha=0.3)
-            ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left', fontsize=8)
+            ax.legend(bbox_to_anchor=(1.05, 1), loc="upper left", fontsize=8)
 
             plt.tight_layout()
 
             buf = io.BytesIO()
-            plt.savefig(buf, format='png', dpi=100)
+            plt.savefig(buf, format="png", dpi=100)
             buf.seek(0)
             img = Image.open(buf)
 
             wandb_logger.log_image(
                 key=f"val/state_sequence_scatter{metric_suffix}",
                 images=[img],
-                caption=[f"Step {global_step}: Top {self.num_top_sequences} sequences by state"],
+                caption=[
+                    f"Step {global_step}: Top {self.num_top_sequences} sequences by state"
+                ],
             )
 
             plt.close(fig)

@@ -9,14 +9,18 @@ from typing import Any
 def _resolve_libero_benchmark_root() -> Path:
     spec = importlib.util.find_spec("libero")
     if spec is None or spec.origin is None:
-        raise RuntimeError("LIBERO package is not importable; cannot bootstrap LIBERO config")
+        raise RuntimeError(
+            "LIBERO package is not importable; cannot bootstrap LIBERO config"
+        )
 
     package_dir = Path(spec.origin).resolve().parent
     benchmark_root = package_dir / "libero"
     if not (benchmark_root / "bddl_files").exists():
         benchmark_root = package_dir
     if not (benchmark_root / "bddl_files").exists():
-        raise RuntimeError(f"Could not locate LIBERO benchmark assets under {package_dir}")
+        raise RuntimeError(
+            f"Could not locate LIBERO benchmark assets under {package_dir}"
+        )
     return benchmark_root
 
 

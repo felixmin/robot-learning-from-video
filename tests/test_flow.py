@@ -130,7 +130,9 @@ class TestFlowConfig:
 
     def test_invalid_summary_loss_weight_negative(self):
         """Test that negative summary loss weight raises error."""
-        with pytest.raises(ValueError, match="summary_loss_weight must be non-negative"):
+        with pytest.raises(
+            ValueError, match="summary_loss_weight must be non-negative"
+        ):
             FlowConfig(
                 model="raft_small",
                 loss_weight=0.1,
@@ -319,131 +321,143 @@ class TestLAMWithFlow:
     def training_config(self):
         """Create training config for testing."""
         from omegaconf import OmegaConf
-        return OmegaConf.create({
-            "metrics": {
-                "log_every_n_steps": 1,
-                "num_unique_codes_every_n_steps": 1,
-            },
-            "optimizer": {
-                "type": "AdamW",
-                "lr": 1e-4,
-                "betas": [0.9, 0.999],
-                "eps": 1e-8,
-                "weight_decay": 0.01,
-            },
-            "scheduler": {"type": "none"},
-        })
+
+        return OmegaConf.create(
+            {
+                "metrics": {
+                    "log_every_n_steps": 1,
+                    "num_unique_codes_every_n_steps": 1,
+                },
+                "optimizer": {
+                    "type": "AdamW",
+                    "lr": 1e-4,
+                    "betas": [0.9, 0.999],
+                    "eps": 1e-8,
+                    "weight_decay": 0.01,
+                },
+                "scheduler": {"type": "none"},
+            }
+        )
 
     @pytest.fixture
     def lam_config_with_flow(self):
         """Create minimal LAM config with flow for testing."""
         from omegaconf import OmegaConf
-        return OmegaConf.create({
-            "dim": 64,
-            "quant_dim": 16,
-            "codebook_size": 8,
-            "image_size": 128,
-            "patch_size": 16,
-            "spatial_depth": 2,
-            "temporal_depth": 2,
-            "dim_head": 16,
-            "heads": 4,
-            "code_seq_len": 1,
-            "channels": 3,
-            "attn_dropout": 0.0,
-            "ff_dropout": 0.0,
-            "vq_discarding_threshold": 0.1,
-            "latent_ablation": "none",
-            "use_dinov3_encoder": False,
-            "dinov3_model_name": "facebook/dinov3-vits16-pretrain-lvd1689m",
-            "dinov3_pool_to_grid": None,
-            "dino": {
-                "enabled": False,
-            },
-            "use_pixel_decoder": False,
-            "use_aux_decoder": False,
-            "codebook_replace_schedule": [[10, 100]],
-            "flow": {
-                "enabled": True,
-                "model": "raft_small",
-                "loss_weight": 0.1,
-                "decoder_depth": 2,
-                "warmup_steps": 0,
-                "teacher_num_flow_updates": 4,
-                "teacher_chunk_size": 64,
-                "summary_loss_weight": 0.2,
-                "summary_static_eps": 1e-5,
+
+        return OmegaConf.create(
+            {
+                "dim": 64,
+                "quant_dim": 16,
+                "codebook_size": 8,
+                "image_size": 128,
+                "patch_size": 16,
+                "spatial_depth": 2,
+                "temporal_depth": 2,
+                "dim_head": 16,
+                "heads": 4,
+                "code_seq_len": 1,
+                "channels": 3,
+                "attn_dropout": 0.0,
+                "ff_dropout": 0.0,
+                "vq_discarding_threshold": 0.1,
+                "latent_ablation": "none",
+                "use_dinov3_encoder": False,
+                "dinov3_model_name": "facebook/dinov3-vits16-pretrain-lvd1689m",
+                "dinov3_pool_to_grid": None,
+                "dino": {
+                    "enabled": False,
+                },
+                "use_pixel_decoder": False,
+                "use_aux_decoder": False,
+                "codebook_replace_schedule": [[10, 100]],
+                "flow": {
+                    "enabled": True,
+                    "model": "raft_small",
+                    "loss_weight": 0.1,
+                    "decoder_depth": 2,
+                    "warmup_steps": 0,
+                    "teacher_num_flow_updates": 4,
+                    "teacher_chunk_size": 64,
+                    "summary_loss_weight": 0.2,
+                    "summary_static_eps": 1e-5,
+                },
             }
-        })
+        )
 
     @pytest.fixture
     def lam_config_without_flow(self):
         """Create minimal LAM config without flow for testing."""
         from omegaconf import OmegaConf
-        return OmegaConf.create({
-            "dim": 64,
-            "quant_dim": 16,
-            "codebook_size": 8,
-            "image_size": 128,
-            "patch_size": 16,
-            "spatial_depth": 2,
-            "temporal_depth": 2,
-            "dim_head": 16,
-            "heads": 4,
-            "code_seq_len": 1,
-            "channels": 3,
-            "attn_dropout": 0.0,
-            "ff_dropout": 0.0,
-            "vq_discarding_threshold": 0.1,
-            "latent_ablation": "none",
-            "use_dinov3_encoder": False,
-            "dinov3_model_name": "facebook/dinov3-vits16-pretrain-lvd1689m",
-            "dinov3_pool_to_grid": None,
-            "dino": {
-                "enabled": True,
-                "loss_weight": 1.0,
-                "warmup_steps": 0,
-            },
-            "use_pixel_decoder": False,
-            "use_aux_decoder": False,
-            "codebook_replace_schedule": [[10, 100]],
-        })
+
+        return OmegaConf.create(
+            {
+                "dim": 64,
+                "quant_dim": 16,
+                "codebook_size": 8,
+                "image_size": 128,
+                "patch_size": 16,
+                "spatial_depth": 2,
+                "temporal_depth": 2,
+                "dim_head": 16,
+                "heads": 4,
+                "code_seq_len": 1,
+                "channels": 3,
+                "attn_dropout": 0.0,
+                "ff_dropout": 0.0,
+                "vq_discarding_threshold": 0.1,
+                "latent_ablation": "none",
+                "use_dinov3_encoder": False,
+                "dinov3_model_name": "facebook/dinov3-vits16-pretrain-lvd1689m",
+                "dinov3_pool_to_grid": None,
+                "dino": {
+                    "enabled": True,
+                    "loss_weight": 1.0,
+                    "warmup_steps": 0,
+                },
+                "use_pixel_decoder": False,
+                "use_aux_decoder": False,
+                "codebook_replace_schedule": [[10, 100]],
+            }
+        )
 
     @pytest.fixture
     def lam_config_with_flow_disabled(self):
         """Create minimal LAM config with flow explicitly disabled."""
         from omegaconf import OmegaConf
-        return OmegaConf.create({
-            "dim": 64,
-            "quant_dim": 16,
-            "codebook_size": 8,
-            "image_size": 128,
-            "patch_size": 16,
-            "spatial_depth": 2,
-            "temporal_depth": 2,
-            "dim_head": 16,
-            "heads": 4,
-            "code_seq_len": 1,
-            "channels": 3,
-            "attn_dropout": 0.0,
-            "ff_dropout": 0.0,
-            "vq_discarding_threshold": 0.1,
-            "latent_ablation": "none",
-            "use_dinov3_encoder": False,
-            "dinov3_model_name": "facebook/dinov3-vits16-pretrain-lvd1689m",
-            "dinov3_pool_to_grid": None,
-            "dino": {
-                "enabled": True,
-                "loss_weight": 1.0,
-                "warmup_steps": 0,
-            },
-            "use_pixel_decoder": False,
-            "use_aux_decoder": False,
-            "codebook_replace_schedule": [[10, 100]],
-            "flow": {
-                "enabled": False,
-            },
-        })
+
+        return OmegaConf.create(
+            {
+                "dim": 64,
+                "quant_dim": 16,
+                "codebook_size": 8,
+                "image_size": 128,
+                "patch_size": 16,
+                "spatial_depth": 2,
+                "temporal_depth": 2,
+                "dim_head": 16,
+                "heads": 4,
+                "code_seq_len": 1,
+                "channels": 3,
+                "attn_dropout": 0.0,
+                "ff_dropout": 0.0,
+                "vq_discarding_threshold": 0.1,
+                "latent_ablation": "none",
+                "use_dinov3_encoder": False,
+                "dinov3_model_name": "facebook/dinov3-vits16-pretrain-lvd1689m",
+                "dinov3_pool_to_grid": None,
+                "dino": {
+                    "enabled": True,
+                    "loss_weight": 1.0,
+                    "warmup_steps": 0,
+                },
+                "use_pixel_decoder": False,
+                "use_aux_decoder": False,
+                "codebook_replace_schedule": [[10, 100]],
+                "flow": {
+                    "enabled": False,
+                },
+            }
+        )
 
     def test_flow_config_parsed(self, lam_config_with_flow, training_config):
         """Test that flow config is correctly parsed in task."""
@@ -461,7 +475,9 @@ class TestLAMWithFlow:
         assert task.model.flow_decoder is not None
         assert task.model.flow_teacher is not None
 
-    def test_no_flow_when_not_configured(self, lam_config_without_flow, training_config):
+    def test_no_flow_when_not_configured(
+        self, lam_config_without_flow, training_config
+    ):
         """Test that missing flow config fails fast."""
         from lam.task import LAMTask
         from omegaconf.errors import ConfigAttributeError
@@ -472,7 +488,9 @@ class TestLAMWithFlow:
                 training_config=training_config,
             )
 
-    def test_no_flow_when_explicitly_disabled(self, lam_config_with_flow_disabled, training_config):
+    def test_no_flow_when_explicitly_disabled(
+        self, lam_config_with_flow_disabled, training_config
+    ):
         """Test that flow is disabled when configured with enabled=false."""
         from lam.task import LAMTask
 
@@ -493,6 +511,7 @@ class TestHydraConfigWithFlow:
     def config_dir(self):
         """Get path to config directory."""
         from pathlib import Path
+
         return str(Path(__file__).parent.parent / "config")
 
     def test_stage1_local_loads(self, config_dir):

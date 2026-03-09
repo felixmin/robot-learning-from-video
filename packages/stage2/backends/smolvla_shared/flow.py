@@ -39,7 +39,9 @@ def sample_beta_time(
     return time_beta * 0.999 + 0.001
 
 
-def make_noisy_target(target: Tensor, noise: Tensor, time: Tensor) -> tuple[Tensor, Tensor]:
+def make_noisy_target(
+    target: Tensor, noise: Tensor, time: Tensor
+) -> tuple[Tensor, Tensor]:
     time_expanded = time.reshape(time.shape[0], *([1] * (target.ndim - 1)))
     x_t = time_expanded * noise + (1.0 - time_expanded) * target
     u_t = noise - target
@@ -61,7 +63,9 @@ def reverse_euler_integration(
 
     for step in range(num_steps):
         t_val = 1.0 + step * dt
-        time = torch.full((batch_size,), t_val, dtype=initial.dtype, device=initial.device)
+        time = torch.full(
+            (batch_size,), t_val, dtype=initial.dtype, device=initial.device
+        )
         v_t = velocity_fn(x_t, time)
         x_t = x_t + dt * v_t
 

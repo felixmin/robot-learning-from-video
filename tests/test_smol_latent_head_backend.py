@@ -18,7 +18,9 @@ from stage2.policy_inputs import ChatConfig
 
 
 class FakeProcessor:
-    def apply_chat_template(self, messages, tokenize: bool, add_generation_prompt: bool):
+    def apply_chat_template(
+        self, messages, tokenize: bool, add_generation_prompt: bool
+    ):
         assert tokenize is False
         parts: List[str] = []
         for msg in messages:
@@ -47,16 +49,29 @@ class FakeProcessor:
             input_ids[i, :l] = torch.arange(1, l + 1, dtype=torch.long)
             attention_mask[i, :l] = 1
         pixel_values = torch.zeros((b, 3, 8, 8), dtype=torch.float32)
-        return {"input_ids": input_ids, "attention_mask": attention_mask, "pixel_values": pixel_values}
+        return {
+            "input_ids": input_ids,
+            "attention_mask": attention_mask,
+            "pixel_values": pixel_values,
+        }
 
 
 class DummyVLM(torch.nn.Module):
     def __init__(self, hidden_size: int):
         super().__init__()
-        self.config = SimpleNamespace(text_config=SimpleNamespace(hidden_size=hidden_size))
+        self.config = SimpleNamespace(
+            text_config=SimpleNamespace(hidden_size=hidden_size)
+        )
         self.proj = torch.nn.Linear(1, hidden_size, bias=False)
 
-    def forward(self, input_ids, attention_mask, pixel_values, output_hidden_states: bool, return_dict: bool):
+    def forward(
+        self,
+        input_ids,
+        attention_mask,
+        pixel_values,
+        output_hidden_states: bool,
+        return_dict: bool,
+    ):
         assert output_hidden_states is True
         assert return_dict is True
         b, l = input_ids.shape
@@ -67,7 +82,14 @@ class DummyVLM(torch.nn.Module):
 
 
 class DummyVLMWithBf16Hidden(DummyVLM):
-    def forward(self, input_ids, attention_mask, pixel_values, output_hidden_states: bool, return_dict: bool):
+    def forward(
+        self,
+        input_ids,
+        attention_mask,
+        pixel_values,
+        output_hidden_states: bool,
+        return_dict: bool,
+    ):
         out = super().forward(
             input_ids,
             attention_mask,
@@ -98,9 +120,13 @@ def test_smol_latent_head_backend_loss_and_latents():
 
     batch = Stage2Batch(
         image_streams={
-            "observation.images.rgb": torch.randint(0, 256, (2, 2, 8, 8, 3), dtype=torch.uint8),
+            "observation.images.rgb": torch.randint(
+                0, 256, (2, 2, 8, 8, 3), dtype=torch.uint8
+            ),
         },
-        image_padding_masks={"observation.images.rgb": torch.ones((2, 2), dtype=torch.bool)},
+        image_padding_masks={
+            "observation.images.rgb": torch.ones((2, 2), dtype=torch.bool)
+        },
         task_text=["pick", "place"],
         target_codes=torch.tensor([[1, 2, 3, 4], [4, 3, 2, 1]], dtype=torch.long),
     )
@@ -133,9 +159,13 @@ def test_smol_latent_head_backend_handles_dtype_mismatch():
 
     batch = Stage2Batch(
         image_streams={
-            "observation.images.rgb": torch.randint(0, 256, (2, 2, 8, 8, 3), dtype=torch.uint8),
+            "observation.images.rgb": torch.randint(
+                0, 256, (2, 2, 8, 8, 3), dtype=torch.uint8
+            ),
         },
-        image_padding_masks={"observation.images.rgb": torch.ones((2, 2), dtype=torch.bool)},
+        image_padding_masks={
+            "observation.images.rgb": torch.ones((2, 2), dtype=torch.bool)
+        },
         task_text=["pick", "place"],
         target_codes=torch.tensor([[1, 2, 3, 4], [4, 3, 2, 1]], dtype=torch.long),
     )
@@ -168,9 +198,13 @@ def test_smol_flow_action_backend_multitask():
 
     batch = Stage2Batch(
         image_streams={
-            "observation.images.rgb": torch.randint(0, 256, (2, 2, 8, 8, 3), dtype=torch.uint8),
+            "observation.images.rgb": torch.randint(
+                0, 256, (2, 2, 8, 8, 3), dtype=torch.uint8
+            ),
         },
-        image_padding_masks={"observation.images.rgb": torch.ones((2, 2), dtype=torch.bool)},
+        image_padding_masks={
+            "observation.images.rgb": torch.ones((2, 2), dtype=torch.bool)
+        },
         task_text=["pick", "place"],
         target_latent_vectors=torch.randn(2, 4, 2),
         target_actions=torch.randn(2, 3),

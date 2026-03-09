@@ -8,7 +8,10 @@ import torch
 from stage2.action_tokens import ActionTokenConfig
 from stage2.constrained_decode import ActionTokenIds
 from stage2.policy_inputs import ChatConfig
-from stage2.legacy.policy_module_legacy import PolicyTokenLightningModule, PolicyOptimizerConfig
+from stage2.legacy.policy_module_legacy import (
+    PolicyTokenLightningModule,
+    PolicyOptimizerConfig,
+)
 
 
 class DummyCodeProvider:
@@ -70,7 +73,11 @@ class DummyPolicyModelWithGenerate(torch.nn.Module):
     ):
         b, t = input_ids.shape
         # Emit the correct sequence for every sample.
-        sep = self.token_ids.between_token_ids[0] if self.token_ids.between_token_ids else None
+        sep = (
+            self.token_ids.between_token_ids[0]
+            if self.token_ids.between_token_ids
+            else None
+        )
         suffix = torch.tensor(
             [
                 self.token_ids.action_start_id,
@@ -157,11 +164,15 @@ def test_predict_codes_slices_generated_suffix_after_padded_prompt():
     # Different prompt lengths => padding in the prompt batch.
     instructions = ["a b c d", "x"]
 
-    _pred_codes, debug = module._predict_codes_with_debug(frames=frames, instructions=instructions)
+    _pred_codes, debug = module._predict_codes_with_debug(
+        frames=frames, instructions=instructions
+    )
     assert len(debug) == 2
     for rec in debug:
         suffix = rec.get("generated_suffix_ids")
-        assert isinstance(suffix, list) and suffix, "missing generated_suffix_ids in debug"
+        assert (
+            isinstance(suffix, list) and suffix
+        ), "missing generated_suffix_ids in debug"
         assert suffix[0] == token_ids.action_start_id
         assert rec.get("has_action_start") is True
         assert rec.get("has_action_end") is True

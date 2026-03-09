@@ -9,7 +9,9 @@ from common.lerobot_v3_types import BatchedDatasetSample
 def _batched_sample(time_steps: int = 2) -> BatchedDatasetSample:
     return BatchedDatasetSample(
         image_streams={
-            "primary": torch.arange(2 * time_steps * 3 * 4 * 4, dtype=torch.uint8).reshape(2, time_steps, 3, 4, 4),
+            "primary": torch.arange(
+                2 * time_steps * 3 * 4 * 4, dtype=torch.uint8
+            ).reshape(2, time_steps, 3, 4, 4),
             "wrist": torch.ones((2, time_steps, 3, 4, 4), dtype=torch.uint8),
         },
         image_padding_masks={

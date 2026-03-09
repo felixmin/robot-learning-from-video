@@ -91,20 +91,28 @@ class PolicyTokenLightningModule(pl.LightningModule):
         return (int(self.global_step) % int(interval)) == 0
 
     def training_step(self, batch: Any, batch_idx: int) -> torch.Tensor:
-        loss, codes, _frames, _instructions, inputs, outputs = self._loss_from_batch(batch)
+        loss, codes, _frames, _instructions, inputs, outputs = self._loss_from_batch(
+            batch
+        )
 
         self.log("train/loss", loss, prog_bar=True, sync_dist=True)
         if self._should_log_train_teacher_forced_metrics():
             self._log_gt_code_stats(stage="train", codes=codes)
-            self._log_teacher_forced_code_metrics(stage="train", inputs=inputs, outputs=outputs)
+            self._log_teacher_forced_code_metrics(
+                stage="train", inputs=inputs, outputs=outputs
+            )
         return loss
 
     def validation_step(self, batch: Any, batch_idx: int) -> torch.Tensor:
-        loss, codes, frames, instructions, inputs, outputs = self._loss_from_batch(batch)
+        loss, codes, frames, instructions, inputs, outputs = self._loss_from_batch(
+            batch
+        )
 
         self.log("val/loss", loss, prog_bar=True, sync_dist=True)
         self._log_gt_code_stats(stage="val", codes=codes)
-        self._log_teacher_forced_code_metrics(stage="val", inputs=inputs, outputs=outputs)
+        self._log_teacher_forced_code_metrics(
+            stage="val", inputs=inputs, outputs=outputs
+        )
 
         if (
             self.action_token_ids is not None
@@ -114,7 +122,9 @@ class PolicyTokenLightningModule(pl.LightningModule):
             pred_codes, gen_debug = self._predict_codes_with_debug(
                 frames=frames, instructions=instructions
             )
-            metrics = self._compute_generation_metrics(gt_codes=codes, pred_codes=pred_codes)
+            metrics = self._compute_generation_metrics(
+                gt_codes=codes, pred_codes=pred_codes
+            )
             self.log(
                 "val/token_accuracy",
                 metrics["token_accuracy"],
@@ -130,32 +140,54 @@ class PolicyTokenLightningModule(pl.LightningModule):
             # Generation-parse health diagnostics.
             if gen_debug:
                 start_frac = torch.tensor(
-                    sum(1 for r in gen_debug if r.get("has_action_start")) / float(len(gen_debug)),
+                    sum(1 for r in gen_debug if r.get("has_action_start"))
+                    / float(len(gen_debug)),
                     device=self.device,
                     dtype=torch.float32,
                 )
                 end_frac = torch.tensor(
-                    sum(1 for r in gen_debug if r.get("has_action_end")) / float(len(gen_debug)),
+                    sum(1 for r in gen_debug if r.get("has_action_end"))
+                    / float(len(gen_debug)),
                     device=self.device,
                     dtype=torch.float32,
                 )
                 mean_codes = torch.tensor(
-                    sum(int(r.get("num_codes_parsed", 0)) for r in gen_debug) / float(len(gen_debug)),
+                    sum(int(r.get("num_codes_parsed", 0)) for r in gen_debug)
+                    / float(len(gen_debug)),
                     device=self.device,
                     dtype=torch.float32,
                 )
-                self.log("val/gen_has_action_start_frac", start_frac, prog_bar=False, sync_dist=True)
-                self.log("val/gen_has_action_end_frac", end_frac, prog_bar=False, sync_dist=True)
-                self.log("val/gen_num_codes_parsed_mean", mean_codes, prog_bar=False, sync_dist=True)
+                self.log(
+                    "val/gen_has_action_start_frac",
+                    start_frac,
+                    prog_bar=False,
+                    sync_dist=True,
+                )
+                self.log(
+                    "val/gen_has_action_end_frac",
+                    end_frac,
+                    prog_bar=False,
+                    sync_dist=True,
+                )
+                self.log(
+                    "val/gen_num_codes_parsed_mean",
+                    mean_codes,
+                    prog_bar=False,
+                    sync_dist=True,
+                )
             # Stash a small sample for visualization callbacks (rank0 only will use it).
             try:
                 max_items = min(64, len(instructions), len(pred_codes))
-                episode_id = batch.get("episode_id") if isinstance(batch, dict) else None
+                episode_id = (
+                    batch.get("episode_id") if isinstance(batch, dict) else None
+                )
                 frame_idx = batch.get("frame_idx") if isinstance(batch, dict) else None
                 self._last_val_sample = {
                     "frames": frames[:max_items].detach().cpu(),
                     "instructions": list(instructions[:max_items]),
-                    "gt_codes": [row.tolist() for row in codes[:max_items].detach().cpu()],
+                    "gt_codes": [
+                        row.tolist() for row in codes[:max_items].detach().cpu()
+                    ],
                     "pred_codes": [list(row) for row in pred_codes[:max_items]],
                     "gen_debug": gen_debug[:max_items],
                     "episode_id": list(episode_id[:max_items]) if episode_id else None,
@@ -166,9 +198,7 @@ class PolicyTokenLightningModule(pl.LightningModule):
 
         return loss
 
-    def _loss_from_batch(
-        self, batch: Any
-    ) -> tuple[
+    def _loss_from_batch(self, batch: Any) -> tuple[
         torch.Tensor,
         torch.Tensor,
         torch.Tensor,
@@ -288,7 +318,9 @@ class PolicyTokenLightningModule(pl.LightningModule):
 
         # Identify positions where the supervision token is an action code token.
         active = shift_labels != -100
-        is_code = (shift_labels.unsqueeze(-1) == code_ids.view(1, 1, -1)).any(dim=-1) & active
+        is_code = (shift_labels.unsqueeze(-1) == code_ids.view(1, 1, -1)).any(
+            dim=-1
+        ) & active
 
         on_step = stage == "train"
         on_epoch = not on_step
@@ -408,7 +440,9 @@ class PolicyTokenLightningModule(pl.LightningModule):
         self, *, gt_codes: torch.Tensor, pred_codes: list[list[int]]
     ) -> dict[str, torch.Tensor]:
         if gt_codes.ndim != 2:
-            raise ValueError(f"Expected gt_codes [B, S], got shape {tuple(gt_codes.shape)}")
+            raise ValueError(
+                f"Expected gt_codes [B, S], got shape {tuple(gt_codes.shape)}"
+            )
         if len(pred_codes) != gt_codes.shape[0]:
             raise ValueError("Batch size mismatch between gt_codes and pred_codes")
 
@@ -429,13 +463,21 @@ class PolicyTokenLightningModule(pl.LightningModule):
         token_acc = 0.0 if total == 0 else (correct / total)
         seq_acc = 0.0 if gt_codes.shape[0] == 0 else (seq_correct / gt_codes.shape[0])
         return {
-            "token_accuracy": torch.tensor(token_acc, device=self.device, dtype=torch.float32),
-            "sequence_accuracy": torch.tensor(seq_acc, device=self.device, dtype=torch.float32),
+            "token_accuracy": torch.tensor(
+                token_acc, device=self.device, dtype=torch.float32
+            ),
+            "sequence_accuracy": torch.tensor(
+                seq_acc, device=self.device, dtype=torch.float32
+            ),
         }
 
     @torch.no_grad()
-    def _predict_codes(self, *, frames: torch.Tensor, instructions: list[str]) -> list[list[int]]:
-        pred_codes, _debug = self._predict_codes_with_debug(frames=frames, instructions=instructions)
+    def _predict_codes(
+        self, *, frames: torch.Tensor, instructions: list[str]
+    ) -> list[list[int]]:
+        pred_codes, _debug = self._predict_codes_with_debug(
+            frames=frames, instructions=instructions
+        )
         return pred_codes
 
     @torch.no_grad()
@@ -463,7 +505,9 @@ class PolicyTokenLightningModule(pl.LightningModule):
 
         token_ids = self.action_token_ids
         if token_ids is None:
-            raise RuntimeError("action_token_ids is required for constrained generation")
+            raise RuntimeError(
+                "action_token_ids is required for constrained generation"
+            )
         prefix_fn = make_prefix_allowed_tokens_fn(token_ids)
 
         # Constrained generations must include any separator tokens (e.g., spaces) that
@@ -525,7 +569,9 @@ class PolicyTokenLightningModule(pl.LightningModule):
                 "has_action_end": has_end,
                 "num_codes_parsed": int(sum(1 for x in pred if int(x) >= 0)),
                 "prompt_padded_len": int(prompt_len),
-                "prompt_true_len": int(prompt_true_len) if prompt_true_len is not None else None,
+                "prompt_true_len": (
+                    int(prompt_true_len) if prompt_true_len is not None else None
+                ),
             }
             if decode is not None:
                 # Include padding in the prompt decode so it is visible.
@@ -546,11 +592,18 @@ class PolicyTokenLightningModule(pl.LightningModule):
                 prompt_ids = [int(x) for x in input_ids[i].tolist()]
                 dbg["prompt_input_ids"] = prompt_ids[:max_prompt_ids]
                 dbg["prompt_input_ids_truncated"] = len(prompt_ids) > max_prompt_ids
-                if isinstance(attention_mask, torch.Tensor) and attention_mask.ndim == 2:
+                if (
+                    isinstance(attention_mask, torch.Tensor)
+                    and attention_mask.ndim == 2
+                ):
                     mask_ids = [int(x) for x in attention_mask[i].tolist()]
                     dbg["prompt_attention_mask"] = mask_ids[:max_mask_ids]
-                    dbg["prompt_attention_mask_truncated"] = len(mask_ids) > max_mask_ids
-                dbg["generated_suffix_ids"] = [int(x) for x in gen_suffix[:max_suffix_ids]]
+                    dbg["prompt_attention_mask_truncated"] = (
+                        len(mask_ids) > max_mask_ids
+                    )
+                dbg["generated_suffix_ids"] = [
+                    int(x) for x in gen_suffix[:max_suffix_ids]
+                ]
                 dbg["generated_suffix_ids_truncated"] = len(gen_suffix) > max_suffix_ids
             except Exception:
                 pass

@@ -20,10 +20,10 @@ from lam.models.attention import (
 def attention_config():
     """Default attention configuration."""
     return {
-        'dim': 1024,
-        'dim_head': 64,
-        'heads': 16,
-        'dropout': 0.0,
+        "dim": 1024,
+        "dim_head": 64,
+        "heads": 16,
+        "dropout": 0.0,
     }
 
 
@@ -31,12 +31,12 @@ def attention_config():
 def transformer_config():
     """Default transformer configuration."""
     return {
-        'dim': 1024,
-        'depth': 8,
-        'dim_head': 64,
-        'heads': 16,
-        'attn_dropout': 0.0,
-        'ff_dropout': 0.0,
+        "dim": 1024,
+        "depth": 8,
+        "dim_head": 64,
+        "heads": 16,
+        "attn_dropout": 0.0,
+        "ff_dropout": 0.0,
     }
 
 
@@ -103,7 +103,7 @@ class TestPEG:
         dim = 1024
         peg = PEG(dim, causal=False)
 
-        assert hasattr(peg, 'dsconv')
+        assert hasattr(peg, "dsconv")
         assert peg.causal == False
 
     def test_peg_forward_with_shape(self, device):
@@ -143,7 +143,7 @@ class TestContinuousPositionBias:
 
         bias = ContinuousPositionBias(dim=dim, heads=heads)
 
-        assert hasattr(bias, 'net')
+        assert hasattr(bias, "net")
 
     def test_continuous_position_bias_forward(self, device):
         """Test ContinuousPositionBias forward pass."""
@@ -168,16 +168,16 @@ class TestAttention:
         """Test Attention initializes correctly."""
         attn = Attention(**attention_config)
 
-        assert attn.heads == attention_config['heads']
-        assert hasattr(attn, 'to_q')
-        assert hasattr(attn, 'to_kv')
-        assert hasattr(attn, 'to_out')
+        assert attn.heads == attention_config["heads"]
+        assert hasattr(attn, "to_q")
+        assert hasattr(attn, "to_kv")
+        assert hasattr(attn, "to_out")
 
     def test_attention_self_attention(self, attention_config, device):
         """Test self-attention forward pass."""
         batch_size, seq_len = 2, 64
 
-        x = torch.randn(batch_size, seq_len, attention_config['dim'], device=device)
+        x = torch.randn(batch_size, seq_len, attention_config["dim"], device=device)
 
         attn = Attention(**attention_config).to(device)
         output = attn(x)
@@ -204,9 +204,9 @@ class TestAttention:
     def test_attention_with_bias(self, attention_config, device):
         """Test attention with positional bias."""
         batch_size, seq_len = 2, 64
-        heads = attention_config['heads']
+        heads = attention_config["heads"]
 
-        x = torch.randn(batch_size, seq_len, attention_config['dim'], device=device)
+        x = torch.randn(batch_size, seq_len, attention_config["dim"], device=device)
         attn_bias = torch.randn(heads, seq_len, seq_len, device=device)
 
         attn = Attention(**attention_config).to(device)
@@ -221,8 +221,11 @@ class TestAttention:
         batch_size, seq_len = 2, 64
 
         x = torch.randn(
-            batch_size, seq_len, attention_config['dim'],
-            device=device, requires_grad=True
+            batch_size,
+            seq_len,
+            attention_config["dim"],
+            device=device,
+            requires_grad=True,
         )
 
         attn = Attention(**attention_config).to(device)
@@ -245,13 +248,13 @@ class TestTransformer:
         transformer = Transformer(**transformer_config)
 
         # Check number of layers (each layer has PEG + Attention + FF)
-        assert len(transformer.layers) == transformer_config['depth']
+        assert len(transformer.layers) == transformer_config["depth"]
 
     def test_transformer_forward(self, transformer_config, device):
         """Test Transformer forward pass."""
         batch_size, seq_len = 2, 64
 
-        x = torch.randn(batch_size, seq_len, transformer_config['dim'], device=device)
+        x = torch.randn(batch_size, seq_len, transformer_config["dim"], device=device)
 
         transformer = Transformer(**transformer_config).to(device)
         output = transformer(x)
@@ -263,9 +266,9 @@ class TestTransformer:
     def test_transformer_with_position_bias(self, transformer_config, device):
         """Test Transformer with continuous position bias."""
         batch_size, seq_len = 2, 64
-        heads = transformer_config['heads']
+        heads = transformer_config["heads"]
 
-        x = torch.randn(batch_size, seq_len, transformer_config['dim'], device=device)
+        x = torch.randn(batch_size, seq_len, transformer_config["dim"], device=device)
         attn_bias = torch.randn(heads, seq_len, seq_len, device=device)
 
         transformer = Transformer(**transformer_config).to(device)
@@ -327,13 +330,16 @@ class TestTransformer:
         batch_size, seq_len = 2, 64
 
         x = torch.randn(
-            batch_size, seq_len, transformer_config['dim'],
-            device=device, requires_grad=True
+            batch_size,
+            seq_len,
+            transformer_config["dim"],
+            device=device,
+            requires_grad=True,
         )
 
         # Use smaller transformer for faster test
         transformer = Transformer(
-            dim=transformer_config['dim'],
+            dim=transformer_config["dim"],
             depth=2,  # Smaller depth
             dim_head=64,
             heads=16,

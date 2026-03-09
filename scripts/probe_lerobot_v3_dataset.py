@@ -74,7 +74,9 @@ def summarize_repo_metadata(repo_id: str, cache_root: Path) -> dict[str, Any]:
     parquet = pq.read_table(downloaded["data/chunk-000/file-000.parquet"])
 
     features = info.get("features", {})
-    camera_keys = [k for k, v in features.items() if v.get("dtype") in {"image", "video"}]
+    camera_keys = [
+        k for k, v in features.items() if v.get("dtype") in {"image", "video"}
+    ]
 
     return {
         "repo_id": repo_id,
@@ -106,13 +108,16 @@ def summarize_repo_metadata(repo_id: str, cache_root: Path) -> dict[str, Any]:
             "first_row_meta": {
                 k: v
                 for k, v in parquet.slice(0, 1).to_pylist()[0].items()
-                if k in {"timestamp", "episode_index", "frame_index", "task_index", "index"}
+                if k
+                in {"timestamp", "episode_index", "frame_index", "task_index", "index"}
             },
         },
     }
 
 
-def compare_repo_metadata(primary: dict[str, Any], other: dict[str, Any]) -> dict[str, Any]:
+def compare_repo_metadata(
+    primary: dict[str, Any], other: dict[str, Any]
+) -> dict[str, Any]:
     rel_paths = sorted(set(primary["fingerprints"]) | set(other["fingerprints"]))
     file_matches: dict[str, bool] = {}
     for rel_path in rel_paths:
@@ -130,7 +135,9 @@ def compare_repo_metadata(primary: dict[str, Any], other: dict[str, Any]) -> dic
     }
 
 
-def summarize_local_oxe_first_episode(dataset_name: str, local_root: Path) -> dict[str, Any]:
+def summarize_local_oxe_first_episode(
+    dataset_name: str, local_root: Path
+) -> dict[str, Any]:
     dataset_root = local_root / dataset_name
     tar_paths = sorted(dataset_root.glob("*.tar"))
     if not tar_paths:
@@ -148,7 +155,9 @@ def summarize_local_oxe_first_episode(dataset_name: str, local_root: Path) -> di
             step = episode["steps"][0]
             obs = step["observation"]
 
-            instruction = obs.get("natural_language_instruction") or obs.get("language_instruction")
+            instruction = obs.get("natural_language_instruction") or obs.get(
+                "language_instruction"
+            )
             if isinstance(instruction, bytes):
                 instruction = instruction.decode("utf-8", errors="replace")
 
@@ -170,7 +179,8 @@ def summarize_local_oxe_first_episode(dataset_name: str, local_root: Path) -> di
             byte_keys = [
                 str(k)
                 for k, v in obs.items()
-                if isinstance(v, (bytes, bytearray)) and str(k) != "natural_language_instruction"
+                if isinstance(v, (bytes, bytearray))
+                and str(k) != "natural_language_instruction"
             ]
 
             return {

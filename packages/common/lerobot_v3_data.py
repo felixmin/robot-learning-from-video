@@ -10,7 +10,10 @@ import torch.nn.functional as F
 import torch.distributed
 from torch.utils.data import DataLoader, Dataset
 
-from common.lerobot_v3_adapters import dataset_batch_to_stage2_batch, dataset_batch_to_stage1_batch
+from common.lerobot_v3_adapters import (
+    dataset_batch_to_stage2_batch,
+    dataset_batch_to_stage1_batch,
+)
 from common.lerobot_v3_sampler import DistributedWeightedLeRobotTokenSampler
 from common.lerobot_v3_sampler import WeightedLeRobotTokenSampler
 from common.lerobot_v3_source import LeRobotSingleSource
@@ -20,7 +23,10 @@ from common.lerobot_v3_types import DatasetRequest, TemporalFieldRequest
 
 try:
     import lightning.pytorch as pl
-except ModuleNotFoundError:  # pragma: no cover - exercised only in lightweight test envs
+except (
+    ModuleNotFoundError
+):  # pragma: no cover - exercised only in lightweight test envs
+
     class _LightningDataModule:
         pass
 
@@ -30,12 +36,16 @@ except ModuleNotFoundError:  # pragma: no cover - exercised only in lightweight 
     pl = _PLNamespace()
 
 
-def _stack_optional_tensors(values: list[torch.Tensor | None], *, field_name: str) -> torch.Tensor | None:
+def _stack_optional_tensors(
+    values: list[torch.Tensor | None], *, field_name: str
+) -> torch.Tensor | None:
     present = [value for value in values if value is not None]
     if not present:
         return None
     if len(present) != len(values):
-        raise ValueError(f"Inconsistent optional tensor field {field_name!r} across batch")
+        raise ValueError(
+            f"Inconsistent optional tensor field {field_name!r} across batch"
+        )
     first_shape = tuple(present[0].shape)
     if all(tuple(value.shape) == first_shape for value in present):
         return torch.stack(present)
@@ -46,7 +56,9 @@ def _stack_optional_tensors(values: list[torch.Tensor | None], *, field_name: st
 
     prefix_shape = first_shape[:-1]
     if not all(tuple(value.shape[:-1]) == prefix_shape for value in present):
-        raise ValueError(f"Inconsistent tensor shapes for field {field_name!r}: {[tuple(value.shape) for value in present]}")
+        raise ValueError(
+            f"Inconsistent tensor shapes for field {field_name!r}: {[tuple(value.shape) for value in present]}"
+        )
 
     target_dim = max(int(value.shape[-1]) for value in present)
     padded: list[torch.Tensor] = []
@@ -58,12 +70,16 @@ def _stack_optional_tensors(values: list[torch.Tensor | None], *, field_name: st
     return torch.stack(padded)
 
 
-def _collect_optional_strings(values: list[str | None], *, field_name: str) -> list[str] | None:
+def _collect_optional_strings(
+    values: list[str | None], *, field_name: str
+) -> list[str] | None:
     present = [value for value in values if value is not None]
     if not present:
         return None
     if len(present) != len(values):
-        raise ValueError(f"Inconsistent optional string field {field_name!r} across batch")
+        raise ValueError(
+            f"Inconsistent optional string field {field_name!r} across batch"
+        )
     return [str(value) for value in present]
 
 
@@ -98,8 +114,13 @@ def collate_dataset_samples(batch: list[DatasetSample]) -> BatchedDatasetSample:
         }
         if first.image_padding_masks is not None:
             for item in batch[1:]:
-                if item.image_padding_masks is None or set(item.image_padding_masks.keys()) != keys:
-                    raise ValueError("All samples must share the same image padding mask keys")
+                if (
+                    item.image_padding_masks is None
+                    or set(item.image_padding_masks.keys()) != keys
+                ):
+                    raise ValueError(
+                        "All samples must share the same image padding mask keys"
+                    )
             image_padding_masks = {
                 key: torch.stack([item.image_padding_masks[key] for item in batch])
                 for key in first.image_padding_masks
@@ -108,12 +129,24 @@ def collate_dataset_samples(batch: list[DatasetSample]) -> BatchedDatasetSample:
     return BatchedDatasetSample(
         image_streams=image_streams,
         image_padding_masks=image_padding_masks,
-        state=_stack_optional_tensors([item.state for item in batch], field_name="state"),
-        state_is_pad=_stack_optional_tensors([item.state_is_pad for item in batch], field_name="state_is_pad"),
-        action=_stack_optional_tensors([item.action for item in batch], field_name="action"),
-        action_is_pad=_stack_optional_tensors([item.action_is_pad for item in batch], field_name="action_is_pad"),
-        task_text=_collect_optional_strings([item.task_text for item in batch], field_name="task_text"),
-        subtask_text=_collect_optional_strings([item.subtask_text for item in batch], field_name="subtask_text"),
+        state=_stack_optional_tensors(
+            [item.state for item in batch], field_name="state"
+        ),
+        state_is_pad=_stack_optional_tensors(
+            [item.state_is_pad for item in batch], field_name="state_is_pad"
+        ),
+        action=_stack_optional_tensors(
+            [item.action for item in batch], field_name="action"
+        ),
+        action_is_pad=_stack_optional_tensors(
+            [item.action_is_pad for item in batch], field_name="action_is_pad"
+        ),
+        task_text=_collect_optional_strings(
+            [item.task_text for item in batch], field_name="task_text"
+        ),
+        subtask_text=_collect_optional_strings(
+            [item.subtask_text for item in batch], field_name="subtask_text"
+        ),
         meta=_collate_meta([item.meta for item in batch]),
     )
 
@@ -131,25 +164,31 @@ def _request_from_config(request_cfg: Mapping[str, Any]) -> DatasetRequest:
     action_cfg = request_cfg.get("action_request")
     return DatasetRequest(
         image_requests=image_requests,
-        state_request=None
-        if state_cfg is None
-        else TemporalFieldRequest(
-            deltas_steps=tuple(int(x) for x in state_cfg["deltas_steps"]),
-            required=bool(state_cfg.get("required", True)),
+        state_request=(
+            None
+            if state_cfg is None
+            else TemporalFieldRequest(
+                deltas_steps=tuple(int(x) for x in state_cfg["deltas_steps"]),
+                required=bool(state_cfg.get("required", True)),
+            )
         ),
-        action_request=None
-        if action_cfg is None
-        else TemporalFieldRequest(
-            deltas_steps=tuple(int(x) for x in action_cfg["deltas_steps"]),
-            required=bool(action_cfg.get("required", True)),
+        action_request=(
+            None
+            if action_cfg is None
+            else TemporalFieldRequest(
+                deltas_steps=tuple(int(x) for x in action_cfg["deltas_steps"]),
+                required=bool(action_cfg.get("required", True)),
+            )
         ),
         include_task_text=bool(request_cfg.get("include_task_text", False)),
         include_subtask_text=bool(request_cfg.get("include_subtask_text", False)),
         include_metadata=bool(request_cfg.get("include_metadata", True)),
         pad_missing_future=bool(request_cfg.get("pad_missing_future", True)),
-        image_size=None
-        if request_cfg.get("image_size") is None
-        else tuple(int(x) for x in request_cfg["image_size"]),
+        image_size=(
+            None
+            if request_cfg.get("image_size") is None
+            else tuple(int(x) for x in request_cfg["image_size"])
+        ),
         image_dtype=str(request_cfg.get("image_dtype", "uint8")),
     )
 
@@ -163,10 +202,16 @@ def _resolve_split_episode_sets(
 ) -> tuple[set[int], set[int]]:
     if train_episode_indices is not None or val_episode_indices is not None:
         if train_episode_indices is None or val_episode_indices is None:
-            raise ValueError("train_episode_indices and val_episode_indices must be provided together")
-        return {int(x) for x in train_episode_indices}, {int(x) for x in val_episode_indices}
+            raise ValueError(
+                "train_episode_indices and val_episode_indices must be provided together"
+            )
+        return {int(x) for x in train_episode_indices}, {
+            int(x) for x in val_episode_indices
+        }
     if val_episode_count is None:
-        raise ValueError("Each LeRobot source must define val_episode_count or explicit episode index splits")
+        raise ValueError(
+            "Each LeRobot source must define val_episode_count or explicit episode index splits"
+        )
     count = int(val_episode_count)
     if count <= 0 or count >= int(total_episodes):
         raise ValueError("val_episode_count must be > 0 and < total_episodes")
@@ -212,7 +257,11 @@ class LeRobotMixedMapDataset(Dataset):
     def __len__(self) -> int:
         total = 0
         for source in self.sources:
-            compiled = source.compiled_train_index if self.split == "train" else source.compiled_val_index
+            compiled = (
+                source.compiled_train_index
+                if self.split == "train"
+                else source.compiled_val_index
+            )
             if compiled is None:
                 continue
             total += int(compiled.episodes.valid_anchor_count.sum())
@@ -269,7 +318,11 @@ class LeRobotV3DataModule(pl.LightningDataModule):
                 val_episode_indices=source_cfg.get("val_episode_indices"),
                 val_episode_count=source_cfg.get("val_episode_count"),
             )
-            source.compile(self.request, train_episode_indices=train_set, val_episode_indices=val_set)
+            source.compile(
+                self.request,
+                train_episode_indices=train_set,
+                val_episode_indices=val_set,
+            )
             self.sources.append(source)
 
         self.normalization_stats = build_run_normalization_stats(
@@ -279,26 +332,38 @@ class LeRobotV3DataModule(pl.LightningDataModule):
 
         train_compiled = [source.compiled_train_index for source in self.sources]
         val_compiled = [source.compiled_val_index for source in self.sources]
-        train_weights = np.asarray([source.weight for source in self.sources], dtype=np.float64)
-        val_weights = np.asarray([source.weight for source in self.sources], dtype=np.float64)
+        train_weights = np.asarray(
+            [source.weight for source in self.sources], dtype=np.float64
+        )
+        val_weights = np.asarray(
+            [source.weight for source in self.sources], dtype=np.float64
+        )
 
         batch_size = int(self.loader_cfg["batch_size"])
         steps_per_epoch = self.adapter_cfg.get("steps_per_epoch")
-        is_distributed = torch.distributed.is_available() and torch.distributed.is_initialized()
+        is_distributed = (
+            torch.distributed.is_available() and torch.distributed.is_initialized()
+        )
         world_size = torch.distributed.get_world_size() if is_distributed else 1
         rank = torch.distributed.get_rank() if is_distributed else 0
         if steps_per_epoch is None:
-            train_num_samples = int(sum(index.episodes.valid_anchor_count.sum() for index in train_compiled))
+            train_num_samples = int(
+                sum(index.episodes.valid_anchor_count.sum() for index in train_compiled)
+            )
         else:
             train_num_samples = int(steps_per_epoch) * batch_size
-        val_num_samples = int(sum(index.episodes.valid_anchor_count.sum() for index in val_compiled))
+        val_num_samples = int(
+            sum(index.episodes.valid_anchor_count.sum() for index in val_compiled)
+        )
         seed = int(self.adapter_cfg["seed"])
 
         self.train_dataset = LeRobotMixedMapDataset(sources=self.sources, split="train")
         self.val_dataset = LeRobotMixedMapDataset(sources=self.sources, split="val")
         if is_distributed:
             train_global_num_samples = train_num_samples * world_size
-            val_global_num_samples = ((val_num_samples + world_size - 1) // world_size) * world_size
+            val_global_num_samples = (
+                (val_num_samples + world_size - 1) // world_size
+            ) * world_size
             self.train_sampler = DistributedWeightedLeRobotTokenSampler(
                 compiled_sources=train_compiled,
                 source_weights=train_weights,
@@ -307,7 +372,9 @@ class LeRobotV3DataModule(pl.LightningDataModule):
                 world_size=world_size,
                 seed=seed,
                 epoch=0,
-                resample_each_epoch=bool(self.adapter_cfg.get("resample_each_epoch", True)),
+                resample_each_epoch=bool(
+                    self.adapter_cfg.get("resample_each_epoch", True)
+                ),
             )
             self.val_sampler = DistributedWeightedLeRobotTokenSampler(
                 compiled_sources=val_compiled,
@@ -326,7 +393,9 @@ class LeRobotV3DataModule(pl.LightningDataModule):
                 num_samples=train_num_samples,
                 seed=seed,
                 epoch=0,
-                resample_each_epoch=bool(self.adapter_cfg.get("resample_each_epoch", True)),
+                resample_each_epoch=bool(
+                    self.adapter_cfg.get("resample_each_epoch", True)
+                ),
             )
             self.val_sampler = WeightedLeRobotTokenSampler(
                 compiled_sources=val_compiled,
@@ -358,7 +427,9 @@ class LeRobotV3DataModule(pl.LightningDataModule):
             shuffle=False,
             num_workers=num_workers,
             pin_memory=bool(self.loader_cfg["pin_memory"]),
-            prefetch_factor=self.loader_cfg["prefetch_factor"] if num_workers > 0 else None,
+            prefetch_factor=(
+                self.loader_cfg["prefetch_factor"] if num_workers > 0 else None
+            ),
             persistent_workers=num_workers > 0,
             collate_fn=self._collate_and_adapt,
         )
@@ -372,7 +443,9 @@ class LeRobotV3DataModule(pl.LightningDataModule):
             shuffle=False,
             num_workers=num_workers,
             pin_memory=bool(self.loader_cfg["pin_memory"]),
-            prefetch_factor=self.loader_cfg["prefetch_factor"] if num_workers > 0 else None,
+            prefetch_factor=(
+                self.loader_cfg["prefetch_factor"] if num_workers > 0 else None
+            ),
             persistent_workers=num_workers > 0,
             collate_fn=self._collate_and_adapt,
         )

@@ -53,14 +53,18 @@ class Stage2ValidationPipelineCallback(Callback):
         self.checks = self._create_checks(checks_config or {})
         self._validate_check_bindings()
 
-    def _create_checks(self, checks_config: dict[str, Any]) -> list[Stage2ValidationCheck]:
+    def _create_checks(
+        self, checks_config: dict[str, Any]
+    ) -> list[Stage2ValidationCheck]:
         checks: list[Stage2ValidationCheck] = []
         for instance_name, raw_cfg in checks_config.items():
             cfg = dict(raw_cfg or {})
             check_type = str(cfg.get("type", instance_name))
             check_cls = CHECK_TYPES.get(check_type)
             if check_cls is None:
-                raise ValueError(f"Unknown Stage 2 validation check type {check_type} (instance {instance_name})")
+                raise ValueError(
+                    f"Unknown Stage 2 validation check type {check_type} (instance {instance_name})"
+                )
 
             kwargs = {k: v for k, v in cfg.items() if k != "type"}
             kwargs["name"] = str(instance_name)
@@ -135,7 +139,9 @@ class Stage2ValidationPipelineCallback(Callback):
         reason = result.get("_reason")
         return True, str(reason) if reason is not None else "no outputs produced"
 
-    def on_validation_epoch_start(self, trainer: pl.Trainer, pl_module: pl.LightningModule) -> None:
+    def on_validation_epoch_start(
+        self, trainer: pl.Trainer, pl_module: pl.LightningModule
+    ) -> None:
         self.global_cache.clear(keep_fixed=True)
         for cache in self.bucket_caches.values():
             cache.clear(keep_fixed=True)
@@ -191,7 +197,9 @@ class Stage2ValidationPipelineCallback(Callback):
                     except Exception:
                         pass
 
-    def on_validation_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule) -> None:
+    def on_validation_epoch_end(
+        self, trainer: pl.Trainer, pl_module: pl.LightningModule
+    ) -> None:
         if self.global_cache.fixed_records is None:
             self._select_fixed_records(self.global_cache, self.num_fixed_samples)
             for cache in self.bucket_caches.values():
@@ -214,11 +222,15 @@ class Stage2ValidationPipelineCallback(Callback):
                     logger.warning("[Stage2Validation] skip %s: %s", check.name, reason)
                     continue
                 try:
-                    result = check.run(self.global_cache, pl_module, trainer, metric_suffix="")
+                    result = check.run(
+                        self.global_cache, pl_module, trainer, metric_suffix=""
+                    )
                     no_output, reason = self._result_is_no_output(result)
                     if no_output:
                         skipped += 1
-                        logger.warning("[Stage2Validation] skip %s: %s", check.name, reason)
+                        logger.warning(
+                            "[Stage2Validation] skip %s: %s", check.name, reason
+                        )
                     else:
                         ran += 1
                 except Exception as e:
@@ -236,7 +248,9 @@ class Stage2ValidationPipelineCallback(Callback):
                 can_run, reason = check.can_run(cache)
                 if not can_run:
                     skipped += 1
-                    logger.warning("[Stage2Validation] skip %s%s: %s", check.name, suffix, reason)
+                    logger.warning(
+                        "[Stage2Validation] skip %s%s: %s", check.name, suffix, reason
+                    )
                     continue
 
                 try:
@@ -244,12 +258,19 @@ class Stage2ValidationPipelineCallback(Callback):
                     no_output, reason = self._result_is_no_output(result)
                     if no_output:
                         skipped += 1
-                        logger.warning("[Stage2Validation] skip %s%s: %s", check.name, suffix, reason)
+                        logger.warning(
+                            "[Stage2Validation] skip %s%s: %s",
+                            check.name,
+                            suffix,
+                            reason,
+                        )
                     else:
                         ran += 1
                 except Exception as e:
                     soft_failed += 1
-                    logger.warning("[Stage2Validation] %s%s failed: %s", check.name, suffix, e)
+                    logger.warning(
+                        "[Stage2Validation] %s%s failed: %s", check.name, suffix, e
+                    )
 
         logger.info(
             "[Stage2Validation] due=%d ran=%d skipped=%d soft_failed=%d",

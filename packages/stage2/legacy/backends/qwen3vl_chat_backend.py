@@ -6,11 +6,20 @@ from typing import Any, Callable, List, Sequence
 import torch
 
 from stage2.action_tokens import ActionTokenConfig
-from stage2.backends.interfaces import BackendMode, Stage2Batch, LatentOutput, LossOutput
+from stage2.backends.interfaces import (
+    BackendMode,
+    Stage2Batch,
+    LatentOutput,
+    LossOutput,
+)
 from stage2.constrained_decode import ActionTokenIds, make_prefix_allowed_tokens_fn
 from stage2.image_adapters import oxe_first_frames_to_pil
 from stage2.legacy.qwen3vl_setup import prepare_action_token_training
-from stage2.policy_inputs import ChatConfig, build_inputs_with_prompt_mask, build_prompt_inputs
+from stage2.policy_inputs import (
+    ChatConfig,
+    build_inputs_with_prompt_mask,
+    build_prompt_inputs,
+)
 
 
 def _infer_between_action_token_ids(
@@ -98,7 +107,9 @@ class Qwen3VLChatActionTokenBackend(torch.nn.Module):
         if streams is None:
             raise ValueError("batch.image_streams is required")
         if "observation.images.rgb" not in streams:
-            raise KeyError("batch.image_streams must include key 'observation.images.rgb'")
+            raise KeyError(
+                "batch.image_streams must include key 'observation.images.rgb'"
+            )
         return streams["observation.images.rgb"]
 
     @staticmethod
@@ -149,7 +160,9 @@ class Qwen3VLChatActionTokenBackend(torch.nn.Module):
         if self.policy_model is None or self.processor is None:
             raise RuntimeError("Backend not initialized. Call setup(device=...) first.")
         if self._action_token_ids is None:
-            raise RuntimeError("Action token ids not initialized. Call setup(device=...) first.")
+            raise RuntimeError(
+                "Action token ids not initialized. Call setup(device=...) first."
+            )
         try:
             device = next(self.policy_model.parameters()).device
         except StopIteration:
@@ -163,16 +176,22 @@ class Qwen3VLChatActionTokenBackend(torch.nn.Module):
 
     def loss_from_batch(self, batch: Stage2Batch, *, mode: BackendMode) -> LossOutput:
         if mode is not BackendMode.CODES:
-            raise NotImplementedError(f"{type(self).__name__} only supports mode={BackendMode.CODES.value!r}")
+            raise NotImplementedError(
+                f"{type(self).__name__} only supports mode={BackendMode.CODES.value!r}"
+            )
         device, _token_ids = self._require_ready()
 
         frames = self._extract_frames(batch)
         instructions = self._extract_instructions(batch)
         if batch.target_codes is None:
-            raise ValueError("batch.target_codes is required for code loss computation.")
+            raise ValueError(
+                "batch.target_codes is required for code loss computation."
+            )
         codes = batch.target_codes.to(torch.long)
         if codes.ndim != 2 or codes.shape[1] != self.code_seq_len:
-            raise ValueError(f"Expected codes [B, {self.code_seq_len}], got {tuple(codes.shape)}")
+            raise ValueError(
+                f"Expected codes [B, {self.code_seq_len}], got {tuple(codes.shape)}"
+            )
 
         targets = [self.cfg.action_tokens.format_target(row.tolist()) for row in codes]
         images = self.frames_to_images(frames)
@@ -188,12 +207,18 @@ class Qwen3VLChatActionTokenBackend(torch.nn.Module):
 
         outputs = self.policy_model(**inputs)
         loss = outputs.loss if hasattr(outputs, "loss") else outputs[0]
-        return LossOutput(loss=loss, metrics={"loss": float(loss.detach().cpu().item())})
+        return LossOutput(
+            loss=loss, metrics={"loss": float(loss.detach().cpu().item())}
+        )
 
     @torch.no_grad()
-    def latent_from_batch(self, batch: Stage2Batch, *, mode: BackendMode) -> LatentOutput:
+    def latent_from_batch(
+        self, batch: Stage2Batch, *, mode: BackendMode
+    ) -> LatentOutput:
         if mode is not BackendMode.CODES:
-            raise NotImplementedError(f"{type(self).__name__} only supports mode={BackendMode.CODES.value!r}")
+            raise NotImplementedError(
+                f"{type(self).__name__} only supports mode={BackendMode.CODES.value!r}"
+            )
         device, token_ids = self._require_ready()
 
         frames = self._extract_frames(batch)
@@ -221,7 +246,9 @@ class Qwen3VLChatActionTokenBackend(torch.nn.Module):
             prefix_allowed_tokens_fn=prefix_fn,
         )
 
-        code_id_to_index = {int(tid): i for i, tid in enumerate(token_ids.action_code_ids)}
+        code_id_to_index = {
+            int(tid): i for i, tid in enumerate(token_ids.action_code_ids)
+        }
         tok = getattr(self.processor, "tokenizer", None)
         decode = getattr(tok, "decode", None) if tok is not None else None
 
@@ -248,7 +275,9 @@ class Qwen3VLChatActionTokenBackend(torch.nn.Module):
                     if tid == int(token_ids.action_end_id):
                         has_end = True
                         break
-                    if tid in code_id_to_index and len(pred) < int(token_ids.code_seq_len):
+                    if tid in code_id_to_index and len(pred) < int(
+                        token_ids.code_seq_len
+                    ):
                         pred.append(int(code_id_to_index[tid]))
 
             if len(pred) < int(token_ids.code_seq_len):
@@ -267,7 +296,9 @@ class Qwen3VLChatActionTokenBackend(torch.nn.Module):
                 "has_action_end": has_end,
                 "num_codes_parsed": int(sum(1 for x in pred if int(x) >= 0)),
                 "prompt_padded_len": int(prompt_len),
-                "prompt_true_len": int(prompt_true_len) if prompt_true_len is not None else None,
+                "prompt_true_len": (
+                    int(prompt_true_len) if prompt_true_len is not None else None
+                ),
             }
             if decode is not None:
                 try:

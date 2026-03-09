@@ -14,7 +14,9 @@ class _NoAuxModel:
         raise AssertionError("Model should not be called when aux_decoder is disabled")
 
 
-def test_basic_visualization_falls_back_to_raw_frame_pairs_without_aux_decoder() -> None:
+def test_basic_visualization_falls_back_to_raw_frame_pairs_without_aux_decoder() -> (
+    None
+):
     strategy = BasicVisualizationStrategy()
     pl_module = SimpleNamespace(
         model=_NoAuxModel(),

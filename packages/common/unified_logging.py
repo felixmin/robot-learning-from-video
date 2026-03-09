@@ -52,13 +52,17 @@ def _make_excepthook(original_hook):
 
     This ensures crashes are captured in the log file instead of only appearing in stderr.
     """
+
     def handle_exception(exc_type, exc_value, exc_traceback):
         # Don't log KeyboardInterrupt (Ctrl+C)
         if issubclass(exc_type, KeyboardInterrupt):
             original_hook(exc_type, exc_value, exc_traceback)
             return
-        logging.critical("Uncaught exception:", exc_info=(exc_type, exc_value, exc_traceback))
+        logging.critical(
+            "Uncaught exception:", exc_info=(exc_type, exc_value, exc_traceback)
+        )
         original_hook(exc_type, exc_value, exc_traceback)
+
     return handle_exception
 
 
@@ -177,7 +181,7 @@ def setup_unified_logging(
     console_handler.setLevel(getattr(logging, log_level.upper()))
     console_formatter = logging.Formatter(
         "[%(asctime)s][%(name)s][%(levelname)s] - %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S"
+        datefmt="%Y-%m-%d %H:%M:%S",
     )
     console_handler.setFormatter(console_formatter)
     root_logger.addHandler(console_handler)
@@ -186,11 +190,11 @@ def setup_unified_logging(
     rank = get_rank()
     if rank == 0:
         try:
-            file_handler = logging.FileHandler(log_file, mode='a')
+            file_handler = logging.FileHandler(log_file, mode="a")
             file_handler.setLevel(getattr(logging, log_level.upper()))
             file_formatter = logging.Formatter(
                 "[%(asctime)s][%(name)s][%(levelname)s] - %(message)s",
-                datefmt="%Y-%m-%d %H:%M:%S"
+                datefmt="%Y-%m-%d %H:%M:%S",
             )
             file_handler.setFormatter(file_formatter)
             root_logger.addHandler(file_handler)
@@ -281,7 +285,9 @@ def setup_wandb_with_unified_paths(
 
 
 @contextlib.contextmanager
-def logging_context(workspace_root: Path, job_id: Optional[str] = None, log_level: str = "INFO"):
+def logging_context(
+    workspace_root: Path, job_id: Optional[str] = None, log_level: str = "INFO"
+):
     """
     Context manager for unified logging setup.
 

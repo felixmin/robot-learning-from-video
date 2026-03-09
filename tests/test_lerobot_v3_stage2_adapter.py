@@ -8,8 +8,12 @@ from common.lerobot_v3_types import BatchedDatasetSample
 
 def _batched_sample() -> BatchedDatasetSample:
     return BatchedDatasetSample(
-        image_streams={"primary": torch.randint(0, 255, (2, 2, 3, 8, 8), dtype=torch.uint8)},
-        image_padding_masks={"primary": torch.tensor([[False, False], [False, True]], dtype=torch.bool)},
+        image_streams={
+            "primary": torch.randint(0, 255, (2, 2, 3, 8, 8), dtype=torch.uint8)
+        },
+        image_padding_masks={
+            "primary": torch.tensor([[False, False], [False, True]], dtype=torch.bool)
+        },
         state=torch.tensor([[[1.0, 2.0]], [[3.0, 4.0]]], dtype=torch.float32),
         state_is_pad=torch.zeros((2, 1), dtype=torch.bool),
         action=torch.tensor(
@@ -40,7 +44,9 @@ def test_dataset_batch_to_stage2_batch_preserves_action_is_pad() -> None:
     )
 
 
-def test_dataset_batch_to_stage2_batch_keeps_raw_actions_before_backend_normalization() -> None:
+def test_dataset_batch_to_stage2_batch_keeps_raw_actions_before_backend_normalization() -> (
+    None
+):
     stage2 = dataset_batch_to_stage2_batch(_batched_sample())
     assert torch.equal(
         stage2.target_actions,

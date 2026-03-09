@@ -78,7 +78,11 @@ def main(cfg: DictConfig):
 
     # Create PIL images (simulating what we do currently)
     pil_images = [
-        [Image.fromarray(np.random.randint(0, 255, (img_size, img_size, 3), dtype=np.uint8))]
+        [
+            Image.fromarray(
+                np.random.randint(0, 255, (img_size, img_size, 3), dtype=np.uint8)
+            )
+        ]
         for _ in range(batch_size)
     ]
 
@@ -86,7 +90,9 @@ def main(cfg: DictConfig):
     tensor_images = torch.rand(batch_size, 3, img_size, img_size, device=device)
 
     # Create text prompts (must include <image> placeholder for SmolVLM2)
-    texts = ["<image>Pick up the red block and place it on the blue block."] * batch_size
+    texts = [
+        "<image>Pick up the red block and place it on the blue block."
+    ] * batch_size
 
     print(f"\nBatch size: {batch_size}")
     print(f"Image size: {img_size}x{img_size}")
@@ -102,7 +108,10 @@ def main(cfg: DictConfig):
             return_tensors="pt",
             padding=True,
         )
-        inputs = {k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in inputs.items()}
+        inputs = {
+            k: v.to(device) if isinstance(v, torch.Tensor) else v
+            for k, v in inputs.items()
+        }
         return inputs
 
     results.append(profile_section("Full HF Processor (PIL images)", full_processor))
@@ -143,7 +152,9 @@ def main(cfg: DictConfig):
         img = img * 2.0 - 1.0
         return img
 
-    results.append(profile_section("GPU image preprocess (F.interpolate)", gpu_image_preprocess))
+    results.append(
+        profile_section("GPU image preprocess (F.interpolate)", gpu_image_preprocess)
+    )
 
     # 5. Profile vision encoder directly
     # Find the vision model
@@ -158,14 +169,19 @@ def main(cfg: DictConfig):
 
         def vision_encoder_direct():
             img = torch.nn.functional.interpolate(
-                tensor_images.to(torch.bfloat16), size=(384, 384), mode="bilinear", align_corners=False
+                tensor_images.to(torch.bfloat16),
+                size=(384, 384),
+                mode="bilinear",
+                align_corners=False,
             )
             img = img * 2.0 - 1.0
             with torch.no_grad():
                 vision_outputs = vision_model(pixel_values=img)
             return vision_outputs.last_hidden_state
 
-        results.append(profile_section("Vision encoder (direct)", vision_encoder_direct))
+        results.append(
+            profile_section("Vision encoder (direct)", vision_encoder_direct)
+        )
     else:
         print("\nWARNING: Could not find vision_model in model structure")
 
@@ -177,7 +193,11 @@ def main(cfg: DictConfig):
             out = model(**cached_inputs, output_hidden_states=True)
         return out.hidden_states[-1]
 
-    results.append(profile_section("Full forward (with cached processor output)", forward_with_processor))
+    results.append(
+        profile_section(
+            "Full forward (with cached processor output)", forward_with_processor
+        )
+    )
 
     # 7. Profile forward WITHOUT output_hidden_states
     def forward_no_hidden():
@@ -185,7 +205,9 @@ def main(cfg: DictConfig):
             out = model(**cached_inputs, output_hidden_states=False)
         return out.logits
 
-    results.append(profile_section("Full forward (NO hidden states)", forward_no_hidden))
+    results.append(
+        profile_section("Full forward (NO hidden states)", forward_no_hidden)
+    )
 
     # Print results
     print("\n" + "=" * 60)
@@ -213,13 +235,17 @@ def main(cfg: DictConfig):
         print(f"GPU preprocess: {gpu_preprocess_time:.2f} ms")
         print(f"Potential preprocessing speedup: {speedup:.1f}x")
 
-    forward_with_hidden = result_map.get("Full forward (with cached processor output)", 0)
+    forward_with_hidden = result_map.get(
+        "Full forward (with cached processor output)", 0
+    )
     forward_no_hidden = result_map.get("Full forward (NO hidden states)", 0)
     if forward_with_hidden > 0 and forward_no_hidden > 0:
         hidden_overhead = forward_with_hidden - forward_no_hidden
         print(f"\nForward (with hidden_states): {forward_with_hidden:.2f} ms")
         print(f"Forward (no hidden_states): {forward_no_hidden:.2f} ms")
-        print(f"Hidden states overhead: {hidden_overhead:.2f} ms ({hidden_overhead/forward_with_hidden*100:.1f}%)")
+        print(
+            f"Hidden states overhead: {hidden_overhead:.2f} ms ({hidden_overhead/forward_with_hidden*100:.1f}%)"
+        )
 
     # Breakdown of total time per forward pass
     print("\n" + "=" * 60)
@@ -227,8 +253,12 @@ def main(cfg: DictConfig):
     print("=" * 60)
     if processor_time > 0 and forward_with_hidden > 0:
         total_time = processor_time + forward_with_hidden
-        print(f"Preprocessing: {processor_time:.2f} ms ({processor_time/total_time*100:.1f}%)")
-        print(f"Forward pass:  {forward_with_hidden:.2f} ms ({forward_with_hidden/total_time*100:.1f}%)")
+        print(
+            f"Preprocessing: {processor_time:.2f} ms ({processor_time/total_time*100:.1f}%)"
+        )
+        print(
+            f"Forward pass:  {forward_with_hidden:.2f} ms ({forward_with_hidden/total_time*100:.1f}%)"
+        )
         print(f"TOTAL:         {total_time:.2f} ms")
         print(
             f"\nAt batch_size={batch_size}: {total_time:.2f}ms -> {1000/total_time:.2f} batches/sec -> {batch_size * 1000 / total_time:.1f} samples/sec"

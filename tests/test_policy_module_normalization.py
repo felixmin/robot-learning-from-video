@@ -5,7 +5,12 @@ from typing import Any
 
 import torch
 
-from stage2.backends.interfaces import BackendMode, Stage2Batch, LatentOutput, LossOutput
+from stage2.backends.interfaces import (
+    BackendMode,
+    Stage2Batch,
+    LatentOutput,
+    LossOutput,
+)
 from stage2.policy_module import PolicyLightningModule, PolicyOptimizerConfig
 
 
@@ -25,7 +30,9 @@ class _CaptureBackend:
         self.last_mode = mode
         return LossOutput(loss=torch.tensor(0.0), metrics={"loss": 0.0})
 
-    def latent_from_batch(self, batch: Stage2Batch, *, mode: BackendMode) -> LatentOutput:
+    def latent_from_batch(
+        self, batch: Stage2Batch, *, mode: BackendMode
+    ) -> LatentOutput:
         del batch, mode
         return LatentOutput()
 
@@ -44,7 +51,9 @@ class _DummyCodeProvider:
         del codes
         raise RuntimeError("not used in ACTIONS mode")
 
-    def codes_and_vectors_from_video(self, video: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    def codes_and_vectors_from_video(
+        self, video: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         del video
         raise RuntimeError("not used in ACTIONS mode")
 
@@ -68,7 +77,9 @@ def test_stage2_module_applies_configured_normalization_stats() -> None:
 
     batch = Stage2Batch(
         image_streams={
-            "observation.images.rgb": torch.randint(0, 255, (2, 2, 8, 8, 3), dtype=torch.uint8),
+            "observation.images.rgb": torch.randint(
+                0, 255, (2, 2, 8, 8, 3), dtype=torch.uint8
+            ),
         },
         task_text=["pick", "place"],
         state=torch.tensor([[3.0, 3.0], [1.0, -1.0]], dtype=torch.float32),

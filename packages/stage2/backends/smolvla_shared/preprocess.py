@@ -6,7 +6,9 @@ import torch
 import torch.nn.functional as F
 
 
-def resize_with_pad(img: torch.Tensor, width: int, height: int, pad_value: float = -1.0) -> torch.Tensor:
+def resize_with_pad(
+    img: torch.Tensor, width: int, height: int, pad_value: float = -1.0
+) -> torch.Tensor:
     if img.ndim != 4:
         raise ValueError(f"Expected (B, C, H, W), got shape {img.shape}")
 
@@ -15,7 +17,9 @@ def resize_with_pad(img: torch.Tensor, width: int, height: int, pad_value: float
     resized_height = int(cur_height / ratio)
     resized_width = int(cur_width / ratio)
 
-    resized_img = F.interpolate(img, size=(resized_height, resized_width), mode="bilinear", align_corners=False)
+    resized_img = F.interpolate(
+        img, size=(resized_height, resized_width), mode="bilinear", align_corners=False
+    )
 
     pad_height = max(0, int(height - resized_height))
     pad_width = max(0, int(width - resized_width))
@@ -55,7 +59,9 @@ def infer_hidden_size(model: Any) -> int:
     raise AttributeError("Could not infer hidden size from model.config")
 
 
-def get_last_layer_module(model: Any, optimized: bool = False) -> torch.nn.Module | None:
+def get_last_layer_module(
+    model: Any, optimized: bool = False
+) -> torch.nn.Module | None:
     if optimized:
         if hasattr(model, "model") and hasattr(model.model, "text_model"):
             text_model = model.model.text_model

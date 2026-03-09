@@ -36,9 +36,11 @@ def normalize_video_input(model: Any, video: torch.Tensor) -> torch.Tensor:
     if video.ndim not in {4, 5}:
         raise ValueError(f"Expected 4D or 5D input, got {video.ndim}D")
     if video.ndim == 4:
-        video = rearrange(video, 'b c h w -> b c 1 h w')
+        video = rearrange(video, "b c h w -> b c 1 h w")
     if tuple(video.shape[3:]) != model.image_size:
-        raise ValueError(f"Expected image size {model.image_size}, got {tuple(video.shape[3:])}")
+        raise ValueError(
+            f"Expected image size {model.image_size}, got {tuple(video.shape[3:])}"
+        )
     return video
 
 
@@ -69,7 +71,7 @@ def prepare_action_tokens(model: Any, encoded: EncodedBatch) -> torch.Tensor:
     action_h, action_w = model.action_shape
     action_tokens = rearrange(
         encoded.tokens,
-        'b (t h w) d -> b t h w d',
+        "b (t h w) d -> b t h w d",
         h=action_h,
         w=action_w,
     )
@@ -154,6 +156,10 @@ def build_decoder_shared_inputs(
     attn_bias = model.spatial_rel_pos_bias(h_dec, w_dec, device=device)
 
     pixel_context = None
-    if model.pixel_decoder is not None or model.aux_decoder is not None or model.flow_decoder is not None:
+    if (
+        model.pixel_decoder is not None
+        or model.aux_decoder is not None
+        or model.flow_decoder is not None
+    ):
         pixel_context = model.decoder_context_projection(first_frame)
     return h_dec, w_dec, attn_bias, pixel_context

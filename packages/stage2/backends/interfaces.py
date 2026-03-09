@@ -79,5 +79,7 @@ class PolicyBackend(Protocol):
         """Compute training loss for the requested mode."""
 
     @torch.no_grad()
-    def latent_from_batch(self, batch: Stage2Batch, *, mode: BackendMode) -> LatentOutput:
+    def latent_from_batch(
+        self, batch: Stage2Batch, *, mode: BackendMode
+    ) -> LatentOutput:
         """Return a latent representation for the requested mode."""

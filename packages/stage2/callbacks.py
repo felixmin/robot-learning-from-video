@@ -106,7 +106,9 @@ def _render_wide_panel(
     line_h = 14
     pad = 10
     text_h = pad * 2 + line_h * max(1, len(text_lines))
-    panel = Image.new("RGB", (image.width, image.height + text_h), color=(255, 255, 255))
+    panel = Image.new(
+        "RGB", (image.width, image.height + text_h), color=(255, 255, 255)
+    )
     panel.paste(image, (0, 0))
 
     draw = ImageDraw.Draw(panel)
@@ -221,7 +223,9 @@ def _select_diverse_indices(
     if n <= 0:
         return []
 
-    episode_ids: Optional[list[Any]] = episode_id if isinstance(episode_id, list) else None
+    episode_ids: Optional[list[Any]] = (
+        episode_id if isinstance(episode_id, list) else None
+    )
     frame_idxs: Optional[list[Any]] = frame_idx if isinstance(frame_idx, list) else None
 
     def get_ep(i: int) -> str:
@@ -410,7 +414,9 @@ class ThroughputLoggingCallback(Callback):
         self._last_time: Optional[float] = None
         self._last_step: Optional[int] = None
 
-    def on_train_start(self, trainer: pl.Trainer, pl_module: pl.LightningModule) -> None:
+    def on_train_start(
+        self, trainer: pl.Trainer, pl_module: pl.LightningModule
+    ) -> None:
         if not self.cfg.enabled:
             return
 
@@ -514,7 +520,9 @@ class PolicyTrainSampleVisualizationCallback(Callback):
         try:
             from stage2.backends.interfaces import BackendMode, Stage2Batch
         except Exception:
-            logger.debug("train sample viz: failed to import Stage2Batch", exc_info=True)
+            logger.debug(
+                "train sample viz: failed to import Stage2Batch", exc_info=True
+            )
             return
         if not isinstance(batch, Stage2Batch):
             return
@@ -522,13 +530,19 @@ class PolicyTrainSampleVisualizationCallback(Callback):
         action_tokens = getattr(pl_module, "action_tokens", None)
         backend = getattr(pl_module, "backend", None)
         if backend is None or not hasattr(backend, "latent_from_batch"):
-            logger.debug("train sample viz: missing pl_module.backend.latent_from_batch")
+            logger.debug(
+                "train sample viz: missing pl_module.backend.latent_from_batch"
+            )
             return
 
-        logger.debug("train sample viz: begin step=%d batch_idx=%d", step, int(batch_idx))
+        logger.debug(
+            "train sample viz: begin step=%d batch_idx=%d", step, int(batch_idx)
+        )
 
         try:
-            from stage2.backends.smolvla_shared.input_transform import normalize_vector_mean_std
+            from stage2.backends.smolvla_shared.input_transform import (
+                normalize_vector_mean_std,
+            )
         except Exception:
             logger.debug("train sample viz: failed to import helpers", exc_info=True)
             return
@@ -581,7 +595,9 @@ class PolicyTrainSampleVisualizationCallback(Callback):
         try:
             images_sel = pl_module.frames_to_images(frames_sel)
         except Exception:
-            logger.debug("train sample viz: frames_to_images failed on selection", exc_info=True)
+            logger.debug(
+                "train sample viz: frames_to_images failed on selection", exc_info=True
+            )
             return
 
         # Compute GT targets for the selected subset.
@@ -598,18 +614,32 @@ class PolicyTrainSampleVisualizationCallback(Callback):
                 gt_codes_t = pl_module.code_provider.codes_from_video(video_sel)
                 gt_codes_sel = [row.tolist() for row in gt_codes_t.detach().cpu()]
             elif mode is BackendMode.LATENT_FLOW:
-                gt_codes_t, gt_vectors_t = pl_module.code_provider.codes_and_vectors_from_video(video_sel)
+                gt_codes_t, gt_vectors_t = (
+                    pl_module.code_provider.codes_and_vectors_from_video(video_sel)
+                )
                 gt_codes_sel = [row.tolist() for row in gt_codes_t.detach().cpu()]
-                gt_vectors_sel = gt_vectors_t.detach().cpu().reshape(gt_vectors_t.shape[0], -1).tolist()
+                gt_vectors_sel = (
+                    gt_vectors_t.detach()
+                    .cpu()
+                    .reshape(gt_vectors_t.shape[0], -1)
+                    .tolist()
+                )
             elif mode is BackendMode.ACTIONS:
                 gt_actions_t = batch.target_actions
                 if gt_actions_t is None:
                     return
                 gt_actions_sel = gt_actions_t[chosen].detach().cpu().tolist()
             elif mode is BackendMode.MULTITASK:
-                gt_codes_t, gt_vectors_t = pl_module.code_provider.codes_and_vectors_from_video(video_sel)
+                gt_codes_t, gt_vectors_t = (
+                    pl_module.code_provider.codes_and_vectors_from_video(video_sel)
+                )
                 gt_codes_sel = [row.tolist() for row in gt_codes_t.detach().cpu()]
-                gt_vectors_sel = gt_vectors_t.detach().cpu().reshape(gt_vectors_t.shape[0], -1).tolist()
+                gt_vectors_sel = (
+                    gt_vectors_t.detach()
+                    .cpu()
+                    .reshape(gt_vectors_t.shape[0], -1)
+                    .tolist()
+                )
                 gt_actions_t = batch.target_actions
                 if gt_actions_t is None:
                     return
@@ -637,7 +667,9 @@ class PolicyTrainSampleVisualizationCallback(Callback):
             latent = backend.latent_from_batch(
                 Stage2Batch(
                     image_streams=image_streams,
-                    image_padding_masks=pl_module._extract_policy_image_padding_masks(image_streams),
+                    image_padding_masks=pl_module._extract_policy_image_padding_masks(
+                        image_streams
+                    ),
                     task_text=instr_sel,
                     state=state,
                 ),
@@ -649,21 +681,36 @@ class PolicyTrainSampleVisualizationCallback(Callback):
             if isinstance(tokens, torch.Tensor):
                 pred_codes_sel = tokens.detach().cpu().tolist()
             if isinstance(latent.vector, torch.Tensor):
-                pred_vectors_sel = latent.vector.detach().cpu().reshape(latent.vector.shape[0], -1).tolist()
+                pred_vectors_sel = (
+                    latent.vector.detach()
+                    .cpu()
+                    .reshape(latent.vector.shape[0], -1)
+                    .tolist()
+                )
             if isinstance(latent.actions, torch.Tensor):
                 pred_actions_sel = latent.actions.detach().cpu().tolist()
             meta = latent.meta if isinstance(latent.meta, dict) else {}
-            gen_debug = meta.get("parse_debug") if isinstance(meta.get("parse_debug"), list) else None
+            gen_debug = (
+                meta.get("parse_debug")
+                if isinstance(meta.get("parse_debug"), list)
+                else None
+            )
         except Exception:
             logger.debug("train sample viz: backend prediction failed", exc_info=True)
             return
 
-        if pred_codes_sel is None and pred_vectors_sel is None and pred_actions_sel is None:
+        if (
+            pred_codes_sel is None
+            and pred_vectors_sel is None
+            and pred_actions_sel is None
+        ):
             logger.debug("train sample viz: backend returned no prediction outputs")
             return
 
         freeform_texts: Optional[list[str]] = None
-        if self.cfg.include_freeform_pred and hasattr(pl_module, "_predict_freeform_text"):
+        if self.cfg.include_freeform_pred and hasattr(
+            pl_module, "_predict_freeform_text"
+        ):
             policy_model = getattr(pl_module, "policy_model", None)
             if policy_model is None or not hasattr(policy_model, "generate"):
                 freeform_texts = None
@@ -675,7 +722,9 @@ class PolicyTrainSampleVisualizationCallback(Callback):
                         max_new_tokens=int(self.cfg.freeform_max_new_tokens),
                     )
                 except Exception:
-                    logger.debug("train sample viz: freeform generation failed", exc_info=True)
+                    logger.debug(
+                        "train sample viz: freeform generation failed", exc_info=True
+                    )
                     freeform_texts = None
 
         out_dir = Path(str(trainer.default_root_dir)) / "visualizations"
@@ -717,10 +766,26 @@ class PolicyTrainSampleVisualizationCallback(Callback):
                 if mse is not None:
                     pred_str = f"{pred_str} mse={mse:.4f}"
             elif mode is BackendMode.MULTITASK:
-                latent_gt = _vector_summary(gt_vectors_sel[rank]) if gt_vectors_sel is not None else "n/a"
-                latent_pred = _vector_summary(pred_vectors_sel[rank]) if pred_vectors_sel is not None else "n/a"
-                action_gt = _vector_summary(gt_actions_sel[rank]) if gt_actions_sel is not None else "n/a"
-                action_pred = _vector_summary(pred_actions_sel[rank]) if pred_actions_sel is not None else "n/a"
+                latent_gt = (
+                    _vector_summary(gt_vectors_sel[rank])
+                    if gt_vectors_sel is not None
+                    else "n/a"
+                )
+                latent_pred = (
+                    _vector_summary(pred_vectors_sel[rank])
+                    if pred_vectors_sel is not None
+                    else "n/a"
+                )
+                action_gt = (
+                    _vector_summary(gt_actions_sel[rank])
+                    if gt_actions_sel is not None
+                    else "n/a"
+                )
+                action_pred = (
+                    _vector_summary(pred_actions_sel[rank])
+                    if pred_actions_sel is not None
+                    else "n/a"
+                )
                 gt_str = f"latent_gt: {latent_gt} action_gt: {action_gt}"
                 pred_str = f"latent_pred: {latent_pred} action_pred: {action_pred}"
 
@@ -776,25 +841,45 @@ class PolicyTrainSampleVisualizationCallback(Callback):
                     "index": int(original_idx),
                     "rank": int(rank),
                     "instruction": str(instructions[original_idx]),
-                    "gt_codes": gt_codes_sel[rank] if gt_codes_sel is not None else None,
-                    "pred_codes": pred_codes_sel[rank] if pred_codes_sel is not None else None,
-                    "gt_vector": gt_vectors_sel[rank] if gt_vectors_sel is not None else None,
-                    "pred_vector": pred_vectors_sel[rank] if pred_vectors_sel is not None else None,
-                    "gt_action": gt_actions_sel[rank] if gt_actions_sel is not None else None,
-                    "pred_action": pred_actions_sel[rank] if pred_actions_sel is not None else None,
+                    "gt_codes": (
+                        gt_codes_sel[rank] if gt_codes_sel is not None else None
+                    ),
+                    "pred_codes": (
+                        pred_codes_sel[rank] if pred_codes_sel is not None else None
+                    ),
+                    "gt_vector": (
+                        gt_vectors_sel[rank] if gt_vectors_sel is not None else None
+                    ),
+                    "pred_vector": (
+                        pred_vectors_sel[rank] if pred_vectors_sel is not None else None
+                    ),
+                    "gt_action": (
+                        gt_actions_sel[rank] if gt_actions_sel is not None else None
+                    ),
+                    "pred_action": (
+                        pred_actions_sel[rank] if pred_actions_sel is not None else None
+                    ),
                     "pred_freeform": freeform,
-                    "gen_debug": gen_debug[rank]
-                    if isinstance(gen_debug, list) and rank < len(gen_debug)
-                    else None,
-                    "episode_id": episode_id_list[original_idx]
-                    if episode_id_list and original_idx < len(episode_id_list)
-                    else None,
-                    "frame_idx": frame_idx_list[original_idx]
-                    if frame_idx_list and original_idx < len(frame_idx_list)
-                    else None,
-                    "dataset_name": dataset_name_list[original_idx]
-                    if dataset_name_list and original_idx < len(dataset_name_list)
-                    else None,
+                    "gen_debug": (
+                        gen_debug[rank]
+                        if isinstance(gen_debug, list) and rank < len(gen_debug)
+                        else None
+                    ),
+                    "episode_id": (
+                        episode_id_list[original_idx]
+                        if episode_id_list and original_idx < len(episode_id_list)
+                        else None
+                    ),
+                    "frame_idx": (
+                        frame_idx_list[original_idx]
+                        if frame_idx_list and original_idx < len(frame_idx_list)
+                        else None
+                    ),
+                    "dataset_name": (
+                        dataset_name_list[original_idx]
+                        if dataset_name_list and original_idx < len(dataset_name_list)
+                        else None
+                    ),
                 }
             )
 

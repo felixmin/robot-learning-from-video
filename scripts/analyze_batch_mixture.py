@@ -70,7 +70,9 @@ def _rolling_average(values: list[float], window: int) -> list[float]:
     return out
 
 
-def _series_for_categories(measured: list[dict], categories: list[str]) -> dict[str, list[float]]:
+def _series_for_categories(
+    measured: list[dict], categories: list[str]
+) -> dict[str, list[float]]:
     out = {c: [] for c in categories}
     out["other"] = []
     for r in measured:
@@ -121,7 +123,9 @@ def _write_mixture_over_time_svg(
     bar_w = max(1.0, x_step)
 
     parts = [_svg_header(width, height)]
-    parts.append(f'<rect x="0" y="0" width="{width}" height="{height}" fill="white"/>\n')
+    parts.append(
+        f'<rect x="0" y="0" width="{width}" height="{height}" fill="white"/>\n'
+    )
     parts.append(
         f'<text x="{margin_l}" y="24" font-size="16" font-family="monospace">Dataset Mixture Over Time</text>\n'
     )
@@ -147,7 +151,13 @@ def _write_mixture_over_time_svg(
             )
             y_base = y
 
-    for tick, yv in [(0.0, plot_h), (0.25, plot_h * 0.75), (0.5, plot_h * 0.5), (0.75, plot_h * 0.25), (1.0, 0.0)]:
+    for tick, yv in [
+        (0.0, plot_h),
+        (0.25, plot_h * 0.75),
+        (0.5, plot_h * 0.5),
+        (0.75, plot_h * 0.25),
+        (1.0, 0.0),
+    ]:
         y = margin_t + yv
         parts.append(
             f'<line x1="{margin_l-5}" y1="{y:.1f}" x2="{margin_l}" y2="{y:.1f}" stroke="#444" stroke-width="1"/>\n'
@@ -170,8 +180,12 @@ def _write_mixture_over_time_svg(
     lx = margin_l + plot_w + 20
     ly = margin_t + 15
     for name, color in _legend_items(categories):
-        parts.append(f'<rect x="{lx}" y="{ly-10}" width="12" height="12" fill="{color}"/>\n')
-        parts.append(f'<text x="{lx+18}" y="{ly}" font-size="11" font-family="monospace">{name}</text>\n')
+        parts.append(
+            f'<rect x="{lx}" y="{ly-10}" width="12" height="12" fill="{color}"/>\n'
+        )
+        parts.append(
+            f'<text x="{lx+18}" y="{ly}" font-size="11" font-family="monospace">{name}</text>\n'
+        )
         ly += 18
 
     parts.append("</svg>\n")
@@ -202,7 +216,9 @@ def _write_windows_svg(
     colors = {k: c for k, c in _legend_items(categories)}
 
     parts = [_svg_header(width, height)]
-    parts.append(f'<rect x="0" y="0" width="{width}" height="{height}" fill="white"/>\n')
+    parts.append(
+        f'<rect x="0" y="0" width="{width}" height="{height}" fill="white"/>\n'
+    )
     parts.append(
         f'<text x="{margin_l}" y="24" font-size="16" font-family="monospace">5-Batch Windows Every {stride} Batches</text>\n'
     )
@@ -234,15 +250,21 @@ def _write_windows_svg(
     lx = margin_l + plot_w + 20
     ly = margin_t + 15
     for name, color in _legend_items(categories):
-        parts.append(f'<rect x="{lx}" y="{ly-10}" width="12" height="12" fill="{color}"/>\n')
-        parts.append(f'<text x="{lx+18}" y="{ly}" font-size="11" font-family="monospace">{name}</text>\n')
+        parts.append(
+            f'<rect x="{lx}" y="{ly-10}" width="12" height="12" fill="{color}"/>\n'
+        )
+        parts.append(
+            f'<text x="{lx+18}" y="{ly}" font-size="11" font-family="monospace">{name}</text>\n'
+        )
         ly += 18
 
     parts.append("</svg>\n")
     out_path.write_text("".join(parts), encoding="utf-8")
 
 
-def _write_summary(measured: list[dict], top_datasets: list[str], out_path: Path) -> None:
+def _write_summary(
+    measured: list[dict], top_datasets: list[str], out_path: Path
+) -> None:
     dom = [r.get("dominant_dataset") for r in measured]
     dom = [d for d in dom if isinstance(d, str) and d]
     switches = sum(1 for i in range(1, len(dom)) if dom[i] != dom[i - 1])
@@ -258,7 +280,9 @@ def _write_summary(measured: list[dict], top_datasets: list[str], out_path: Path
 
 
 def main() -> None:
-    p = argparse.ArgumentParser(description="Analyze batch mixture from benchmark jsonl.")
+    p = argparse.ArgumentParser(
+        description="Analyze batch mixture from benchmark jsonl."
+    )
     p.add_argument("--jsonl", type=Path, required=True)
     p.add_argument("--out-dir", type=Path, required=True)
     p.add_argument("--window-size", type=int, default=5)
@@ -299,4 +323,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

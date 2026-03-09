@@ -83,12 +83,16 @@ def resolve_request_to_delta_timestamps(
             if field_request.required:
                 raise KeyError(f"Missing camera role mapping for {role!r}")
             continue
-        out[camera_role_to_key[role]] = _steps_to_seconds(field_request.deltas_steps, fps=fps)
+        out[camera_role_to_key[role]] = _steps_to_seconds(
+            field_request.deltas_steps, fps=fps
+        )
 
     if request.state_request is not None and state_key is not None:
         out[state_key] = _steps_to_seconds(request.state_request.deltas_steps, fps=fps)
     if request.action_request is not None and action_key is not None:
-        out[action_key] = _steps_to_seconds(request.action_request.deltas_steps, fps=fps)
+        out[action_key] = _steps_to_seconds(
+            request.action_request.deltas_steps, fps=fps
+        )
     return out
 
 
@@ -172,15 +176,21 @@ def compile_source_index(
         action_key=action_key,
         episodes=episode_bundle,
         sampleable_episode_ids=np.asarray(sampleable_episode_ids, dtype=np.int32),
-        sampleable_episode_weights=np.asarray(sampleable_episode_weights, dtype=np.float64),
+        sampleable_episode_weights=np.asarray(
+            sampleable_episode_weights, dtype=np.float64
+        ),
     )
 
 
-def _filter_episodes(meta: LeRobotDatasetMetadata, episode_indices: set[int] | None) -> SourceMetaView:
+def _filter_episodes(
+    meta: LeRobotDatasetMetadata, episode_indices: set[int] | None
+) -> SourceMetaView:
     if episode_indices is None:
         episodes = list(meta.episodes)
     else:
-        episodes = [ep for ep in meta.episodes if int(ep["episode_index"]) in episode_indices]
+        episodes = [
+            ep for ep in meta.episodes if int(ep["episode_index"]) in episode_indices
+        ]
     return SourceMetaView(
         repo_id=str(meta.repo_id),
         fps=int(meta.fps),
@@ -201,7 +211,9 @@ def _to_tchw(image: torch.Tensor) -> torch.Tensor:
     raise ValueError(f"Unsupported image layout: {tuple(image.shape)}")
 
 
-def _resize_image_stream_to_uint8(image: torch.Tensor, image_size: tuple[int, int] | None) -> torch.Tensor:
+def _resize_image_stream_to_uint8(
+    image: torch.Tensor, image_size: tuple[int, int] | None
+) -> torch.Tensor:
     image_t = _to_tchw(image)
     if image_t.dtype == torch.uint8:
         image_f = image_t.to(torch.float32)
@@ -210,11 +222,15 @@ def _resize_image_stream_to_uint8(image: torch.Tensor, image_size: tuple[int, in
     else:
         raise TypeError(f"Expected uint8 or floating image stream, got {image_t.dtype}")
     if image_size is not None and tuple(image_f.shape[-2:]) != tuple(image_size):
-        image_f = F.interpolate(image_f, size=tuple(image_size), mode="bilinear", align_corners=False)
+        image_f = F.interpolate(
+            image_f, size=tuple(image_size), mode="bilinear", align_corners=False
+        )
     return image_f.round().clamp_(0.0, 255.0).to(torch.uint8)
 
 
-def _restrict_dataset_video_features(dataset: LeRobotDataset, requested_video_keys: set[str]) -> None:
+def _restrict_dataset_video_features(
+    dataset: LeRobotDataset, requested_video_keys: set[str]
+) -> None:
     if not requested_video_keys:
         return
     filtered_features = {
@@ -326,31 +342,51 @@ class LeRobotSingleSource:
                 continue
             if dataset_key not in raw:
                 continue
-            image_streams[role] = _resize_image_stream_to_uint8(raw[dataset_key], self.request.image_size)
+            image_streams[role] = _resize_image_stream_to_uint8(
+                raw[dataset_key], self.request.image_size
+            )
             is_pad_key = f"{dataset_key}_is_pad"
             if is_pad_key in raw:
-                image_padding_masks[role] = ~torch.as_tensor(raw[is_pad_key], dtype=torch.bool)
+                image_padding_masks[role] = ~torch.as_tensor(
+                    raw[is_pad_key], dtype=torch.bool
+                )
             else:
-                image_padding_masks[role] = torch.ones((int(image_streams[role].shape[0]),), dtype=torch.bool)
+                image_padding_masks[role] = torch.ones(
+                    (int(image_streams[role].shape[0]),), dtype=torch.bool
+                )
 
         state = None
         state_is_pad = None
-        if self.request.state_request is not None and self.state_key is not None and self.state_key in raw:
+        if (
+            self.request.state_request is not None
+            and self.state_key is not None
+            and self.state_key in raw
+        ):
             state = torch.as_tensor(raw[self.state_key])
             if state.ndim == 1:
                 state = state.unsqueeze(0)
             state_is_pad = torch.as_tensor(
-                raw.get(f"{self.state_key}_is_pad", torch.zeros((int(state.shape[0]),), dtype=torch.bool))
+                raw.get(
+                    f"{self.state_key}_is_pad",
+                    torch.zeros((int(state.shape[0]),), dtype=torch.bool),
+                )
             )
 
         action = None
         action_is_pad = None
-        if self.request.action_request is not None and self.action_key is not None and self.action_key in raw:
+        if (
+            self.request.action_request is not None
+            and self.action_key is not None
+            and self.action_key in raw
+        ):
             action = torch.as_tensor(raw[self.action_key])
             if action.ndim == 1:
                 action = action.unsqueeze(0)
             action_is_pad = torch.as_tensor(
-                raw.get(f"{self.action_key}_is_pad", torch.zeros((int(action.shape[0]),), dtype=torch.bool))
+                raw.get(
+                    f"{self.action_key}_is_pad",
+                    torch.zeros((int(action.shape[0]),), dtype=torch.bool),
+                )
             )
 
         return DatasetSample(
@@ -365,7 +401,9 @@ class LeRobotSingleSource:
             meta={
                 "dataset_name": self.repo_id,
                 "dataset_short": _dataset_short_from_repo_id(self.repo_id),
-                "episode_id": int(raw["episode_index"]) if "episode_index" in raw else None,
+                "episode_id": (
+                    int(raw["episode_index"]) if "episode_index" in raw else None
+                ),
                 "frame_idx": int(raw["frame_index"]) if "frame_index" in raw else None,
             },
         )

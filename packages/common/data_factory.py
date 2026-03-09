@@ -6,7 +6,9 @@ from typing import Any, Dict
 
 try:
     from omegaconf import DictConfig, OmegaConf
-except ModuleNotFoundError:  # pragma: no cover - used only in lightweight unit-test envs
+except (
+    ModuleNotFoundError
+):  # pragma: no cover - used only in lightweight unit-test envs
     DictConfig = None  # type: ignore[assignment]
     OmegaConf = None
 

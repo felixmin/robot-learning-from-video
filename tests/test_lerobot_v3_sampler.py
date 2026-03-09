@@ -56,7 +56,9 @@ def test_weighted_lerobot_token_sampler_respects_configured_source_weights() -> 
     assert 0.04 <= frac1 <= 0.16
 
 
-def test_weighted_lerobot_token_sampler_rebuilds_episode_cycle_after_exhaustion() -> None:
+def test_weighted_lerobot_token_sampler_rebuilds_episode_cycle_after_exhaustion() -> (
+    None
+):
     source = _build_source(start=0, lengths=[20, 20, 20])
     sampler = WeightedLeRobotTokenSampler(
         compiled_sources=[source],
@@ -74,7 +76,9 @@ def test_weighted_lerobot_token_sampler_rebuilds_episode_cycle_after_exhaustion(
     assert max(per_episode.values()) - min(per_episode.values()) <= 1
 
 
-def test_weighted_lerobot_token_sampler_is_deterministic_for_same_seed_and_epoch() -> None:
+def test_weighted_lerobot_token_sampler_is_deterministic_for_same_seed_and_epoch() -> (
+    None
+):
     source_a = _build_source(start=0, lengths=[12, 12, 12])
     source_b = _build_source(start=100, lengths=[12, 12])
     sampler_a = WeightedLeRobotTokenSampler(
@@ -114,7 +118,9 @@ def test_weighted_lerobot_token_sampler_set_epoch_changes_sequence() -> None:
     assert seq0 != seq1
 
 
-def test_distributed_weighted_lerobot_token_sampler_produces_equal_rank_lengths() -> None:
+def test_distributed_weighted_lerobot_token_sampler_produces_equal_rank_lengths() -> (
+    None
+):
     source_a = _build_source(start=0, lengths=[20, 20, 20])
     source_b = _build_source(start=100, lengths=[20, 20, 20])
 
@@ -141,7 +147,9 @@ def test_distributed_weighted_lerobot_token_sampler_produces_equal_rank_lengths(
     assert len(rank0) == len(rank1) == 6
 
 
-def test_distributed_weighted_lerobot_token_sampler_has_no_cross_rank_token_overlap_for_epoch_plan() -> None:
+def test_distributed_weighted_lerobot_token_sampler_has_no_cross_rank_token_overlap_for_epoch_plan() -> (
+    None
+):
     source = _build_source(start=0, lengths=[50, 50, 50])
 
     rank0 = DistributedWeightedLeRobotTokenSampler(

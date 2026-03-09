@@ -29,11 +29,12 @@ def _source_cfg(
     }
 
 
-def _request_cfg(*, image_requests: dict[str, list[int]], include_actions: bool = True) -> dict[str, object]:
+def _request_cfg(
+    *, image_requests: dict[str, list[int]], include_actions: bool = True
+) -> dict[str, object]:
     out: dict[str, object] = {
         "image_requests": {
-            role: {"deltas_steps": deltas}
-            for role, deltas in image_requests.items()
+            role: {"deltas_steps": deltas} for role, deltas in image_requests.items()
         },
         "state_request": {"deltas_steps": [0]},
         "include_task_text": True,

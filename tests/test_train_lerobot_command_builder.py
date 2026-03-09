@@ -22,7 +22,9 @@ def config_dir() -> str:
     return str(Path(__file__).resolve().parents[1] / "config")
 
 
-def test_command_builder_artifact_mode_includes_stage2_artifact(config_dir: str) -> None:
+def test_command_builder_artifact_mode_includes_stage2_artifact(
+    config_dir: str,
+) -> None:
     mod = _load_stage3_script_module()
     with initialize_config_dir(version_base=None, config_dir=config_dir):
         cfg = compose(
@@ -38,7 +40,9 @@ def test_command_builder_artifact_mode_includes_stage2_artifact(config_dir: str)
     assert "--policy.stage2_artifact=/tmp/stage2.pt" in cmd
 
 
-def test_command_builder_scratch_mode_sets_null_stage2_artifact(config_dir: str) -> None:
+def test_command_builder_scratch_mode_sets_null_stage2_artifact(
+    config_dir: str,
+) -> None:
     mod = _load_stage3_script_module()
     with initialize_config_dir(version_base=None, config_dir=config_dir):
         cfg = compose(
@@ -50,7 +54,9 @@ def test_command_builder_scratch_mode_sets_null_stage2_artifact(config_dir: str)
     assert "--policy.stage2_artifact=null" in cmd
 
 
-def test_command_builder_artifact_mode_requires_stage2_artifact(config_dir: str) -> None:
+def test_command_builder_artifact_mode_requires_stage2_artifact(
+    config_dir: str,
+) -> None:
     mod = _load_stage3_script_module()
     with initialize_config_dir(version_base=None, config_dir=config_dir):
         cfg = compose(
@@ -61,7 +67,9 @@ def test_command_builder_artifact_mode_requires_stage2_artifact(config_dir: str)
                 "lerobot.policy.stage2_artifact=null",
             ],
         )
-    with pytest.raises(ValueError, match="required when lerobot.policy.init_mode=artifact"):
+    with pytest.raises(
+        ValueError, match="required when lerobot.policy.init_mode=artifact"
+    ):
         mod._lerobot_run_command_from_cfg(cfg)
 
 

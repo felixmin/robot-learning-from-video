@@ -16,7 +16,7 @@ sys.path.insert(0, str(workspace_root / "packages"))
 @pytest.fixture(scope="session")
 def device():
     """Get device for testing (CUDA if available, else CPU)."""
-    return 'cuda' if torch.cuda.is_available() else 'cpu'
+    return "cuda" if torch.cuda.is_available() else "cpu"
 
 
 @pytest.fixture(scope="session")
@@ -36,16 +36,16 @@ def test_data_path(workspace_root_path):
 def lam_config():
     """Standard LAM model configuration for testing."""
     return {
-        'dim': 1024,
-        'quant_dim': 32,
-        'codebook_size': 8,
-        'image_size': 256,
-        'patch_size': 32,
-        'spatial_depth': 8,
-        'temporal_depth': 8,
-        'dim_head': 64,
-        'heads': 16,
-        'code_seq_len': 4,
+        "dim": 1024,
+        "quant_dim": 32,
+        "codebook_size": 8,
+        "image_size": 256,
+        "patch_size": 32,
+        "spatial_depth": 8,
+        "temporal_depth": 8,
+        "dim_head": 64,
+        "heads": 16,
+        "code_seq_len": 4,
     }
 
 
@@ -53,14 +53,14 @@ def lam_config():
 def small_lam_config():
     """Smaller LAM config for faster tests."""
     return {
-        'dim': 256,
-        'quant_dim': 16,
-        'codebook_size': 8,
-        'image_size': 256,
-        'patch_size': 32,
-        'spatial_depth': 2,
-        'temporal_depth': 2,
-        'dim_head': 32,
-        'heads': 4,
-        'code_seq_len': 4,
+        "dim": 256,
+        "quant_dim": 16,
+        "codebook_size": 8,
+        "image_size": 256,
+        "patch_size": 32,
+        "spatial_depth": 2,
+        "temporal_depth": 2,
+        "dim_head": 32,
+        "heads": 4,
+        "code_seq_len": 4,
     }

@@ -7,10 +7,17 @@ import sys
 
 import torch
 
-from stage2.backends.interfaces import BackendMode, Stage2Batch, LatentOutput, LossOutput
+from stage2.backends.interfaces import (
+    BackendMode,
+    Stage2Batch,
+    LatentOutput,
+    LossOutput,
+)
 from stage2.policy_module import PolicyLightningModule, PolicyOptimizerConfig
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lerobot_policy_hlrp" / "src"))
+sys.path.insert(
+    0, str(Path(__file__).resolve().parents[1] / "lerobot_policy_hlrp" / "src")
+)
 from lerobot_policy_hlrp.policies.hlrp_smolvla_shared.modeling_hlrp_smolvla_shared import (
     HLRPSmolVLASharedPolicy,
 )
@@ -32,7 +39,9 @@ class _CaptureBackend:
         self.last_mode = mode
         return LossOutput(loss=torch.tensor(0.0), metrics={"loss": 0.0})
 
-    def latent_from_batch(self, batch: Stage2Batch, *, mode: BackendMode) -> LatentOutput:
+    def latent_from_batch(
+        self, batch: Stage2Batch, *, mode: BackendMode
+    ) -> LatentOutput:
         del batch, mode
         return LatentOutput()
 
@@ -60,7 +69,9 @@ def test_stage2_stage3_adapter_parity_for_core_inputs() -> None:
     )
 
     stage2_input = Stage2Batch(
-        image_streams={"primary": torch.randint(0, 255, (2, 2, 3, 8, 8), dtype=torch.uint8)},
+        image_streams={
+            "primary": torch.randint(0, 255, (2, 2, 3, 8, 8), dtype=torch.uint8)
+        },
         image_padding_masks={"primary": torch.ones((2, 2), dtype=torch.bool)},
         task_text=["pick", "place"],
         state=torch.tensor([[[3.0, 3.0]], [[1.0, -1.0]]], dtype=torch.float32),
@@ -84,7 +95,9 @@ def test_stage2_stage3_adapter_parity_for_core_inputs() -> None:
         "observation.images.rgb": stage2_batch.image_streams["primary"],
         "observation.images.rgb_is_pad": torch.zeros((2, 1), dtype=torch.bool),
         "task": ["pick", "place"],
-        "observation.state": torch.tensor([[3.0, 3.0], [1.0, -1.0]], dtype=torch.float32),
+        "observation.state": torch.tensor(
+            [[3.0, 3.0], [1.0, -1.0]], dtype=torch.float32
+        ),
         "action": torch.tensor([[3.0, 6.0], [1.0, 2.0]], dtype=torch.float32),
         "action_is_pad": torch.zeros((2, 1), dtype=torch.bool),
     }
@@ -95,7 +108,9 @@ def test_stage2_stage3_adapter_parity_for_core_inputs() -> None:
         require_image_padding_masks=True,
         conditioning_step_index=-1,
     )
-    stage3_action_target = HLRPSmolVLASharedPolicy._extract_action_target(policy, lerobot_batch)
+    stage3_action_target = HLRPSmolVLASharedPolicy._extract_action_target(
+        policy, lerobot_batch
+    )
 
     assert torch.equal(
         stage2_batch.image_streams["primary"][:, -1, ...],
@@ -103,7 +118,9 @@ def test_stage2_stage3_adapter_parity_for_core_inputs() -> None:
     )
     assert torch.equal(stage2_batch.action_is_pad, stage3_batch.action_is_pad)
     assert torch.allclose(stage2_batch.state.squeeze(1), stage3_batch.state)
-    assert torch.allclose(stage2_batch.target_actions.squeeze(1), stage3_action_target.squeeze(1))
+    assert torch.allclose(
+        stage2_batch.target_actions.squeeze(1), stage3_action_target.squeeze(1)
+    )
 
 
 def test_stage3_policy_accepts_actions_id_pad_alias() -> None:
@@ -116,7 +133,9 @@ def test_stage3_policy_accepts_actions_id_pad_alias() -> None:
     policy.core = torch.nn.Linear(1, 1)
 
     batch = {
-        "observation.images.rgb": torch.randint(0, 255, (2, 1, 8, 8, 3), dtype=torch.uint8),
+        "observation.images.rgb": torch.randint(
+            0, 255, (2, 1, 8, 8, 3), dtype=torch.uint8
+        ),
         "observation.images.rgb_is_pad": torch.zeros((2, 1), dtype=torch.bool),
         "task": ["pick", "place"],
         "observation.state": torch.zeros((2, 2), dtype=torch.float32),
@@ -142,7 +161,9 @@ def test_stage3_policy_rejects_conflicting_mask_aliases() -> None:
     policy.core = torch.nn.Linear(1, 1)
 
     batch = {
-        "observation.images.rgb": torch.randint(0, 255, (1, 1, 8, 8, 3), dtype=torch.uint8),
+        "observation.images.rgb": torch.randint(
+            0, 255, (1, 1, 8, 8, 3), dtype=torch.uint8
+        ),
         "observation.images.rgb_is_pad": torch.zeros((1, 1), dtype=torch.bool),
         "task": ["pick"],
         "observation.state": torch.zeros((1, 2), dtype=torch.float32),
@@ -173,7 +194,9 @@ def test_stage3_policy_inference_batch_allows_missing_action_mask() -> None:
     policy.core = torch.nn.Linear(1, 1)
 
     batch = {
-        "observation.images.rgb": torch.randint(0, 255, (2, 1, 8, 8, 3), dtype=torch.uint8),
+        "observation.images.rgb": torch.randint(
+            0, 255, (2, 1, 8, 8, 3), dtype=torch.uint8
+        ),
         "observation.images.rgb_is_pad": torch.zeros((2, 1), dtype=torch.bool),
         "task": ["pick", "place"],
         "observation.state": torch.zeros((2, 2), dtype=torch.float32),
@@ -198,7 +221,9 @@ def test_stage3_policy_inference_batch_allows_missing_image_is_pad() -> None:
     policy.core = torch.nn.Linear(1, 1)
 
     batch = {
-        "observation.images.rgb": torch.randint(0, 255, (2, 1, 8, 8, 3), dtype=torch.uint8),
+        "observation.images.rgb": torch.randint(
+            0, 255, (2, 1, 8, 8, 3), dtype=torch.uint8
+        ),
         "task": ["pick", "place"],
         "observation.state": torch.zeros((2, 2), dtype=torch.float32),
     }

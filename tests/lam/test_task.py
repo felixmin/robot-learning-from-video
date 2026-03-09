@@ -15,65 +15,69 @@ from lam.task import LAMTask, separate_weight_decayable_params
 @pytest.fixture
 def model_config():
     """Minimal model config for testing."""
-    return OmegaConf.create({
-        "dim": 256,
-        "quant_dim": 16,
-        "codebook_size": 8,
-        "image_size": 256,  # Match existing tests
-        "patch_size": 32,
-        "spatial_depth": 2,
-        "temporal_depth": 2,
-        "dim_head": 32,
-        "heads": 4,
-        "code_seq_len": 4,
-        "channels": 3,
-        "attn_dropout": 0.0,
-        "ff_dropout": 0.0,
-        "vq_discarding_threshold": 0.1,
-        "vq_discarding_threshold_schedule": None,
-        "latent_ablation": "none",
-        "use_dinov3_encoder": False,
-        "dinov3_model_name": "facebook/dinov3-vits16-pretrain-lvd1689m",
-        "dinov3_pool_to_grid": None,
-        "dino": {
-            "enabled": True,
-            "loss_weight": 1.0,
-            "warmup_steps": 0,
-        },
-        "use_pixel_decoder": False,
-        "use_aux_decoder": True,
-        "flow": {
-            "enabled": False,
-        },
-        "codebook_replace_schedule": [[10, 100]],
-    })
+    return OmegaConf.create(
+        {
+            "dim": 256,
+            "quant_dim": 16,
+            "codebook_size": 8,
+            "image_size": 256,  # Match existing tests
+            "patch_size": 32,
+            "spatial_depth": 2,
+            "temporal_depth": 2,
+            "dim_head": 32,
+            "heads": 4,
+            "code_seq_len": 4,
+            "channels": 3,
+            "attn_dropout": 0.0,
+            "ff_dropout": 0.0,
+            "vq_discarding_threshold": 0.1,
+            "vq_discarding_threshold_schedule": None,
+            "latent_ablation": "none",
+            "use_dinov3_encoder": False,
+            "dinov3_model_name": "facebook/dinov3-vits16-pretrain-lvd1689m",
+            "dinov3_pool_to_grid": None,
+            "dino": {
+                "enabled": True,
+                "loss_weight": 1.0,
+                "warmup_steps": 0,
+            },
+            "use_pixel_decoder": False,
+            "use_aux_decoder": True,
+            "flow": {
+                "enabled": False,
+            },
+            "codebook_replace_schedule": [[10, 100]],
+        }
+    )
 
 
 @pytest.fixture
 def training_config():
     """Minimal training config for testing."""
-    return OmegaConf.create({
-        "max_steps": 10,
-        "metrics": {
-            "log_every_n_steps": 1,
-            "num_unique_codes_every_n_steps": 1,
-        },
-        "optimizer": {
-            "lr": 1e-4,
-            "betas": [0.9, 0.999],
-            "weight_decay": 0.01,
-            "eps": 1e-8,
-        },
-        "scheduler": {
-            "type": "cosine",
-            "min_lr": 1e-6,
-            "warmup_steps": 0,
-            "warmup_start_lr": 1e-6,
-        },
-        "gradient": {
-            "clip_val": 1.0,
-        },
-    })
+    return OmegaConf.create(
+        {
+            "max_steps": 10,
+            "metrics": {
+                "log_every_n_steps": 1,
+                "num_unique_codes_every_n_steps": 1,
+            },
+            "optimizer": {
+                "lr": 1e-4,
+                "betas": [0.9, 0.999],
+                "weight_decay": 0.01,
+                "eps": 1e-8,
+            },
+            "scheduler": {
+                "type": "cosine",
+                "min_lr": 1e-6,
+                "warmup_steps": 0,
+                "warmup_start_lr": 1e-6,
+            },
+            "gradient": {
+                "clip_val": 1.0,
+            },
+        }
+    )
 
 
 @pytest.fixture
@@ -87,7 +91,11 @@ def _make_stage1_batch(frames: torch.Tensor) -> Stage1Batch:
     time_steps = int(frames.shape[2])
     return Stage1Batch(
         image_streams={"primary": frames},
-        image_padding_masks={"primary": torch.ones((batch_size, time_steps), dtype=torch.bool, device=frames.device)},
+        image_padding_masks={
+            "primary": torch.ones(
+                (batch_size, time_steps), dtype=torch.bool, device=frames.device
+            )
+        },
         task_text=["test-task"] * batch_size,
         meta={"dataset_name": [f"dataset_{i}" for i in range(batch_size)]},
     )
@@ -100,8 +108,8 @@ class TestSeparateWeightDecayableParams:
         """Test separating 2D+ params from <2D params."""
         # Create dummy parameters
         weight_2d = torch.nn.Parameter(torch.randn(10, 10))  # 2D -> weight decay
-        bias_1d = torch.nn.Parameter(torch.randn(10))        # 1D -> no weight decay
-        weight_3d = torch.nn.Parameter(torch.randn(5, 5, 5)) # 3D -> weight decay
+        bias_1d = torch.nn.Parameter(torch.randn(10))  # 1D -> no weight decay
+        weight_3d = torch.nn.Parameter(torch.randn(5, 5, 5))  # 3D -> weight decay
 
         params = [weight_2d, bias_1d, weight_3d]
         wd_params, no_wd_params = separate_weight_decayable_params(params)
@@ -154,7 +162,9 @@ class TestLAMTaskInitialization:
 
         print("✓ LAMTask initialized")
 
-    def test_task_passes_vq_discarding_threshold_schedule(self, model_config, training_config):
+    def test_task_passes_vq_discarding_threshold_schedule(
+        self, model_config, training_config
+    ):
         """Test task forwards threshold schedule to LAM model."""
         model_config.vq_discarding_threshold_schedule = [[0.1, 100], [0.01, 1000]]
         task = LAMTask(
@@ -214,9 +224,13 @@ class TestLAMTaskForward:
         assert metrics["usage_count_threshold_in_window"] >= 0
         assert float(metrics["code_assignments_in_window"].item()) > 0
 
-        print(f"✓ Forward pass: loss={loss.item():.4f}, num_unique={metrics['unique_codes_in_batch']}")
+        print(
+            f"✓ Forward pass: loss={loss.item():.4f}, num_unique={metrics['unique_codes_in_batch']}"
+        )
 
-    def test_forward_with_recons_only(self, model_config, training_config, synthetic_batch, device):
+    def test_forward_with_recons_only(
+        self, model_config, training_config, synthetic_batch, device
+    ):
         """Test forward pass returning reconstructions only."""
         task = LAMTask(
             model_config=model_config,
@@ -236,7 +250,9 @@ class TestLAMTaskForward:
 class TestLAMTaskTrainingStep:
     """Test LAMTask training step."""
 
-    def test_training_step_stage1_batch(self, model_config, training_config, synthetic_batch, device):
+    def test_training_step_stage1_batch(
+        self, model_config, training_config, synthetic_batch, device
+    ):
         """Test training step with Stage1Batch input."""
         task = LAMTask(
             model_config=model_config,
@@ -254,7 +270,9 @@ class TestLAMTaskTrainingStep:
 
         print(f"✓ Training step (Stage1Batch): loss={loss.item():.4f}")
 
-    def test_training_step_rejects_legacy_dict_batch(self, model_config, training_config, synthetic_batch, device):
+    def test_training_step_rejects_legacy_dict_batch(
+        self, model_config, training_config, synthetic_batch, device
+    ):
         """Test training step rejects legacy dict batches."""
         task = LAMTask(
             model_config=model_config,
@@ -274,7 +292,9 @@ class TestLAMTaskTrainingStep:
 class TestLAMTaskValidationStep:
     """Test LAMTask validation step."""
 
-    def test_validation_step(self, model_config, training_config, synthetic_batch, device):
+    def test_validation_step(
+        self, model_config, training_config, synthetic_batch, device
+    ):
         """Test validation step."""
         task = LAMTask(
             model_config=model_config,
@@ -312,7 +332,7 @@ class TestLAMTaskOptimizer:
 
         # Check weight decay settings
         assert optimizer.param_groups[0]["weight_decay"] == 0.01  # wd group
-        assert optimizer.param_groups[1]["weight_decay"] == 0.0   # no_wd group
+        assert optimizer.param_groups[1]["weight_decay"] == 0.0  # no_wd group
 
         print("✓ Optimizer configured with 2 parameter groups")
 
@@ -335,7 +355,9 @@ class TestLAMTaskOptimizer:
 class TestLAMTaskGradients:
     """Test LAMTask gradient flow."""
 
-    def test_gradient_flow(self, model_config, training_config, synthetic_batch, device):
+    def test_gradient_flow(
+        self, model_config, training_config, synthetic_batch, device
+    ):
         """Test gradients flow through task."""
         task = LAMTask(
             model_config=model_config,
@@ -350,7 +372,8 @@ class TestLAMTaskGradients:
 
         # Check gradients exist
         params_with_grad = [
-            p for p in task.parameters()
+            p
+            for p in task.parameters()
             if p.grad is not None and p.grad.abs().sum() > 0
         ]
 
@@ -359,7 +382,9 @@ class TestLAMTaskGradients:
 
         assert grad_ratio > 0.5  # At least 50% of params have gradients
 
-        print(f"✓ Gradient flow: {len(params_with_grad)}/{total_params} params with gradients")
+        print(
+            f"✓ Gradient flow: {len(params_with_grad)}/{total_params} params with gradients"
+        )
 
 
 if __name__ == "__main__":

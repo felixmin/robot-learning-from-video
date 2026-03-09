@@ -14,6 +14,7 @@ from torchvision.utils import make_grid
 
 from common.batch_utils import select_primary_image_stream, temporal_frames_to_bcthw
 
+
 def _batch_meta_list(batch: Any, *, key: str) -> list[Any] | None:
     if isinstance(batch, dict):
         items = batch.get(key)
@@ -91,7 +92,9 @@ class DataSampleVisualizationCallback(Callback):
         self.cfg = cfg or DataSampleVisualizationConfig()
 
     @staticmethod
-    def _extract_video_and_meta(batch: Any) -> tuple[torch.Tensor | None, dict[str, Any], list[str]]:
+    def _extract_video_and_meta(
+        batch: Any,
+    ) -> tuple[torch.Tensor | None, dict[str, Any], list[str]]:
         if isinstance(batch, dict):
             frames = batch.get("frames")
             if not isinstance(frames, torch.Tensor):
@@ -144,7 +147,10 @@ class DataSampleVisualizationCallback(Callback):
         step = int(getattr(trainer, "global_step", 0))
         if step <= 0:
             return
-        if int(self.cfg.every_n_steps) <= 0 or (step % int(self.cfg.every_n_steps)) != 0:
+        if (
+            int(self.cfg.every_n_steps) <= 0
+            or (step % int(self.cfg.every_n_steps)) != 0
+        ):
             return
 
         image_logger = _find_image_logger(trainer)
@@ -167,7 +173,9 @@ class DataSampleVisualizationCallback(Callback):
                 return
             frame_t = video[:, :, 0]
             frame_t_plus = video[:, :, 1]
-            stacked = torch.stack([frame_t, frame_t_plus], dim=1).reshape(n * 2, *frame_t.shape[1:])
+            stacked = torch.stack([frame_t, frame_t_plus], dim=1).reshape(
+                n * 2, *frame_t.shape[1:]
+            )
             grid = make_grid(stacked, nrow=2, normalize=False)
         else:
             frame_t = video[:, :, 0]
@@ -291,7 +299,9 @@ class DatasetUsageLoggerCallback(Callback):
         self._since_last: collections.Counter[str] = collections.Counter()
         self._total: collections.Counter[str] = collections.Counter()
 
-    def on_train_batch_end(self, trainer, pl_module, outputs, batch: Any, batch_idx: int) -> None:
+    def on_train_batch_end(
+        self, trainer, pl_module, outputs, batch: Any, batch_idx: int
+    ) -> None:
         if not self.enabled:
             return
         items = _batch_meta_list(batch, key=self.key)
@@ -310,7 +320,10 @@ class DatasetUsageLoggerCallback(Callback):
 
         if self.log_batch_composition_every_n_steps is not None:
             step = int(getattr(trainer, "global_step", 0))
-            if self.log_batch_composition_every_n_steps > 0 and (step + 1) % self.log_batch_composition_every_n_steps == 0:
+            if (
+                self.log_batch_composition_every_n_steps > 0
+                and (step + 1) % self.log_batch_composition_every_n_steps == 0
+            ):
                 self._print_batch_mix(step=step + 1, items=items)
 
     def on_validation_end(self, trainer, pl_module) -> None:
@@ -329,7 +342,10 @@ class DatasetUsageLoggerCallback(Callback):
             parts.append(f"{name}={count} ({pct:.1f}%)")
 
         step = int(getattr(trainer, "global_step", 0))
-        msg = f"[{prefix}][DatasetUsage] step={step} interval_total={total} " + ", ".join(parts)
+        msg = (
+            f"[{prefix}][DatasetUsage] step={step} interval_total={total} "
+            + ", ".join(parts)
+        )
         print(msg)
 
         if reset_since_last:

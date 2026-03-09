@@ -27,13 +27,33 @@ def _compiled_index(*, repo_id: str, start: int, stop: int) -> CompiledSourceInd
             valid_anchor_end=np.asarray([stop], dtype=np.int64),
             valid_anchor_count=np.asarray([count], dtype=np.int32),
         ),
-        sampleable_episode_ids=np.asarray([0], dtype=np.int32) if count > 0 else np.asarray([], dtype=np.int32),
-        sampleable_episode_weights=np.asarray([count], dtype=np.float64) if count > 0 else np.asarray([], dtype=np.float64),
+        sampleable_episode_ids=(
+            np.asarray([0], dtype=np.int32)
+            if count > 0
+            else np.asarray([], dtype=np.int32)
+        ),
+        sampleable_episode_weights=(
+            np.asarray([count], dtype=np.float64)
+            if count > 0
+            else np.asarray([], dtype=np.float64)
+        ),
     )
 
 
 class _FakeSource:
-    def __init__(self, *, repo_id, root, revision, weight, camera_map, state_key, action_key, video_backend, tolerance_s):
+    def __init__(
+        self,
+        *,
+        repo_id,
+        root,
+        revision,
+        weight,
+        camera_map,
+        state_key,
+        action_key,
+        video_backend,
+        tolerance_s,
+    ):
         del root, revision, state_key, action_key, video_backend, tolerance_s
         self.repo_id = repo_id
         self.weight = weight
@@ -53,12 +73,20 @@ class _FakeSource:
         self.compiled_val_index = None
 
     def compile(self, request, *, train_episode_indices, val_episode_indices):
-        self.compile_calls.append((request, set(train_episode_indices), set(val_episode_indices)))
-        self.compiled_train_index = _compiled_index(repo_id=self.repo_id, start=0, stop=8)
-        self.compiled_val_index = _compiled_index(repo_id=self.repo_id, start=8, stop=10)
+        self.compile_calls.append(
+            (request, set(train_episode_indices), set(val_episode_indices))
+        )
+        self.compiled_train_index = _compiled_index(
+            repo_id=self.repo_id, start=0, stop=8
+        )
+        self.compiled_val_index = _compiled_index(
+            repo_id=self.repo_id, start=8, stop=10
+        )
 
     def get_sample(self, anchor_abs_index):
-        raise AssertionError("get_sample should not be called in datamodule wiring tests")
+        raise AssertionError(
+            "get_sample should not be called in datamodule wiring tests"
+        )
 
 
 def _cfg(*, num_sources: int = 1):
@@ -77,7 +105,12 @@ def _cfg(*, num_sources: int = 1):
     return {
         "backend": "lerobot_v3",
         "preprocess": {"image_size": 224, "return_metadata": True},
-        "loader": {"batch_size": 4, "num_workers": 0, "pin_memory": False, "prefetch_factor": 1},
+        "loader": {
+            "batch_size": 4,
+            "num_workers": 0,
+            "pin_memory": False,
+            "prefetch_factor": 1,
+        },
         "request": {
             "image_requests": {"primary": {"deltas_steps": [0, 1]}},
             "include_task_text": True,
@@ -88,7 +121,9 @@ def _cfg(*, num_sources: int = 1):
         },
         "output_format": "raw",
         "dataset": {"lerobot": {"sources": sources}},
-        "adapter": {"lerobot_v3": {"seed": 7, "steps_per_epoch": 3, "resample_each_epoch": True}},
+        "adapter": {
+            "lerobot_v3": {"seed": 7, "steps_per_epoch": 3, "resample_each_epoch": True}
+        },
     }
 
 
@@ -120,10 +155,14 @@ def test_lerobot_v3_datamodule_builds_weighted_mixed_dataset(monkeypatch) -> Non
     )
     dm.setup()
     assert len(dm.sources) == 2
-    assert np.allclose(dm.train_sampler.source_weights, np.asarray([1.0 / 3.0, 2.0 / 3.0]))
+    assert np.allclose(
+        dm.train_sampler.source_weights, np.asarray([1.0 / 3.0, 2.0 / 3.0])
+    )
 
 
-def test_lerobot_v3_datamodule_builds_separate_train_and_val_indices(monkeypatch) -> None:
+def test_lerobot_v3_datamodule_builds_separate_train_and_val_indices(
+    monkeypatch,
+) -> None:
     monkeypatch.setattr("common.lerobot_v3_data.LeRobotSingleSource", _FakeSource)
     cfg = _cfg(num_sources=1)
     dm = LeRobotV3DataModule(
@@ -173,7 +212,9 @@ def test_lerobot_v3_datamodule_stage1_output_returns_stage1_batch(monkeypatch) -
     assert tuple(batch.image_streams["primary"].shape) == (4, 2, 3, 8, 8)
 
 
-def test_lerobot_v3_datamodule_rejects_removed_stage1_legacy_output(monkeypatch) -> None:
+def test_lerobot_v3_datamodule_rejects_removed_stage1_legacy_output(
+    monkeypatch,
+) -> None:
     class _SampleSource(_FakeSource):
         def get_sample(self, anchor_abs_index):
             del anchor_abs_index
@@ -200,11 +241,19 @@ def test_lerobot_v3_datamodule_rejects_removed_stage1_legacy_output(monkeypatch)
         next(iter(dm.train_dataloader()))
 
 
-def test_lerobot_v3_datamodule_uses_distributed_sampler_when_initialized(monkeypatch) -> None:
+def test_lerobot_v3_datamodule_uses_distributed_sampler_when_initialized(
+    monkeypatch,
+) -> None:
     monkeypatch.setattr("common.lerobot_v3_data.LeRobotSingleSource", _FakeSource)
-    monkeypatch.setattr("common.lerobot_v3_data.torch.distributed.is_available", lambda: True)
-    monkeypatch.setattr("common.lerobot_v3_data.torch.distributed.is_initialized", lambda: True)
-    monkeypatch.setattr("common.lerobot_v3_data.torch.distributed.get_world_size", lambda: 4)
+    monkeypatch.setattr(
+        "common.lerobot_v3_data.torch.distributed.is_available", lambda: True
+    )
+    monkeypatch.setattr(
+        "common.lerobot_v3_data.torch.distributed.is_initialized", lambda: True
+    )
+    monkeypatch.setattr(
+        "common.lerobot_v3_data.torch.distributed.get_world_size", lambda: 4
+    )
     monkeypatch.setattr("common.lerobot_v3_data.torch.distributed.get_rank", lambda: 1)
 
     cfg = _cfg(num_sources=2)
@@ -217,14 +266,18 @@ def test_lerobot_v3_datamodule_uses_distributed_sampler_when_initialized(monkeyp
     )
     dm.setup()
 
-    assert dm.train_sampler.__class__.__name__ == "DistributedWeightedLeRobotTokenSampler"
+    assert (
+        dm.train_sampler.__class__.__name__ == "DistributedWeightedLeRobotTokenSampler"
+    )
     assert dm.val_sampler.__class__.__name__ == "DistributedWeightedLeRobotTokenSampler"
     assert dm.train_sampler.world_size == 4
     assert dm.train_sampler.rank == 1
     assert dm.train_sampler.global_num_samples == 48
 
 
-def test_lerobot_v3_datamodule_fails_fast_on_missing_camera_role_mapping(monkeypatch) -> None:
+def test_lerobot_v3_datamodule_fails_fast_on_missing_camera_role_mapping(
+    monkeypatch,
+) -> None:
     monkeypatch.setattr("common.lerobot_v3_data.LeRobotSingleSource", _FakeSource)
     cfg = _cfg(num_sources=1)
     cfg["request"]["image_requests"] = {

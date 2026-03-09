@@ -22,7 +22,9 @@ def test_train_editable_paths_accept_legacy_single_path() -> None:
 
     editable_paths = mod._editable_paths_from_cfg(cfg)
 
-    assert editable_paths == [Path(mod.workspace_root / "lerobot_policy_hlrp").resolve()]
+    assert editable_paths == [
+        Path(mod.workspace_root / "lerobot_policy_hlrp").resolve()
+    ]
 
 
 def test_train_editable_paths_preserve_order_and_dedupe() -> None:
@@ -45,11 +47,15 @@ def test_train_editable_paths_preserve_order_and_dedupe() -> None:
 
 def test_rollout_editable_paths_accept_legacy_single_path() -> None:
     mod = _load_script_module("7_rollout_lerobot.py", "stage3_rollout_script")
-    cfg = OmegaConf.create({"lerobot_eval": {"install_policy_editable": "lerobot_policy_hlrp"}})
+    cfg = OmegaConf.create(
+        {"lerobot_eval": {"install_policy_editable": "lerobot_policy_hlrp"}}
+    )
 
     editable_paths = mod._editable_paths_from_cfg(cfg)
 
-    assert editable_paths == [Path(mod.workspace_root / "lerobot_policy_hlrp").resolve()]
+    assert editable_paths == [
+        Path(mod.workspace_root / "lerobot_policy_hlrp").resolve()
+    ]
 
 
 def test_rollout_editable_paths_preserve_order_and_dedupe() -> None:

@@ -78,11 +78,15 @@ class BasicVisualizationStrategy(ValidationStrategy):
 
         # === Training samples visualization ===
         if self.visualize_train and not bucket_name:  # Only for global cache
-            produced += self._visualize_training_samples(cache, pl_module, trainer, wandb_logger)
+            produced += self._visualize_training_samples(
+                cache, pl_module, trainer, wandb_logger
+            )
 
         # === Validation samples visualization ===
         if self.visualize_val:
-            produced += self._visualize_validation_samples(cache, pl_module, trainer, wandb_logger, prefix)
+            produced += self._visualize_validation_samples(
+                cache, pl_module, trainer, wandb_logger, prefix
+            )
 
         if produced <= 0:
             if wandb_logger is None:
@@ -103,7 +107,8 @@ class BasicVisualizationStrategy(ValidationStrategy):
         produced = 0
 
         train_frames, train_metadata = self._sample_from_train_preview_buffer(
-            trainer, self.num_train_samples * 2  # Sample extra for both fixed and random
+            trainer,
+            self.num_train_samples * 2,  # Sample extra for both fixed and random
         )
 
         if train_frames is None or len(train_frames) == 0:
@@ -112,8 +117,10 @@ class BasicVisualizationStrategy(ValidationStrategy):
         # === Fixed training samples (same across validations for progress tracking) ===
         if cache.train_frames is None or len(cache.train_frames) == 0:
             # First validation: cache a fixed set of training samples
-            cache.train_frames = train_frames[:self.num_train_samples]
-            cache.train_metadata = train_metadata[:self.num_train_samples] if train_metadata else None
+            cache.train_frames = train_frames[: self.num_train_samples]
+            cache.train_metadata = (
+                train_metadata[: self.num_train_samples] if train_metadata else None
+            )
 
         fixed_grid = self._create_recon_grid(cache.train_frames, pl_module)
         if fixed_grid is not None:
@@ -125,7 +132,9 @@ class BasicVisualizationStrategy(ValidationStrategy):
             produced += 1
 
         # === Random training samples (different each validation for diversity) ===
-        random_grid = self._create_recon_grid(train_frames[:self.num_train_samples], pl_module)
+        random_grid = self._create_recon_grid(
+            train_frames[: self.num_train_samples], pl_module
+        )
         if random_grid is not None:
             wandb_logger.log_image(
                 key="train/random_reconstructions",
@@ -137,8 +146,13 @@ class BasicVisualizationStrategy(ValidationStrategy):
         # === Per-bucket training visualization ===
         if self.visualize_per_bucket and train_metadata:
             produced += self._visualize_buckets(
-                train_frames, train_metadata, cache, pl_module, trainer,
-                wandb_logger, prefix="train"
+                train_frames,
+                train_metadata,
+                cache,
+                pl_module,
+                trainer,
+                wandb_logger,
+                prefix="train",
             )
         return produced
 
@@ -162,8 +176,12 @@ class BasicVisualizationStrategy(ValidationStrategy):
         distribution = cache.get_dataset_distribution()
         bucket_name = cache.bucket_name or "global"
         if distribution:
-            print(f"  [{bucket_name}] Cached validation samples per datasource: {distribution}")
-            print(f"  [{bucket_name}] Total cached validation samples: {sum(distribution.values())}")
+            print(
+                f"  [{bucket_name}] Cached validation samples per datasource: {distribution}"
+            )
+            print(
+                f"  [{bucket_name}] Total cached validation samples: {sum(distribution.values())}"
+            )
 
         # === Fixed samples (diverse across datasets) ===
         if cache.fixed_frames is not None and len(cache.fixed_frames) > 0:
@@ -193,8 +211,13 @@ class BasicVisualizationStrategy(ValidationStrategy):
         # === Per-bucket visualization ===
         if self.visualize_per_bucket and all_metadata:
             produced += self._visualize_buckets(
-                all_frames, all_metadata, cache, pl_module, trainer,
-                wandb_logger, prefix="val"
+                all_frames,
+                all_metadata,
+                cache,
+                pl_module,
+                trainer,
+                wandb_logger,
+                prefix="val",
             )
         return produced
 
@@ -221,54 +244,62 @@ class BasicVisualizationStrategy(ValidationStrategy):
             return produced
 
         for bucket_name, filters in self.bucket_filters.items():
-                bucket_frames = None
-                
-                # Try to get data from side dataloader first (Targeted Evaluation)
-                if use_dataloaders:
-                    try:
-                        # Determine if we need train or val loader
-                        if prefix == "train" and hasattr(datamodule, "train_bucket_dataloader"):
-                            loader = datamodule.train_bucket_dataloader(bucket_name)
-                        elif prefix == "val" and hasattr(datamodule, "val_bucket_dataloader"):
-                            loader = datamodule.val_bucket_dataloader(bucket_name)
-                        else:
-                            loader = None
-                            
-                        if loader:
-                            # Fetch one batch
-                            batch = next(iter(loader))
-                            if isinstance(batch, dict):
-                                bucket_frames = batch["frames"]
-                            else:
-                                bucket_frames = batch
-                            # Move to device/cpu as needed (viz expects CPU usually)
-                            bucket_frames = bucket_frames[:self.samples_per_bucket].detach().cpu()
-                    except (ValueError, StopIteration, NotImplementedError):
-                        # Dataloader might not exist for this bucket or be empty
-                        pass
+            bucket_frames = None
 
-                # Fallback to cache filtering if dataloader failed
-                if bucket_frames is None:
-                    bucket_frames, _ = cache.get_frames_by_filter(
-                        filters, frames=all_frames, metadata=all_metadata
-                    )
-
-                if bucket_frames is not None and len(bucket_frames) > 0:
-                    # Randomly sample if we have more than needed (and came from cache)
-                    if len(bucket_frames) > self.samples_per_bucket:
-                        indices = torch.randperm(len(bucket_frames))[:self.samples_per_bucket]
-                        samples = bucket_frames[indices]
+            # Try to get data from side dataloader first (Targeted Evaluation)
+            if use_dataloaders:
+                try:
+                    # Determine if we need train or val loader
+                    if prefix == "train" and hasattr(
+                        datamodule, "train_bucket_dataloader"
+                    ):
+                        loader = datamodule.train_bucket_dataloader(bucket_name)
+                    elif prefix == "val" and hasattr(
+                        datamodule, "val_bucket_dataloader"
+                    ):
+                        loader = datamodule.val_bucket_dataloader(bucket_name)
                     else:
-                        samples = bucket_frames
+                        loader = None
 
-                    bucket_grid = self._create_recon_grid(samples, pl_module)
-                    if bucket_grid is not None:
-                        wandb_logger.log_image(
-                            key=f"{prefix}/reconstructions_{bucket_name}",
-                            images=[bucket_grid],
-                            caption=[f"Step {trainer.global_step} ({bucket_name})"],
+                    if loader:
+                        # Fetch one batch
+                        batch = next(iter(loader))
+                        if isinstance(batch, dict):
+                            bucket_frames = batch["frames"]
+                        else:
+                            bucket_frames = batch
+                        # Move to device/cpu as needed (viz expects CPU usually)
+                        bucket_frames = (
+                            bucket_frames[: self.samples_per_bucket].detach().cpu()
                         )
-                        produced += 1
+                except (ValueError, StopIteration, NotImplementedError):
+                    # Dataloader might not exist for this bucket or be empty
+                    pass
+
+            # Fallback to cache filtering if dataloader failed
+            if bucket_frames is None:
+                bucket_frames, _ = cache.get_frames_by_filter(
+                    filters, frames=all_frames, metadata=all_metadata
+                )
+
+            if bucket_frames is not None and len(bucket_frames) > 0:
+                # Randomly sample if we have more than needed (and came from cache)
+                if len(bucket_frames) > self.samples_per_bucket:
+                    indices = torch.randperm(len(bucket_frames))[
+                        : self.samples_per_bucket
+                    ]
+                    samples = bucket_frames[indices]
+                else:
+                    samples = bucket_frames
+
+                bucket_grid = self._create_recon_grid(samples, pl_module)
+                if bucket_grid is not None:
+                    wandb_logger.log_image(
+                        key=f"{prefix}/reconstructions_{bucket_name}",
+                        images=[bucket_grid],
+                        caption=[f"Step {trainer.global_step} ({bucket_name})"],
+                    )
+                    produced += 1
         return produced
 
     def _sample_from_train_preview_buffer(
@@ -314,7 +345,9 @@ class BasicVisualizationStrategy(ValidationStrategy):
 
         # Create a lightweight fallback when aux decoder is disabled.
         # This keeps sample visualization available without reconstruction overhead.
-        has_aux_decoder = getattr(getattr(pl_module, "model", None), "aux_decoder", None) is not None
+        has_aux_decoder = (
+            getattr(getattr(pl_module, "model", None), "aux_decoder", None) is not None
+        )
         recons = None
         if has_aux_decoder:
             was_training = pl_module.training
@@ -336,7 +369,7 @@ class BasicVisualizationStrategy(ValidationStrategy):
             recons = recons.cpu()
             imgs = torch.stack([frame_t, frame_t_plus, recons], dim=0)
             nrow = 3
-        imgs = rearrange(imgs, 'r b c h w -> (b r) c h w')
+        imgs = rearrange(imgs, "r b c h w -> (b r) c h w")
         imgs = imgs.clamp(0.0, 1.0)
 
         return make_grid(imgs, nrow=nrow, normalize=False)

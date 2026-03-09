@@ -28,8 +28,8 @@ def compute_dino_loss(
 
     dino_context = encoded.enc_first_frame_tokens
     video_shape = tuple(dino_context.shape[:-1])
-    dino_context_flat = rearrange(dino_context, 'b t h w d -> (b t) (h w) d')
-    dino_action_flat = rearrange(action_tokens, 'b t h w d -> (b t) (h w) d')
+    dino_context_flat = rearrange(dino_context, "b t h w d -> (b t) (h w) d")
+    dino_action_flat = rearrange(action_tokens, "b t h w d -> (b t) (h w) d")
     pred_dino_tokens = model.dino_decoder(
         dino_context_flat,
         attn_bias=attn_bias,
@@ -38,7 +38,7 @@ def compute_dino_loss(
     )
     pred_dino_tokens = rearrange(
         pred_dino_tokens,
-        '(b t) (h w) d -> b t h w d',
+        "(b t) (h w) d -> b t h w d",
         b=encoded.batch_size,
         h=h_dec,
         w=w_dec,
@@ -67,8 +67,8 @@ def compute_pixel_loss(
         raise RuntimeError("pixel_context is required when pixel decoder is enabled")
 
     video_shape = tuple(pixel_context.shape[:-1])
-    pixel_context_flat = rearrange(pixel_context, 'b t h w d -> (b t) (h w) d')
-    pixel_action_flat = rearrange(action_tokens, 'b t h w d -> (b t) (h w) d')
+    pixel_context_flat = rearrange(pixel_context, "b t h w d -> (b t) (h w) d")
+    pixel_action_flat = rearrange(action_tokens, "b t h w d -> (b t) (h w) d")
     pred_pixel_tokens = model.pixel_decoder(
         pixel_context_flat,
         attn_bias=attn_bias,
@@ -77,7 +77,7 @@ def compute_pixel_loss(
     )
     pred_pixel_tokens = rearrange(
         pred_pixel_tokens,
-        '(b t) (h w) d -> b t h w d',
+        "(b t) (h w) d -> b t h w d",
         b=batch_size,
         h=h_dec,
         w=w_dec,
@@ -110,8 +110,8 @@ def compute_aux_outputs(
 
     aux_actions = action_tokens.detach()
     video_shape = tuple(pixel_context.shape[:-1])
-    aux_context_flat = rearrange(pixel_context, 'b t h w d -> (b t) (h w) d')
-    aux_action_flat = rearrange(aux_actions, 'b t h w d -> (b t) (h w) d')
+    aux_context_flat = rearrange(pixel_context, "b t h w d -> (b t) (h w) d")
+    aux_action_flat = rearrange(aux_actions, "b t h w d -> (b t) (h w) d")
     aux_tokens = model.aux_decoder(
         aux_context_flat,
         attn_bias=attn_bias,
@@ -120,7 +120,7 @@ def compute_aux_outputs(
     )
     aux_tokens = rearrange(
         aux_tokens,
-        '(b t) (h w) d -> b t h w d',
+        "(b t) (h w) d -> b t h w d",
         b=batch_size,
         h=h_dec,
         w=w_dec,
@@ -128,7 +128,7 @@ def compute_aux_outputs(
     recon_video = model.aux_to_pixels(aux_tokens)
 
     if return_recons_only:
-        recon_frames = rearrange(recon_video, 'b c 1 h w -> b c h w')
+        recon_frames = rearrange(recon_video, "b c 1 h w -> b c h w")
         return None, recon_frames
 
     aux_loss = F.mse_loss(rest_frames, recon_video)
@@ -190,7 +190,11 @@ def compute_flow_loss_term(
             gt_flow,
             static_eps=model.flow_config.summary_static_eps,
         )
-        metrics["flow_mean_dx_abs_err"] = (pred_mean_dx - gt_mean_dx).abs().mean().detach()
-        metrics["flow_mean_dy_abs_err"] = (pred_mean_dy - gt_mean_dy).abs().mean().detach()
+        metrics["flow_mean_dx_abs_err"] = (
+            (pred_mean_dx - gt_mean_dx).abs().mean().detach()
+        )
+        metrics["flow_mean_dy_abs_err"] = (
+            (pred_mean_dy - gt_mean_dy).abs().mean().detach()
+        )
 
     return loss_term

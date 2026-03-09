@@ -190,7 +190,14 @@ def _install_editable_package(
     pip_bin = shutil.which("pip", path=env.get("PATH"))
     if pip_bin is not None:
         ok, err = _run_install_command(
-            [pip_bin, "install", "--no-deps", "--no-build-isolation", "-e", str(editable_path)],
+            [
+                pip_bin,
+                "install",
+                "--no-deps",
+                "--no-build-isolation",
+                "-e",
+                str(editable_path),
+            ],
             logger=logger,
             cwd=cwd,
             env=env,
@@ -307,7 +314,9 @@ def _lerobot_run_command_from_cfg(cfg: DictConfig) -> list[str]:
 
     if str(policy_type) == "hlrp_smolvla_shared":
         if init_mode is None:
-            raise ValueError("lerobot.policy.init_mode is required for policy_type=hlrp_smolvla_shared")
+            raise ValueError(
+                "lerobot.policy.init_mode is required for policy_type=hlrp_smolvla_shared"
+            )
         cmd.append(f"--policy.init_mode={init_mode}")
         if str(init_mode) == "artifact":
             if stage2_artifact is None:
@@ -349,7 +358,14 @@ def _lerobot_run_command_from_cfg(cfg: DictConfig) -> list[str]:
         cfg,
         cfg_path="lerobot.policy",
         cli_prefix="policy",
-        skip_keys={"type", "repo_id", "push_to_hub", "device", "init_mode", "stage2_artifact"},
+        skip_keys={
+            "type",
+            "repo_id",
+            "push_to_hub",
+            "device",
+            "init_mode",
+            "stage2_artifact",
+        },
     )
     _append_group_args(
         cmd,
@@ -375,9 +391,13 @@ def _lerobot_run_command_from_cfg(cfg: DictConfig) -> list[str]:
     _append_group_args(cmd, cfg, cfg_path="lerobot.optimizer", cli_prefix="optimizer")
     _append_group_args(cmd, cfg, cfg_path="lerobot.scheduler", cli_prefix="scheduler")
 
-    use_policy_training_preset = OmegaConf.select(cfg, "lerobot.use_policy_training_preset")
+    use_policy_training_preset = OmegaConf.select(
+        cfg, "lerobot.use_policy_training_preset"
+    )
     if use_policy_training_preset is not None:
-        cmd.append(f"--use_policy_training_preset={_to_bool_flag(use_policy_training_preset)}")
+        cmd.append(
+            f"--use_policy_training_preset={_to_bool_flag(use_policy_training_preset)}"
+        )
     return cmd
 
 
@@ -399,7 +419,9 @@ def main(cfg: DictConfig) -> None:
     packages_path = str(workspace_root / "packages")
     existing_pythonpath = env.get("PYTHONPATH", "")
     env["PYTHONPATH"] = (
-        packages_path if not existing_pythonpath else f"{packages_path}:{existing_pythonpath}"
+        packages_path
+        if not existing_pythonpath
+        else f"{packages_path}:{existing_pythonpath}"
     )
     env_overrides = OmegaConf.select(cfg, "lerobot.shell_env") or {}
     if not OmegaConf.is_dict(env_overrides):

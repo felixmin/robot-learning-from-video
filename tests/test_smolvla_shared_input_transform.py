@@ -21,7 +21,14 @@ class _FakeTokenizer:
     def __init__(self) -> None:
         self.last_texts: list[str] | None = None
 
-    def __call__(self, texts, return_tensors: str, padding: str, truncation: bool, max_length: int):
+    def __call__(
+        self,
+        texts,
+        return_tensors: str,
+        padding: str,
+        truncation: bool,
+        max_length: int,
+    ):
         assert return_tensors == "pt"
         assert truncation is True
         assert padding in {"longest", "max_length"}
@@ -61,7 +68,9 @@ def test_prepare_image_inputs_supports_multi_camera_and_empty_camera() -> None:
             "cam_wrist": torch.randint(0, 255, (2, 1, 16, 16, 3), dtype=torch.uint8),
         },
         image_padding_masks={
-            "cam_front": torch.tensor([[False, False], [False, True]], dtype=torch.bool),
+            "cam_front": torch.tensor(
+                [[False, False], [False, True]], dtype=torch.bool
+            ),
             "cam_wrist": torch.tensor([[False], [False]], dtype=torch.bool),
         },
     )
@@ -111,7 +120,9 @@ def test_prepare_image_inputs_default_camera_order_preserves_stream_insertion() 
     assert float(images[0].mean().item()) < float(images[1].mean().item())
 
 
-def test_prepare_language_inputs_requires_task_text_without_pretokenized_inputs() -> None:
+def test_prepare_language_inputs_requires_task_text_without_pretokenized_inputs() -> (
+    None
+):
     tokenizer = _FakeTokenizer()
     with pytest.raises(ValueError, match="task_text"):
         prepare_language_inputs(

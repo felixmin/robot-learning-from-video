@@ -96,10 +96,17 @@ def main(cfg: DictConfig):
         hf_pv = inputs["pixel_values"]
         # If HF uses mean=[0.5,0.5,0.5], std=[0.5,0.5,0.5], output should be in [-1,1]
         # If HF uses ImageNet mean/std, output will be different
-        print(f"\nHF processor pixel_values range: [{hf_pv.min():.4f}, {hf_pv.max():.4f}]")
-        print(f"GPU preprocessing range: [{normalized.min():.4f}, {normalized.max():.4f}]")
+        print(
+            f"\nHF processor pixel_values range: [{hf_pv.min():.4f}, {hf_pv.max():.4f}]"
+        )
+        print(
+            f"GPU preprocessing range: [{normalized.min():.4f}, {normalized.max():.4f}]"
+        )
 
-        if abs(hf_pv.min().item() - (-1.0)) < 0.5 and abs(hf_pv.max().item() - 1.0) < 0.5:
+        if (
+            abs(hf_pv.min().item() - (-1.0)) < 0.5
+            and abs(hf_pv.max().item() - 1.0) < 0.5
+        ):
             print("\n✓ HF processor likely uses [-1, 1] normalization (SigLIP style)")
         else:
             print("\n⚠ HF processor may use different normalization!")

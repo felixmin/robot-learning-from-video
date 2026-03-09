@@ -45,7 +45,9 @@ class TestNSVQReplacementIndices:
 
         # total=25 => expected=2.5 => min_count=1.25
         # used: counts >= 1.25 => {0,1,2}; unused includes index 3 (count=1)
-        vq.codebooks_used[:] = torch.tensor([20, 2, 2, 1, 0, 0, 0, 0, 0, 0], dtype=torch.int32)
+        vq.codebooks_used[:] = torch.tensor(
+            [20, 2, 2, 1, 0, 0, 0, 0, 0, 0], dtype=torch.int32
+        )
 
         unused, used, min_count = vq._get_replacement_indices()
 
@@ -55,7 +57,9 @@ class TestNSVQReplacementIndices:
 
     def test_override_threshold_is_used_for_index_split(self):
         vq = _make_nsvq(num_embeddings=10, discarding_threshold=0.5)
-        vq.codebooks_used[:] = torch.tensor([20, 2, 2, 1, 0, 0, 0, 0, 0, 0], dtype=torch.int32)
+        vq.codebooks_used[:] = torch.tensor(
+            [20, 2, 2, 1, 0, 0, 0, 0, 0, 0], dtype=torch.int32
+        )
 
         _, used_default, _ = vq._get_replacement_indices()
         _, used_override, _ = vq._get_replacement_indices(discarding_threshold=0.05)

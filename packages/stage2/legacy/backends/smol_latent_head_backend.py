@@ -7,12 +7,19 @@ import torch
 import torch.nn.functional as F
 
 from stage2.action_tokens import ActionTokenConfig
-from stage2.backends.interfaces import BackendMode, Stage2Batch, LatentOutput, LossOutput
+from stage2.backends.interfaces import (
+    BackendMode,
+    Stage2Batch,
+    LatentOutput,
+    LossOutput,
+)
 from stage2.image_adapters import oxe_first_frames_to_pil
 from stage2.policy_inputs import ChatConfig
 
 
-def _resize_with_pad(img: torch.Tensor, width: int, height: int, pad_value: float = -1.0) -> torch.Tensor:
+def _resize_with_pad(
+    img: torch.Tensor, width: int, height: int, pad_value: float = -1.0
+) -> torch.Tensor:
     """GPU-accelerated image resize with aspect-ratio preserving padding.
 
     LeRobot-style resize that maintains aspect ratio and pads to target size.
@@ -25,7 +32,9 @@ def _resize_with_pad(img: torch.Tensor, width: int, height: int, pad_value: floa
     resized_height = int(cur_height / ratio)
     resized_width = int(cur_width / ratio)
 
-    resized_img = F.interpolate(img, size=(resized_height, resized_width), mode="bilinear", align_corners=False)
+    resized_img = F.interpolate(
+        img, size=(resized_height, resized_width), mode="bilinear", align_corners=False
+    )
 
     pad_height = max(0, int(height - resized_height))
     pad_width = max(0, int(width - resized_width))
@@ -36,7 +45,9 @@ def _resize_with_pad(img: torch.Tensor, width: int, height: int, pad_value: floa
 
 
 def _gpu_preprocess_images(
-    frames: torch.Tensor, target_size: tuple[int, int] = (384, 384), normalize: bool = True
+    frames: torch.Tensor,
+    target_size: tuple[int, int] = (384, 384),
+    normalize: bool = True,
 ) -> torch.Tensor:
     """GPU-accelerated image preprocessing for SmolVLM.
 
@@ -51,7 +62,11 @@ def _gpu_preprocess_images(
     # Convert to float if needed (uint8 -> float in [0, 1])
     if frames.dtype == torch.uint8:
         frames = frames.float() / 255.0
-    elif frames.dtype != torch.float32 and frames.dtype != torch.float16 and frames.dtype != torch.bfloat16:
+    elif (
+        frames.dtype != torch.float32
+        and frames.dtype != torch.float16
+        and frames.dtype != torch.bfloat16
+    ):
         frames = frames.float()
 
     # Resize with aspect-ratio preserving padding
@@ -79,7 +94,9 @@ def _infer_hidden_size(model: Any) -> int:
     raise AttributeError("Could not infer hidden size from model.config")
 
 
-def _get_last_layer_module(model: Any, optimized: bool = False) -> torch.nn.Module | None:
+def _get_last_layer_module(
+    model: Any, optimized: bool = False
+) -> torch.nn.Module | None:
     """Find the last transformer layer to attach a hook for capturing hidden states.
 
     Args:
@@ -118,9 +135,13 @@ class SmolLatentHeadBackendConfig:
     torch_dtype: torch.dtype = torch.bfloat16
     trust_remote_code: bool = False
     chat: ChatConfig = field(default_factory=lambda: ChatConfig(system_prompt=None))
-    action_tokens: ActionTokenConfig = field(default_factory=lambda: ActionTokenConfig(codebook_size=8, code_seq_len=4))
+    action_tokens: ActionTokenConfig = field(
+        default_factory=lambda: ActionTokenConfig(codebook_size=8, code_seq_len=4)
+    )
     # Optimization flags
-    use_gpu_preprocessing: bool = True  # Use GPU-accelerated image preprocessing (48000x faster)
+    use_gpu_preprocessing: bool = (
+        True  # Use GPU-accelerated image preprocessing (48000x faster)
+    )
     image_size: tuple[int, int] = (384, 384)  # SigLIP expected size
 
 
@@ -166,7 +187,9 @@ class SmolLatentHeadBackend(torch.nn.Module):
         if streams is None:
             raise ValueError("batch.image_streams is required")
         if "observation.images.rgb" not in streams:
-            raise KeyError("batch.image_streams must include key 'observation.images.rgb'")
+            raise KeyError(
+                "batch.image_streams must include key 'observation.images.rgb'"
+            )
         return streams["observation.images.rgb"]
 
     @staticmethod
@@ -205,9 +228,13 @@ class SmolLatentHeadBackend(torch.nn.Module):
 
         # Register forward hook on the last transformer layer
         # Use optimized=True if GPU preprocessing is enabled (we call text_model directly)
-        last_layer = _get_last_layer_module(self.vlm, optimized=self.cfg.use_gpu_preprocessing)
+        last_layer = _get_last_layer_module(
+            self.vlm, optimized=self.cfg.use_gpu_preprocessing
+        )
         if last_layer is not None and self._hook_handle is None:
-            self._hook_handle = last_layer.register_forward_hook(self._capture_hidden_state_hook)
+            self._hook_handle = last_layer.register_forward_hook(
+                self._capture_hidden_state_hook
+            )
 
         if self.lam_head is None:
             hidden = _infer_hidden_size(self.vlm)
@@ -215,11 +242,13 @@ class SmolLatentHeadBackend(torch.nn.Module):
                 vlm_dtype = next(self.vlm.parameters()).dtype
             except StopIteration:
                 vlm_dtype = self.cfg.torch_dtype
-            self.lam_head = torch.nn.Linear(hidden, self.code_seq_len * self.codebook_size).to(
-                device=device, dtype=vlm_dtype
-            )
+            self.lam_head = torch.nn.Linear(
+                hidden, self.code_seq_len * self.codebook_size
+            ).to(device=device, dtype=vlm_dtype)
 
-    def _require_ready(self) -> tuple[torch.device, torch.nn.Module, Any, torch.nn.Linear]:
+    def _require_ready(
+        self,
+    ) -> tuple[torch.device, torch.nn.Module, Any, torch.nn.Linear]:
         if self.vlm is None or self.processor is None or self.lam_head is None:
             raise RuntimeError("Backend not initialized. Call setup(device=...) first.")
         try:
@@ -232,7 +261,9 @@ class SmolLatentHeadBackend(torch.nn.Module):
         proc = self.processor
         sys = self.cfg.chat.system_prompt
 
-        apply_chat = getattr(proc, "apply_chat_template", None) if proc is not None else None
+        apply_chat = (
+            getattr(proc, "apply_chat_template", None) if proc is not None else None
+        )
         if apply_chat is None:
             if sys:
                 return [f"{sys}\n{instr}" for instr in instructions]
@@ -242,7 +273,9 @@ class SmolLatentHeadBackend(torch.nn.Module):
         for instr in instructions:
             messages: list[dict[str, Any]] = []
             if sys:
-                messages.append({"role": "system", "content": [{"type": "text", "text": str(sys)}]})
+                messages.append(
+                    {"role": "system", "content": [{"type": "text", "text": str(sys)}]}
+                )
             messages.append(
                 {
                     "role": "user",
@@ -252,7 +285,9 @@ class SmolLatentHeadBackend(torch.nn.Module):
                     ],
                 }
             )
-            texts.append(str(apply_chat(messages, tokenize=False, add_generation_prompt=False)))
+            texts.append(
+                str(apply_chat(messages, tokenize=False, add_generation_prompt=False))
+            )
         return texts
 
     def _forward_logits(self, batch: Stage2Batch) -> torch.Tensor:
@@ -285,7 +320,10 @@ class SmolLatentHeadBackend(torch.nn.Module):
             return_tensors="pt",
             padding=True,
         )
-        inputs = {k: (v.to(device) if isinstance(v, torch.Tensor) else v) for k, v in inputs.items()}
+        inputs = {
+            k: (v.to(device) if isinstance(v, torch.Tensor) else v)
+            for k, v in inputs.items()
+        }
         if "attention_mask" not in inputs:
             raise KeyError("processor output must include attention_mask")
 
@@ -375,7 +413,9 @@ class SmolLatentHeadBackend(torch.nn.Module):
         # Call vision encoder directly - bypasses HF processor entirely
         # This is 0.06ms vs 3080ms for HF processor!
         image_hidden_states = self._vision_model(
-            pixel_values=pixel_values.to(dtype=self._vision_model.embeddings.patch_embedding.weight.dtype),
+            pixel_values=pixel_values.to(
+                dtype=self._vision_model.embeddings.patch_embedding.weight.dtype
+            ),
             patch_attention_mask=None,
         ).last_hidden_state
 
@@ -416,11 +456,19 @@ class SmolLatentHeadBackend(torch.nn.Module):
         combined_embeds = torch.cat([image_embeds, text_embeds], dim=1)
 
         # Build attention mask: all image tokens + text attention mask
-        image_attention_mask = torch.ones(batch_size, num_image_tokens, device=device, dtype=torch.bool)
-        combined_attention_mask = torch.cat([image_attention_mask, text_attention_mask.bool()], dim=1)
+        image_attention_mask = torch.ones(
+            batch_size, num_image_tokens, device=device, dtype=torch.bool
+        )
+        combined_attention_mask = torch.cat(
+            [image_attention_mask, text_attention_mask.bool()], dim=1
+        )
 
         # Build position ids
-        position_ids = torch.arange(combined_embeds.shape[1], device=device).unsqueeze(0).expand(batch_size, -1)
+        position_ids = (
+            torch.arange(combined_embeds.shape[1], device=device)
+            .unsqueeze(0)
+            .expand(batch_size, -1)
+        )
 
         # ========================================
         # 5. Forward Through Text Model
@@ -433,7 +481,9 @@ class SmolLatentHeadBackend(torch.nn.Module):
             # Use the language_model.model for direct forward with embeddings
             # This is the LlamaModel inside SmolVLM
             outputs = self._text_model(
-                inputs_embeds=combined_embeds.to(dtype=self._text_model.embed_tokens.weight.dtype),
+                inputs_embeds=combined_embeds.to(
+                    dtype=self._text_model.embed_tokens.weight.dtype
+                ),
                 attention_mask=combined_attention_mask,
                 position_ids=position_ids,
                 output_hidden_states=False,
@@ -448,7 +498,9 @@ class SmolLatentHeadBackend(torch.nn.Module):
         else:
             # Fallback without hook
             outputs = self._text_model(
-                inputs_embeds=combined_embeds.to(dtype=self._text_model.embed_tokens.weight.dtype),
+                inputs_embeds=combined_embeds.to(
+                    dtype=self._text_model.embed_tokens.weight.dtype
+                ),
                 attention_mask=combined_attention_mask,
                 position_ids=position_ids,
                 output_hidden_states=True,
@@ -479,19 +531,29 @@ class SmolLatentHeadBackend(torch.nn.Module):
 
     def loss_from_batch(self, batch: Stage2Batch, *, mode: BackendMode) -> LossOutput:
         if mode is not BackendMode.CODES:
-            raise NotImplementedError(f"{type(self).__name__} only supports mode={BackendMode.CODES.value!r}")
+            raise NotImplementedError(
+                f"{type(self).__name__} only supports mode={BackendMode.CODES.value!r}"
+            )
         if batch.target_codes is None:
             raise ValueError("batch.target_codes is required for latent-head training.")
 
         logits = self._forward_logits(batch)
         codes = batch.target_codes.to(device=logits.device, dtype=torch.long)
-        loss = F.cross_entropy(logits.reshape(-1, self.codebook_size), codes.reshape(-1))
-        return LossOutput(loss=loss, metrics={"loss": float(loss.detach().cpu().item())})
+        loss = F.cross_entropy(
+            logits.reshape(-1, self.codebook_size), codes.reshape(-1)
+        )
+        return LossOutput(
+            loss=loss, metrics={"loss": float(loss.detach().cpu().item())}
+        )
 
     @torch.no_grad()
-    def latent_from_batch(self, batch: Stage2Batch, *, mode: BackendMode) -> LatentOutput:
+    def latent_from_batch(
+        self, batch: Stage2Batch, *, mode: BackendMode
+    ) -> LatentOutput:
         if mode is not BackendMode.CODES:
-            raise NotImplementedError(f"{type(self).__name__} only supports mode={BackendMode.CODES.value!r}")
+            raise NotImplementedError(
+                f"{type(self).__name__} only supports mode={BackendMode.CODES.value!r}"
+            )
         logits = self._forward_logits(batch)
         tokens = logits.argmax(dim=-1)
         return LatentOutput(logits=logits, tokens=tokens, vector=None, meta=None)
@@ -505,7 +567,9 @@ class SmolFlowActionBackendConfig:
     torch_dtype: torch.dtype = torch.bfloat16
     trust_remote_code: bool = False
     chat: ChatConfig = field(default_factory=lambda: ChatConfig(system_prompt=None))
-    action_tokens: ActionTokenConfig = field(default_factory=lambda: ActionTokenConfig(codebook_size=8, code_seq_len=4))
+    action_tokens: ActionTokenConfig = field(
+        default_factory=lambda: ActionTokenConfig(codebook_size=8, code_seq_len=4)
+    )
     use_gpu_preprocessing: bool = True
     image_size: tuple[int, int] = (384, 384)
     flow_hidden_dim: int = 1024
@@ -553,20 +617,31 @@ class SmolFlowActionBackend(SmolLatentHeadBackend):
     def setup(self, *, device: torch.device) -> None:
         super().setup(device=device)
         if self.lam_head is None:
-            raise RuntimeError("Smol latent head must be initialized before flow/action heads")
+            raise RuntimeError(
+                "Smol latent head must be initialized before flow/action heads"
+            )
 
         hidden = int(self.lam_head.in_features)
         dtype = self.lam_head.weight.dtype
         if self.flow_head is None:
             self.flow_head = torch.nn.Sequential(
-                torch.nn.Linear(hidden + self.latent_vector_dim + 1, int(self.flow_cfg.flow_hidden_dim)),
+                torch.nn.Linear(
+                    hidden + self.latent_vector_dim + 1,
+                    int(self.flow_cfg.flow_hidden_dim),
+                ),
                 torch.nn.SiLU(),
-                torch.nn.Linear(int(self.flow_cfg.flow_hidden_dim), self.latent_vector_dim),
+                torch.nn.Linear(
+                    int(self.flow_cfg.flow_hidden_dim), self.latent_vector_dim
+                ),
             ).to(device=device, dtype=dtype)
         if self.action_head is None:
-            self.action_head = torch.nn.Linear(hidden, self.action_dim).to(device=device, dtype=dtype)
+            self.action_head = torch.nn.Linear(hidden, self.action_dim).to(
+                device=device, dtype=dtype
+            )
 
-    def _require_multitask_ready(self) -> tuple[torch.device, torch.nn.Module, torch.nn.Linear]:
+    def _require_multitask_ready(
+        self,
+    ) -> tuple[torch.device, torch.nn.Module, torch.nn.Linear]:
         if self.vlm is None or self.flow_head is None or self.action_head is None:
             raise RuntimeError("Backend not initialized. Call setup(device=...) first.")
         try:
@@ -577,12 +652,16 @@ class SmolFlowActionBackend(SmolLatentHeadBackend):
 
     def _require_target_vector(self, batch: Stage2Batch) -> torch.Tensor:
         if batch.target_latent_vectors is None:
-            raise ValueError("batch.target_latent_vectors is required for flow-matching latent training.")
+            raise ValueError(
+                "batch.target_latent_vectors is required for flow-matching latent training."
+            )
         vec = batch.target_latent_vectors
         if vec.ndim == 3:
             vec = vec.reshape(vec.shape[0], -1)
         elif vec.ndim != 2:
-            raise ValueError(f"Expected target_latent_vectors [B,S,D] or [B,D], got {tuple(vec.shape)}")
+            raise ValueError(
+                f"Expected target_latent_vectors [B,S,D] or [B,D], got {tuple(vec.shape)}"
+            )
         if vec.shape[1] != self.latent_vector_dim:
             raise ValueError(
                 f"target_latent_vectors dim mismatch: expected {self.latent_vector_dim}, got {int(vec.shape[1])}"
@@ -591,15 +670,23 @@ class SmolFlowActionBackend(SmolLatentHeadBackend):
 
     def _require_target_actions(self, batch: Stage2Batch) -> torch.Tensor:
         if batch.target_actions is None:
-            raise ValueError("batch.target_actions is required for real-action training.")
+            raise ValueError(
+                "batch.target_actions is required for real-action training."
+            )
         actions = batch.target_actions
         if actions.ndim != 2:
-            raise ValueError(f"Expected target_actions [B,A], got {tuple(actions.shape)}")
+            raise ValueError(
+                f"Expected target_actions [B,A], got {tuple(actions.shape)}"
+            )
         if actions.shape[1] != self.action_dim:
-            raise ValueError(f"target_actions dim mismatch: expected {self.action_dim}, got {int(actions.shape[1])}")
+            raise ValueError(
+                f"target_actions dim mismatch: expected {self.action_dim}, got {int(actions.shape[1])}"
+            )
         return actions
 
-    def _flow_matching_loss(self, pooled: torch.Tensor, target_vec: torch.Tensor, flow_head: torch.nn.Module) -> torch.Tensor:
+    def _flow_matching_loss(
+        self, pooled: torch.Tensor, target_vec: torch.Tensor, flow_head: torch.nn.Module
+    ) -> torch.Tensor:
         x_1 = target_vec
         x_0 = torch.randn_like(x_1)
         t = torch.rand((x_1.shape[0], 1), device=x_1.device, dtype=x_1.dtype)
@@ -608,16 +695,24 @@ class SmolFlowActionBackend(SmolLatentHeadBackend):
         v_pred = flow_head(torch.cat([pooled, x_t, t], dim=-1))
         return F.mse_loss(v_pred, v_target)
 
-    def _flow_sample(self, pooled: torch.Tensor, flow_head: torch.nn.Module) -> torch.Tensor:
+    def _flow_sample(
+        self, pooled: torch.Tensor, flow_head: torch.nn.Module
+    ) -> torch.Tensor:
         steps = int(self.flow_cfg.flow_steps)
         if steps <= 0:
             raise ValueError("flow_steps must be > 0")
         batch_size = int(pooled.shape[0])
-        x = torch.randn((batch_size, self.latent_vector_dim), device=pooled.device, dtype=pooled.dtype)
+        x = torch.randn(
+            (batch_size, self.latent_vector_dim),
+            device=pooled.device,
+            dtype=pooled.dtype,
+        )
         dt = 1.0 / float(steps)
         for i in range(steps):
             t_val = float(i) / float(steps)
-            t = torch.full((batch_size, 1), t_val, device=pooled.device, dtype=pooled.dtype)
+            t = torch.full(
+                (batch_size, 1), t_val, device=pooled.device, dtype=pooled.dtype
+            )
             v = flow_head(torch.cat([pooled, x, t], dim=-1))
             x = x + dt * v
         return x
@@ -626,7 +721,9 @@ class SmolFlowActionBackend(SmolLatentHeadBackend):
         if mode is BackendMode.CODES:
             return super().loss_from_batch(batch, mode=mode)
         if mode not in (BackendMode.ACTIONS, BackendMode.MULTITASK):
-            raise NotImplementedError(f"{type(self).__name__} does not support mode={mode.value!r}")
+            raise NotImplementedError(
+                f"{type(self).__name__} does not support mode={mode.value!r}"
+            )
 
         _device, flow_head, action_head = self._require_multitask_ready()
         pooled = self._forward_pooled(batch)
@@ -634,7 +731,9 @@ class SmolFlowActionBackend(SmolLatentHeadBackend):
             pooled = pooled.to(dtype=action_head.weight.dtype)
 
         pred_actions = action_head(pooled)
-        target_actions = self._require_target_actions(batch).to(device=pred_actions.device, dtype=pred_actions.dtype)
+        target_actions = self._require_target_actions(batch).to(
+            device=pred_actions.device, dtype=pred_actions.dtype
+        )
         action_loss = F.mse_loss(pred_actions, target_actions)
 
         if mode is BackendMode.ACTIONS:
@@ -646,9 +745,14 @@ class SmolFlowActionBackend(SmolLatentHeadBackend):
                 },
             )
 
-        target_vec = self._require_target_vector(batch).to(device=pooled.device, dtype=pooled.dtype)
+        target_vec = self._require_target_vector(batch).to(
+            device=pooled.device, dtype=pooled.dtype
+        )
         latent_loss = self._flow_matching_loss(pooled, target_vec, flow_head)
-        total = float(self.flow_cfg.latent_loss_weight) * latent_loss + float(self.flow_cfg.action_loss_weight) * action_loss
+        total = (
+            float(self.flow_cfg.latent_loss_weight) * latent_loss
+            + float(self.flow_cfg.action_loss_weight) * action_loss
+        )
         return LossOutput(
             loss=total,
             metrics={
@@ -659,11 +763,15 @@ class SmolFlowActionBackend(SmolLatentHeadBackend):
         )
 
     @torch.no_grad()
-    def latent_from_batch(self, batch: Stage2Batch, *, mode: BackendMode) -> LatentOutput:
+    def latent_from_batch(
+        self, batch: Stage2Batch, *, mode: BackendMode
+    ) -> LatentOutput:
         if mode is BackendMode.CODES:
             return super().latent_from_batch(batch, mode=mode)
         if mode not in (BackendMode.ACTIONS, BackendMode.MULTITASK):
-            raise NotImplementedError(f"{type(self).__name__} does not support mode={mode.value!r}")
+            raise NotImplementedError(
+                f"{type(self).__name__} does not support mode={mode.value!r}"
+            )
 
         _device, flow_head, action_head = self._require_multitask_ready()
         pooled = self._forward_pooled(batch)
@@ -672,7 +780,11 @@ class SmolFlowActionBackend(SmolLatentHeadBackend):
         pred_actions = action_head(pooled)
 
         if mode is BackendMode.ACTIONS:
-            return LatentOutput(logits=None, tokens=None, vector=None, actions=pred_actions, meta=None)
+            return LatentOutput(
+                logits=None, tokens=None, vector=None, actions=pred_actions, meta=None
+            )
 
         vec = self._flow_sample(pooled, flow_head)
-        return LatentOutput(logits=None, tokens=None, vector=vec, actions=pred_actions, meta=None)
+        return LatentOutput(
+            logits=None, tokens=None, vector=vec, actions=pred_actions, meta=None
+        )

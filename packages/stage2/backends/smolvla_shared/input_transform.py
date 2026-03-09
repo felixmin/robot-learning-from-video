@@ -44,7 +44,9 @@ def infer_batch_size(batch: Stage2Batch) -> int:
 def _ensure_text_count(texts: Sequence[str], *, expected: int) -> list[str]:
     out = [str(x) for x in texts]
     if len(out) != expected:
-        raise ValueError(f"Text batch size mismatch: expected {expected}, got {len(out)}")
+        raise ValueError(
+            f"Text batch size mismatch: expected {expected}, got {len(out)}"
+        )
     return out
 
 
@@ -74,7 +76,9 @@ def prepare_language_inputs(
 ) -> tuple[torch.Tensor, torch.Tensor]:
     if batch.language_tokens is not None or batch.language_attention_mask is not None:
         if batch.language_tokens is None or batch.language_attention_mask is None:
-            raise ValueError("Both language_tokens and language_attention_mask must be set together.")
+            raise ValueError(
+                "Both language_tokens and language_attention_mask must be set together."
+            )
         tokens = batch.language_tokens.to(device=device, dtype=torch.long)
         mask = batch.language_attention_mask.to(device=device, dtype=torch.bool)
         if tokens.ndim != 2 or mask.ndim != 2:
@@ -89,7 +93,9 @@ def prepare_language_inputs(
         return tokens, mask
 
     if batch.task_text is None:
-        raise ValueError("Expected either pretokenized language fields or task_text in Stage2Batch.")
+        raise ValueError(
+            "Expected either pretokenized language fields or task_text in Stage2Batch."
+        )
     bsize = infer_batch_size(batch)
     instructions = _ensure_text_count(batch.task_text, expected=bsize)
 
@@ -116,7 +122,9 @@ def _select_image_step(stream: torch.Tensor, *, use_last: bool) -> torch.Tensor:
     if stream.ndim == 4:
         return stream
     if stream.ndim != 5:
-        raise ValueError(f"Expected 4D/5D image tensor, got shape {tuple(stream.shape)}")
+        raise ValueError(
+            f"Expected 4D/5D image tensor, got shape {tuple(stream.shape)}"
+        )
 
     idx = -1 if use_last else 0
     if stream.shape[-1] == 3:
@@ -147,11 +155,15 @@ def _extract_padding_mask(
 ) -> torch.Tensor:
     if mask.ndim == 1:
         if int(mask.shape[0]) != batch_size:
-            raise ValueError(f"Padding mask batch mismatch: expected {batch_size}, got {int(mask.shape[0])}")
+            raise ValueError(
+                f"Padding mask batch mismatch: expected {batch_size}, got {int(mask.shape[0])}"
+            )
         return mask.to(device=device, dtype=torch.bool)
     if mask.ndim == 2:
         if int(mask.shape[0]) != batch_size:
-            raise ValueError(f"Padding mask batch mismatch: expected {batch_size}, got {int(mask.shape[0])}")
+            raise ValueError(
+                f"Padding mask batch mismatch: expected {batch_size}, got {int(mask.shape[0])}"
+            )
         idx = -1 if use_last else 0
         return mask[:, idx].to(device=device, dtype=torch.bool)
     raise ValueError(f"Unsupported padding mask shape: {tuple(mask.shape)}")
@@ -209,7 +221,9 @@ def prepare_image_inputs(
     num_empty = min(len(missing), max(0, int(config.empty_cameras)))
     if num_empty > 0:
         if not images:
-            raise ValueError("empty_cameras>0 requires at least one present camera to infer tensor shape.")
+            raise ValueError(
+                "empty_cameras>0 requires at least one present camera to infer tensor shape."
+            )
         for _ in range(num_empty):
             fill = -1.0 if bool(config.normalize_to_neg_one_to_one) else 0.0
             images.append(torch.full_like(images[0], fill))
@@ -248,7 +262,9 @@ def to_action_chunk(
             )
         return actions[:, None, :]
     if actions.ndim != 3:
-        raise ValueError(f"Expected action tensor [B,A] or [B,T,A], got {tuple(actions.shape)}")
+        raise ValueError(
+            f"Expected action tensor [B,A] or [B,T,A], got {tuple(actions.shape)}"
+        )
     if int(actions.shape[1]) != int(chunk_size):
         raise ValueError(
             f"Expected action tensor [B,{int(chunk_size)},A], got {tuple(actions.shape)}"
@@ -273,7 +289,9 @@ def resolve_action_pad_field(
         action_is_pad = batch[action_is_pad_key]
         actions_id_pad = batch[actions_id_pad_key]
         action_is_pad_t = (
-            action_is_pad if torch.is_tensor(action_is_pad) else torch.as_tensor(action_is_pad, dtype=torch.bool)
+            action_is_pad
+            if torch.is_tensor(action_is_pad)
+            else torch.as_tensor(action_is_pad, dtype=torch.bool)
         )
         actions_id_pad_t = (
             actions_id_pad
@@ -302,7 +320,9 @@ def resolve_action_pad_mask(
     device: torch.device,
 ) -> torch.Tensor:
     if action_is_pad.ndim != 2:
-        raise ValueError(f"Expected action_is_pad [B,T], got {tuple(action_is_pad.shape)}")
+        raise ValueError(
+            f"Expected action_is_pad [B,T], got {tuple(action_is_pad.shape)}"
+        )
     if int(action_is_pad.shape[0]) != int(batch_size):
         raise ValueError(
             f"action_is_pad batch mismatch: expected {batch_size}, got {int(action_is_pad.shape[0])}"
@@ -348,7 +368,9 @@ def normalize_vector_mean_std(
         src_dim = int(mean_t.shape[0])
         if src_dim > target_dim:
             pad_shape = (*value.shape[:-1], src_dim - target_dim)
-            pad_value = mean_t[target_dim:].view(*([1] * (value.ndim - 1)), src_dim - target_dim)
+            pad_value = mean_t[target_dim:].view(
+                *([1] * (value.ndim - 1)), src_dim - target_dim
+            )
             value = torch.cat([value, pad_value.expand(pad_shape)], dim=-1)
             target_dim = src_dim
         mean_pad = torch.zeros((target_dim,), device=value.device, dtype=value.dtype)

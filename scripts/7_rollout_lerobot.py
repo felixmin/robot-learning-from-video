@@ -58,7 +58,16 @@ def _install_editable_package(
     attempted_errors: list[str] = []
 
     ok, err = _run_install_command(
-        [python, "-m", "pip", "install", "--no-deps", "--no-build-isolation", "-e", str(editable_path)],
+        [
+            python,
+            "-m",
+            "pip",
+            "install",
+            "--no-deps",
+            "--no-build-isolation",
+            "-e",
+            str(editable_path),
+        ],
         logger=logger,
         cwd=cwd,
         env=env,
@@ -124,7 +133,14 @@ def _install_editable_package(
     pip_bin = shutil.which("pip", path=env.get("PATH"))
     if pip_bin is not None:
         ok, err = _run_install_command(
-            [pip_bin, "install", "--no-deps", "--no-build-isolation", "-e", str(editable_path)],
+            [
+                pip_bin,
+                "install",
+                "--no-deps",
+                "--no-build-isolation",
+                "-e",
+                str(editable_path),
+            ],
             logger=logger,
             cwd=cwd,
             env=env,
@@ -148,7 +164,9 @@ def _editable_paths_from_cfg(cfg: DictConfig) -> list[Path]:
         legacy_path = OmegaConf.select(cfg, "lerobot_eval.install_policy_editable")
         raw_paths = [] if legacy_path is None else [legacy_path]
     elif not (OmegaConf.is_list(raw_paths) or isinstance(raw_paths, (list, tuple))):
-        raise ValueError("lerobot_eval.install_editables must be a list of package paths")
+        raise ValueError(
+            "lerobot_eval.install_editables must be a list of package paths"
+        )
 
     editable_paths: list[Path] = []
     seen_paths: set[str] = set()
@@ -263,7 +281,9 @@ def main(cfg: DictConfig) -> None:
     packages_path = str(workspace_root / "packages")
     existing_pythonpath = env.get("PYTHONPATH", "")
     env["PYTHONPATH"] = (
-        packages_path if not existing_pythonpath else f"{packages_path}:{existing_pythonpath}"
+        packages_path
+        if not existing_pythonpath
+        else f"{packages_path}:{existing_pythonpath}"
     )
     env_overrides = OmegaConf.select(cfg, "lerobot_eval.env") or {}
     if not OmegaConf.is_dict(env_overrides):

@@ -31,7 +31,11 @@ def test_image_stream_metrics_exact_match() -> None:
 
 
 def test_compare_legacy_and_lerobot_pair_samples_reports_zero_diff_for_match() -> None:
-    legacy_frames = torch.arange(2 * 3 * 4 * 4, dtype=torch.uint8).reshape(2, 3, 4, 4).permute(1, 0, 2, 3)
+    legacy_frames = (
+        torch.arange(2 * 3 * 4 * 4, dtype=torch.uint8)
+        .reshape(2, 3, 4, 4)
+        .permute(1, 0, 2, 3)
+    )
     legacy = {
         "frames": legacy_frames,
         "language": "pick up cube",
@@ -50,7 +54,9 @@ def test_compare_legacy_and_lerobot_pair_samples_reports_zero_diff_for_match() -
         meta={"frame_idx": 7},
     )
 
-    report = compare_legacy_and_lerobot_pair_samples(legacy, lerobot, camera_role="primary")
+    report = compare_legacy_and_lerobot_pair_samples(
+        legacy, lerobot, camera_role="primary"
+    )
 
     assert report["language_exact_match"] is True
     assert report["image_mask_exact_match"] is True

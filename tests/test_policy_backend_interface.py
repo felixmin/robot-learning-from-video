@@ -76,7 +76,9 @@ class FakeProcessor:
     def __init__(self):
         self.tokenizer = FakeTokenizer()
 
-    def apply_chat_template(self, messages, tokenize: bool, add_generation_prompt: bool):
+    def apply_chat_template(
+        self, messages, tokenize: bool, add_generation_prompt: bool
+    ):
         parts: List[str] = []
         for msg in messages:
             for item in msg.get("content", []):
@@ -133,13 +135,19 @@ class DummyPolicyModel(torch.nn.Module):
         prefix_allowed_tokens_fn,
         **kwargs,
     ):
-        assert self._suffix_ids is not None, "test must set suffix ids after backend.setup()"
+        assert (
+            self._suffix_ids is not None
+        ), "test must set suffix ids after backend.setup()"
         b = int(input_ids.shape[0])
-        suffix = torch.tensor(self._suffix_ids, dtype=torch.long).unsqueeze(0).repeat(b, 1)
+        suffix = (
+            torch.tensor(self._suffix_ids, dtype=torch.long).unsqueeze(0).repeat(b, 1)
+        )
         return torch.cat([input_ids, suffix], dim=1)
 
 
-def _make_backend() -> tuple[Qwen3VLChatActionTokenBackend, DummyPolicyModel, FakeProcessor]:
+def _make_backend() -> (
+    tuple[Qwen3VLChatActionTokenBackend, DummyPolicyModel, FakeProcessor]
+):
     model = DummyPolicyModel()
     processor = FakeProcessor()
     cfg = Qwen3VLChatBackendConfig(
@@ -167,7 +175,9 @@ def test_backend_setup_adds_tokens_and_infers_between_ids():
     assert token_ids is not None
     assert token_ids.code_seq_len == 4
     assert len(token_ids.action_code_ids) == 8
-    assert token_ids.between_token_ids, "expected non-empty between_token_ids in test tokenizer"
+    assert (
+        token_ids.between_token_ids
+    ), "expected non-empty between_token_ids in test tokenizer"
 
     # Build a suffix matching the expected parsed code sequence [3,1,7,0]
     tok = processor.tokenizer
@@ -189,9 +199,13 @@ def test_backend_setup_adds_tokens_and_infers_between_ids():
 
     batch = Stage2Batch(
         image_streams={
-            "observation.images.rgb": torch.randint(0, 256, (2, 2, 16, 16, 3), dtype=torch.uint8),
+            "observation.images.rgb": torch.randint(
+                0, 256, (2, 2, 16, 16, 3), dtype=torch.uint8
+            ),
         },
-        image_padding_masks={"observation.images.rgb": torch.ones((2, 2), dtype=torch.bool)},
+        image_padding_masks={
+            "observation.images.rgb": torch.ones((2, 2), dtype=torch.bool)
+        },
         task_text=["pick up block", "push button"],
     )
     out = backend.latent_from_batch(batch, mode=BackendMode.CODES)
@@ -225,9 +239,13 @@ def test_backend_loss_from_batch_requires_target_codes():
 
     batch = Stage2Batch(
         image_streams={
-            "observation.images.rgb": torch.randint(0, 256, (2, 2, 16, 16, 3), dtype=torch.uint8),
+            "observation.images.rgb": torch.randint(
+                0, 256, (2, 2, 16, 16, 3), dtype=torch.uint8
+            ),
         },
-        image_padding_masks={"observation.images.rgb": torch.ones((2, 2), dtype=torch.bool)},
+        image_padding_masks={
+            "observation.images.rgb": torch.ones((2, 2), dtype=torch.bool)
+        },
         task_text=["a", "b"],
         target_codes=torch.tensor([[3, 1, 7, 0], [3, 1, 7, 0]], dtype=torch.long),
     )
@@ -241,9 +259,13 @@ def test_backend_loss_raises_without_target_codes():
 
     batch = Stage2Batch(
         image_streams={
-            "observation.images.rgb": torch.randint(0, 256, (2, 2, 16, 16, 3), dtype=torch.uint8),
+            "observation.images.rgb": torch.randint(
+                0, 256, (2, 2, 16, 16, 3), dtype=torch.uint8
+            ),
         },
-        image_padding_masks={"observation.images.rgb": torch.ones((2, 2), dtype=torch.bool)},
+        image_padding_masks={
+            "observation.images.rgb": torch.ones((2, 2), dtype=torch.bool)
+        },
         task_text=["a", "b"],
         target_codes=None,
     )

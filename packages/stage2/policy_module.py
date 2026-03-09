@@ -17,7 +17,12 @@ import lightning.pytorch as pl
 import torch
 import torch.nn.functional as F
 
-from common.batch_utils import move_dataclass_tensors_to_device, select_primary_image_stream, temporal_frames_to_bcthw, uint8_image_streams_to_float32
+from common.batch_utils import (
+    move_dataclass_tensors_to_device,
+    select_primary_image_stream,
+    temporal_frames_to_bcthw,
+    uint8_image_streams_to_float32,
+)
 from stage2.backends.interfaces import BackendMode, Stage2Batch, PolicyBackend
 from stage2.backends.smolvla_shared.input_transform import normalize_vector_mean_std
 from stage2.constrained_decode import ActionTokenIds
@@ -59,7 +64,9 @@ class PolicyLightningModule(pl.LightningModule):
         self.normalization_stats = normalization_stats
         self.optimizer_cfg = optimizer or PolicyOptimizerConfig()
         self.action_token_ids = action_token_ids
-        self.train_teacher_forced_metrics_every_n_steps = train_teacher_forced_metrics_every_n_steps
+        self.train_teacher_forced_metrics_every_n_steps = (
+            train_teacher_forced_metrics_every_n_steps
+        )
 
         self._val_batch_payload_queue: deque[dict[str, Any]] = deque()
 
@@ -118,7 +125,9 @@ class PolicyLightningModule(pl.LightningModule):
     @staticmethod
     def _extract_policy_image_streams(frames: torch.Tensor) -> dict[str, torch.Tensor]:
         if frames.ndim != 5:
-            raise ValueError(f"Expected temporal frames tensor [B,T,...], got shape {tuple(frames.shape)}")
+            raise ValueError(
+                f"Expected temporal frames tensor [B,T,...], got shape {tuple(frames.shape)}"
+            )
         if frames.shape[-1] == 3:
             return {"observation.images.rgb": frames[:, 0, ...]}
         if frames.shape[2] == 3:
@@ -136,10 +145,14 @@ class PolicyLightningModule(pl.LightningModule):
     ) -> dict[str, torch.Tensor]:
         masks: dict[str, torch.Tensor] = {}
         for key, stream in image_streams.items():
-            masks[key] = torch.ones((int(stream.shape[0]),), dtype=torch.bool, device=stream.device)
+            masks[key] = torch.ones(
+                (int(stream.shape[0]),), dtype=torch.bool, device=stream.device
+            )
         return masks
 
-    def _log_vector_stats(self, *, prefix: str, pred: torch.Tensor, gt: torch.Tensor) -> dict[str, float]:
+    def _log_vector_stats(
+        self, *, prefix: str, pred: torch.Tensor, gt: torch.Tensor
+    ) -> dict[str, float]:
         if pred.shape != gt.shape or pred.numel() == 0:
             return {}
         diff = pred - gt
@@ -239,13 +252,37 @@ class PolicyLightningModule(pl.LightningModule):
                 "mode": self.backend_mode.value,
                 "frame": frames[i].detach().cpu(),
                 "instruction": str(instructions[i]),
-                "gt_codes": codes[i].detach().cpu().tolist() if codes is not None else None,
-                "pred_codes": pred_tokens[i].to(torch.long).detach().cpu().tolist() if pred_tokens is not None else None,
-                "gt_vector": vectors[i].detach().cpu().reshape(-1).tolist() if vectors is not None else None,
-                "pred_vector": pred_vectors[i].detach().cpu().reshape(-1).tolist() if pred_vectors is not None else None,
-                "gt_action": actions[i].detach().cpu().tolist() if actions is not None else None,
-                "pred_action": pred_actions[i].detach().cpu().tolist() if pred_actions is not None else None,
-                "gen_debug": gen_debug[i] if isinstance(gen_debug, list) and i < len(gen_debug) else None,
+                "gt_codes": (
+                    codes[i].detach().cpu().tolist() if codes is not None else None
+                ),
+                "pred_codes": (
+                    pred_tokens[i].to(torch.long).detach().cpu().tolist()
+                    if pred_tokens is not None
+                    else None
+                ),
+                "gt_vector": (
+                    vectors[i].detach().cpu().reshape(-1).tolist()
+                    if vectors is not None
+                    else None
+                ),
+                "pred_vector": (
+                    pred_vectors[i].detach().cpu().reshape(-1).tolist()
+                    if pred_vectors is not None
+                    else None
+                ),
+                "gt_action": (
+                    actions[i].detach().cpu().tolist() if actions is not None else None
+                ),
+                "pred_action": (
+                    pred_actions[i].detach().cpu().tolist()
+                    if pred_actions is not None
+                    else None
+                ),
+                "gen_debug": (
+                    gen_debug[i]
+                    if isinstance(gen_debug, list) and i < len(gen_debug)
+                    else None
+                ),
                 "metadata": {
                     "episode_id": self._metadata_value_at(episode_id, i),
                     "frame_idx": self._metadata_value_at(frame_idx, i),
@@ -268,7 +305,9 @@ class PolicyLightningModule(pl.LightningModule):
         self._val_batch_payload_queue.clear()
 
     def training_step(self, batch: Any, batch_idx: int) -> torch.Tensor:
-        out, _codes, _vectors, _actions, _frames, _instructions = self._loss_and_targets_from_batch(batch)
+        out, _codes, _vectors, _actions, _frames, _instructions = (
+            self._loss_and_targets_from_batch(batch)
+        )
         self.log("train/loss", out.loss, prog_bar=True, sync_dist=True)
         for key, value in out.metrics.items():
             if key == "loss":
@@ -277,7 +316,9 @@ class PolicyLightningModule(pl.LightningModule):
         return out.loss
 
     def validation_step(self, batch: Any, batch_idx: int) -> torch.Tensor:
-        out, codes, vectors, actions, frames, instructions = self._loss_and_targets_from_batch(batch)
+        out, codes, vectors, actions, frames, instructions = (
+            self._loss_and_targets_from_batch(batch)
+        )
         self.log("val/loss", out.loss, prog_bar=True, sync_dist=True)
         for key, value in out.metrics.items():
             if key == "loss":
@@ -299,7 +340,9 @@ class PolicyLightningModule(pl.LightningModule):
         latent = self.backend.latent_from_batch(
             Stage2Batch(
                 image_streams=image_streams,
-                image_padding_masks=self._extract_policy_image_padding_masks(image_streams),
+                image_padding_masks=self._extract_policy_image_padding_masks(
+                    image_streams
+                ),
                 task_text=instructions,
                 state=state,
             ),
@@ -314,7 +357,11 @@ class PolicyLightningModule(pl.LightningModule):
         dataset_mix: dict[str, int] | None = None
 
         meta = latent.meta if isinstance(latent.meta, dict) else {}
-        gen_debug = meta.get("parse_debug") if isinstance(meta.get("parse_debug"), list) else None
+        gen_debug = (
+            meta.get("parse_debug")
+            if isinstance(meta.get("parse_debug"), list)
+            else None
+        )
 
         if batch_idx == 0:
             if pred is not None and codes is not None:
@@ -336,52 +383,104 @@ class PolicyLightningModule(pl.LightningModule):
                     )
 
             if pred_vector is not None and vectors is not None:
-                gt_vec = vectors.reshape(vectors.shape[0], -1).to(device=pred_vector.device, dtype=pred_vector.dtype)
+                gt_vec = vectors.reshape(vectors.shape[0], -1).to(
+                    device=pred_vector.device, dtype=pred_vector.dtype
+                )
                 if pred_vector.shape == gt_vec.shape and pred_vector.numel() > 0:
                     vec_mse = torch.mean((pred_vector - gt_vec) ** 2)
-                    self.log("val/latent_vector_mse", vec_mse.to(self.device), prog_bar=True, sync_dist=True)
-                    vector_stats = self._log_vector_stats(prefix="val/latent_vector_stats", pred=pred_vector, gt=gt_vec)
+                    self.log(
+                        "val/latent_vector_mse",
+                        vec_mse.to(self.device),
+                        prog_bar=True,
+                        sync_dist=True,
+                    )
+                    vector_stats = self._log_vector_stats(
+                        prefix="val/latent_vector_stats", pred=pred_vector, gt=gt_vec
+                    )
 
             if pred_actions is not None and actions is not None:
-                gt_actions = actions.to(device=pred_actions.device, dtype=pred_actions.dtype)
+                gt_actions = actions.to(
+                    device=pred_actions.device, dtype=pred_actions.dtype
+                )
                 if pred_actions.shape == gt_actions.shape and pred_actions.numel() > 0:
                     act_mse = torch.mean((pred_actions - gt_actions) ** 2)
-                    self.log("val/action_mse", act_mse.to(self.device), prog_bar=True, sync_dist=True)
+                    self.log(
+                        "val/action_mse",
+                        act_mse.to(self.device),
+                        prog_bar=True,
+                        sync_dist=True,
+                    )
                     action_stats = self._log_vector_stats(
                         prefix="val/action_stats", pred=pred_actions, gt=gt_actions
                     )
 
             if gen_debug:
                 start_frac = torch.tensor(
-                    sum(1 for r in gen_debug if isinstance(r, dict) and r.get("has_action_start"))
+                    sum(
+                        1
+                        for r in gen_debug
+                        if isinstance(r, dict) and r.get("has_action_start")
+                    )
                     / float(len(gen_debug)),
                     device=self.device,
                     dtype=torch.float32,
                 )
                 end_frac = torch.tensor(
-                    sum(1 for r in gen_debug if isinstance(r, dict) and r.get("has_action_end"))
+                    sum(
+                        1
+                        for r in gen_debug
+                        if isinstance(r, dict) and r.get("has_action_end")
+                    )
                     / float(len(gen_debug)),
                     device=self.device,
                     dtype=torch.float32,
                 )
                 mean_codes = torch.tensor(
-                    sum(int(r.get("num_codes_parsed", 0)) for r in gen_debug if isinstance(r, dict))
+                    sum(
+                        int(r.get("num_codes_parsed", 0))
+                        for r in gen_debug
+                        if isinstance(r, dict)
+                    )
                     / float(len(gen_debug)),
                     device=self.device,
                     dtype=torch.float32,
                 )
-                self.log("val/gen_has_action_start_frac", start_frac, prog_bar=False, sync_dist=True)
-                self.log("val/gen_has_action_end_frac", end_frac, prog_bar=False, sync_dist=True)
-                self.log("val/gen_num_codes_parsed_mean", mean_codes, prog_bar=False, sync_dist=True)
+                self.log(
+                    "val/gen_has_action_start_frac",
+                    start_frac,
+                    prog_bar=False,
+                    sync_dist=True,
+                )
+                self.log(
+                    "val/gen_has_action_end_frac",
+                    end_frac,
+                    prog_bar=False,
+                    sync_dist=True,
+                )
+                self.log(
+                    "val/gen_num_codes_parsed_mean",
+                    mean_codes,
+                    prog_bar=False,
+                    sync_dist=True,
+                )
 
             batch_meta = batch.meta if isinstance(batch.meta, dict) else None
-            dataset_names = batch_meta.get("dataset_short") if batch_meta is not None else None
+            dataset_names = (
+                batch_meta.get("dataset_short") if batch_meta is not None else None
+            )
             if isinstance(dataset_names, list) and dataset_names:
-                counts = Counter(str(x) if x is not None else "None" for x in dataset_names)
+                counts = Counter(
+                    str(x) if x is not None else "None" for x in dataset_names
+                )
                 total = float(len(dataset_names))
                 top = counts.most_common(8)
                 dataset_mix = {name: int(count) for name, count in top}
-                self.log("val/dataset_mix_unique", float(len(counts)), prog_bar=False, sync_dist=True)
+                self.log(
+                    "val/dataset_mix_unique",
+                    float(len(counts)),
+                    prog_bar=False,
+                    sync_dist=True,
+                )
                 self.log(
                     "val/dataset_mix_top1_frac",
                     float(top[0][1]) / total,
@@ -395,9 +494,16 @@ class PolicyLightningModule(pl.LightningModule):
                 )
                 if probs.numel() > 1:
                     entropy = -torch.sum(probs * torch.log(probs + 1.0e-8))
-                    max_entropy = torch.log(torch.tensor(float(probs.numel()), device=self.device))
+                    max_entropy = torch.log(
+                        torch.tensor(float(probs.numel()), device=self.device)
+                    )
                     entropy_norm = entropy / (max_entropy + 1.0e-8)
-                    self.log("val/dataset_mix_entropy_norm", entropy_norm, prog_bar=False, sync_dist=True)
+                    self.log(
+                        "val/dataset_mix_entropy_norm",
+                        entropy_norm,
+                        prog_bar=False,
+                        sync_dist=True,
+                    )
                 for name, count in top:
                     suffix = self._sanitize_metric_suffix(name)
                     self.log(
@@ -458,16 +564,24 @@ class PolicyLightningModule(pl.LightningModule):
         return super().transfer_batch_to_device(batch, device, dataloader_idx)
 
     @staticmethod
-    def _resize_lam_video(video: torch.Tensor, target_image_size: tuple[int, int]) -> torch.Tensor:
+    def _resize_lam_video(
+        video: torch.Tensor, target_image_size: tuple[int, int]
+    ) -> torch.Tensor:
         if video.ndim != 5:
-            raise ValueError(f"Expected LAM video [B,C,T,H,W], got {tuple(video.shape)}")
+            raise ValueError(
+                f"Expected LAM video [B,C,T,H,W], got {tuple(video.shape)}"
+            )
         target_hw = tuple(int(x) for x in target_image_size)
         if tuple(int(x) for x in video.shape[3:]) == target_hw:
             return video
         b, c, t, h, w = video.shape
         flat = video.permute(0, 2, 1, 3, 4).reshape(b * t, c, h, w)
         flat = F.interpolate(flat, size=target_hw, mode="bilinear", align_corners=False)
-        return flat.reshape(b, t, c, target_hw[0], target_hw[1]).permute(0, 2, 1, 3, 4).contiguous()
+        return (
+            flat.reshape(b, t, c, target_hw[0], target_hw[1])
+            .permute(0, 2, 1, 3, 4)
+            .contiguous()
+        )
 
     @classmethod
     def _lam_video_from_stage2_batch(
@@ -489,7 +603,14 @@ class PolicyLightningModule(pl.LightningModule):
     def _loss_and_targets_from_stage2_batch(
         self,
         batch: Stage2Batch,
-    ) -> tuple[Any, torch.Tensor | None, torch.Tensor | None, torch.Tensor | None, torch.Tensor, list[str]]:
+    ) -> tuple[
+        Any,
+        torch.Tensor | None,
+        torch.Tensor | None,
+        torch.Tensor | None,
+        torch.Tensor,
+        list[str],
+    ]:
         target_image_size = None
         if self.code_provider is not None:
             raw_image_size = getattr(self.code_provider, "image_size", None)
@@ -506,7 +627,9 @@ class PolicyLightningModule(pl.LightningModule):
         vectors: torch.Tensor | None = None
         state = batch.state
         if state is None:
-            raise ValueError("Stage2Batch must include state for current Stage 2 training.")
+            raise ValueError(
+                "Stage2Batch must include state for current Stage 2 training."
+            )
 
         if self.backend_mode is BackendMode.CODES:
             code_provider = self._require_code_provider()
@@ -521,10 +644,18 @@ class PolicyLightningModule(pl.LightningModule):
             codes, vectors = code_provider.codes_and_vectors_from_video(video)
             codes = codes.to(torch.long).detach().cpu()
             vectors = vectors.detach().cpu()
-            actions = None if batch.target_actions is None else batch.target_actions.detach().cpu()
+            actions = (
+                None
+                if batch.target_actions is None
+                else batch.target_actions.detach().cpu()
+            )
             action_is_pad = batch.action_is_pad
         elif self.backend_mode is BackendMode.ACTIONS:
-            actions = None if batch.target_actions is None else batch.target_actions.detach().cpu()
+            actions = (
+                None
+                if batch.target_actions is None
+                else batch.target_actions.detach().cpu()
+            )
             action_is_pad = batch.action_is_pad
         else:
             raise NotImplementedError(f"Unsupported backend mode: {self.backend_mode}")
@@ -557,9 +688,14 @@ class PolicyLightningModule(pl.LightningModule):
         )
         return out, codes, vectors, actions, frames, instructions
 
-    def _loss_and_targets_from_batch(
-        self, batch: Any
-    ) -> tuple[Any, torch.Tensor | None, torch.Tensor | None, torch.Tensor | None, torch.Tensor, list[str]]:
+    def _loss_and_targets_from_batch(self, batch: Any) -> tuple[
+        Any,
+        torch.Tensor | None,
+        torch.Tensor | None,
+        torch.Tensor | None,
+        torch.Tensor,
+        list[str],
+    ]:
         if not isinstance(batch, Stage2Batch):
             raise TypeError("Stage 2 training expects Stage2Batch.")
         return self._loss_and_targets_from_stage2_batch(batch)
@@ -576,8 +712,15 @@ class PolicyLightningModule(pl.LightningModule):
         processor = self.processor
         chat = self.chat
         frames_to_images = self.frames_to_images
-        if model is None or processor is None or chat is None or frames_to_images is None:
-            raise RuntimeError("Backend must expose policy_model, processor, chat, and frames_to_images for freeform.")
+        if (
+            model is None
+            or processor is None
+            or chat is None
+            or frames_to_images is None
+        ):
+            raise RuntimeError(
+                "Backend must expose policy_model, processor, chat, and frames_to_images for freeform."
+            )
 
         from stage2.policy_inputs import build_prompt_inputs
 

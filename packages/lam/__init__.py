@@ -40,17 +40,29 @@ __all__ = [
 
 _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     "LAMTask": ("lam.task", "LAMTask"),
-    "separate_weight_decayable_params": ("lam.task", "separate_weight_decayable_params"),
+    "separate_weight_decayable_params": (
+        "lam.task",
+        "separate_weight_decayable_params",
+    ),
     "EMACallback": ("lam.callbacks", "EMACallback"),
     "TrainPreviewBufferCallback": ("lam.callbacks", "TrainPreviewBufferCallback"),
     "ValidationStrategyCallback": ("lam.callbacks", "ValidationStrategyCallback"),
-    "LatentActionQuantization": ("lam.models.latent_action_quantization", "LatentActionQuantization"),
+    "LatentActionQuantization": (
+        "lam.models.latent_action_quantization",
+        "LatentActionQuantization",
+    ),
     "NSVQ": ("lam.models.nsvq", "NSVQ"),
     "Attention": ("lam.models.attention", "Attention"),
     "Transformer": ("lam.models.attention", "Transformer"),
-    "load_lam_task_from_checkpoint": ("lam.checkpoints", "load_lam_task_from_checkpoint"),
+    "load_lam_task_from_checkpoint": (
+        "lam.checkpoints",
+        "load_lam_task_from_checkpoint",
+    ),
     "load_lam_model_weights_only": ("lam.checkpoints", "load_lam_model_weights_only"),
-    "load_lam_encoder_vq_inference_from_checkpoint": ("lam.checkpoints", "load_lam_encoder_vq_inference_from_checkpoint"),
+    "load_lam_encoder_vq_inference_from_checkpoint": (
+        "lam.checkpoints",
+        "load_lam_encoder_vq_inference_from_checkpoint",
+    ),
     "LAMEncoderVQInference": ("lam.inference", "LAMEncoderVQInference"),
     "ValidationStrategy": ("lam.validation", "ValidationStrategy"),
     "ValidationCache": ("lam.validation", "ValidationCache"),

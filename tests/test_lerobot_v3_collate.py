@@ -66,11 +66,17 @@ def test_collate_dataset_samples_rejects_mismatched_camera_sets() -> None:
         collate_dataset_samples(
             [
                 DatasetSample(
-                    image_streams={"primary": torch.zeros((1, 3, 4, 4), dtype=torch.uint8)},
-                    image_padding_masks={"primary": torch.zeros((1,), dtype=torch.bool)},
+                    image_streams={
+                        "primary": torch.zeros((1, 3, 4, 4), dtype=torch.uint8)
+                    },
+                    image_padding_masks={
+                        "primary": torch.zeros((1,), dtype=torch.bool)
+                    },
                 ),
                 DatasetSample(
-                    image_streams={"wrist": torch.zeros((1, 3, 4, 4), dtype=torch.uint8)},
+                    image_streams={
+                        "wrist": torch.zeros((1, 3, 4, 4), dtype=torch.uint8)
+                    },
                     image_padding_masks={"wrist": torch.zeros((1,), dtype=torch.bool)},
                 ),
             ]
@@ -93,13 +99,20 @@ def test_collate_dataset_samples_pads_state_and_action_dims_to_batch_max() -> No
                 image_padding_masks={"primary": torch.zeros((1,), dtype=torch.bool)},
                 state=torch.tensor([[5.0, 6.0, 7.0]], dtype=torch.float32),
                 state_is_pad=torch.tensor([False], dtype=torch.bool),
-                action=torch.tensor([[8.0, 9.0, 10.0, 11.0], [12.0, 13.0, 14.0, 15.0]], dtype=torch.float32),
+                action=torch.tensor(
+                    [[8.0, 9.0, 10.0, 11.0], [12.0, 13.0, 14.0, 15.0]],
+                    dtype=torch.float32,
+                ),
                 action_is_pad=torch.tensor([False, False], dtype=torch.bool),
             ),
         ]
     )
 
     assert tuple(out.state.shape) == (2, 1, 3)
-    assert torch.equal(out.state[0, 0], torch.tensor([1.0, 2.0, 0.0], dtype=torch.float32))
+    assert torch.equal(
+        out.state[0, 0], torch.tensor([1.0, 2.0, 0.0], dtype=torch.float32)
+    )
     assert tuple(out.action.shape) == (2, 2, 4)
-    assert torch.equal(out.action[0, 0], torch.tensor([1.0, 2.0, 0.0, 0.0], dtype=torch.float32))
+    assert torch.equal(
+        out.action[0, 0], torch.tensor([1.0, 2.0, 0.0, 0.0], dtype=torch.float32)
+    )

@@ -153,7 +153,11 @@ def main(cfg: DictConfig):
 
     action_token_ids = None
     if backend_type == "smolvla_shared":
-        if backend_mode not in (BackendMode.LATENT_FLOW, BackendMode.ACTIONS, BackendMode.MULTITASK):
+        if backend_mode not in (
+            BackendMode.LATENT_FLOW,
+            BackendMode.ACTIONS,
+            BackendMode.MULTITASK,
+        ):
             raise ValueError(
                 "smolvla_shared backend supports model.training_mode in {latent_flow, actions, multitask}"
             )
@@ -167,7 +171,9 @@ def main(cfg: DictConfig):
         if stage1_provider is None:
             latent_vector_dim = int(cfg.stage2_policy_core.latent.latent_vector_dim)
         else:
-            latent_vector_dim = int(stage1_provider.code_seq_len * stage1_provider.codebook_dim)
+            latent_vector_dim = int(
+                stage1_provider.code_seq_len * stage1_provider.codebook_dim
+            )
         action_dim = int(flow_cfg.action_dim)
         action_chunk_size = int(flow_cfg.action_chunk_size)
 
@@ -196,7 +202,9 @@ def main(cfg: DictConfig):
             use_gpu_preprocessing=use_gpu_preprocessing,
             image_size=image_size,
             camera_keys=(
-                None if cfg.model.policy.camera_keys is None else tuple(str(k) for k in cfg.model.policy.camera_keys)
+                None
+                if cfg.model.policy.camera_keys is None
+                else tuple(str(k) for k in cfg.model.policy.camera_keys)
             ),
             empty_cameras=int(cfg.model.policy.empty_cameras),
             flow_hidden_dim=int(flow_cfg.flow_hidden_dim),
@@ -256,7 +264,9 @@ def main(cfg: DictConfig):
             save_top_k=int(checkpoint_cfg.save_top_k),
             save_last=bool(checkpoint_cfg.save_last),
             save_weights_only=save_weights_only,
-            every_n_train_steps=int(every_n_train_steps) if every_n_train_steps is not None else None,
+            every_n_train_steps=(
+                int(every_n_train_steps) if every_n_train_steps is not None else None
+            ),
             filename="stage2-policy-step{step:06d}",
             verbose=True,
         ),
@@ -449,7 +459,9 @@ def main(cfg: DictConfig):
             system_prompt=backend_cfg.chat.system_prompt,
             max_state_dim=int(backend_cfg.max_state_dim),
             camera_keys=(
-                None if backend_cfg.camera_keys is None else tuple(str(k) for k in backend_cfg.camera_keys)
+                None
+                if backend_cfg.camera_keys is None
+                else tuple(str(k) for k in backend_cfg.camera_keys)
             ),
             flow_hidden_dim=int(backend_cfg.flow_hidden_dim),
             flow_steps=int(backend_cfg.flow_steps),

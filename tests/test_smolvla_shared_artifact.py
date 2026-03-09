@@ -11,7 +11,9 @@ from stage2.backends.smolvla_shared.artifact import (
 )
 
 
-def _manifest(*, schema_version: str = SMOLVLA_SHARED_ARTIFACT_SCHEMA_VERSION) -> SmolVLASharedArtifactManifest:
+def _manifest(
+    *, schema_version: str = SMOLVLA_SHARED_ARTIFACT_SCHEMA_VERSION
+) -> SmolVLASharedArtifactManifest:
     return SmolVLASharedArtifactManifest(
         schema_version=schema_version,
         model_name="dummy",
@@ -38,7 +40,9 @@ def _manifest(*, schema_version: str = SMOLVLA_SHARED_ARTIFACT_SCHEMA_VERSION) -
 
 
 def test_manifest_validation_rejects_schema_mismatch() -> None:
-    with pytest.raises(ValueError, match="Unsupported smolvla_shared artifact schema_version"):
+    with pytest.raises(
+        ValueError, match="Unsupported smolvla_shared artifact schema_version"
+    ):
         _manifest(schema_version="smolvla_shared.v0").validate()
 
 
@@ -49,12 +53,16 @@ def test_save_and_load_artifact_roundtrip(tmp_path) -> None:
         "latent_in_proj.bias": torch.randn(4),
         "_private_cache.weight": torch.randn(4, 8),
     }
-    save_smolvla_shared_artifact(path=path, manifest=_manifest(), core_state_dict=core_state_dict)
+    save_smolvla_shared_artifact(
+        path=path, manifest=_manifest(), core_state_dict=core_state_dict
+    )
 
     loaded_manifest, loaded_core = load_smolvla_shared_artifact(path=path)
     assert loaded_manifest.schema_version == SMOLVLA_SHARED_ARTIFACT_SCHEMA_VERSION
     assert loaded_manifest.model_name == "dummy"
-    assert loaded_manifest.normalization_stats == {"action": {"mean": [0.0], "std": [1.0]}}
+    assert loaded_manifest.normalization_stats == {
+        "action": {"mean": [0.0], "std": [1.0]}
+    }
     assert "_private_cache.weight" not in loaded_core
     expected_keys = {"latent_in_proj.weight", "latent_in_proj.bias"}
     assert set(loaded_core.keys()) == expected_keys
@@ -76,5 +84,7 @@ def test_load_fails_on_invalid_artifact_schema(tmp_path) -> None:
         artifact_path,
     )
 
-    with pytest.raises(ValueError, match="Unsupported smolvla_shared artifact schema_version"):
+    with pytest.raises(
+        ValueError, match="Unsupported smolvla_shared artifact schema_version"
+    ):
         load_smolvla_shared_artifact(path=artifact_path)

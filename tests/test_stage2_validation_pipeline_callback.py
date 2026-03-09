@@ -40,7 +40,10 @@ class _DummyModule:
         self.logged_dicts.append(dict(metrics))
 
     def frames_to_images(self, frames: torch.Tensor):
-        return [Image.new("RGB", (16, 16), color=(10, 20, 30)) for _ in range(int(frames.shape[0]))]
+        return [
+            Image.new("RGB", (16, 16), color=(10, 20, 30))
+            for _ in range(int(frames.shape[0]))
+        ]
 
 
 class _BoomCheck(Stage2ValidationCheck):
@@ -69,7 +72,9 @@ class _NoOutputCheck(Stage2ValidationCheck):
         return {"_produced": 0, "_reason": "test_no_output"}
 
 
-def _make_record(*, dataset_name: str = "mix", gt_codes: list[int] | None = None) -> dict:
+def _make_record(
+    *, dataset_name: str = "mix", gt_codes: list[int] | None = None
+) -> dict:
     return {
         "mode": "codes",
         "frame": torch.randint(0, 256, (2, 16, 16, 3), dtype=torch.uint8),
@@ -129,8 +134,12 @@ def test_batch_idx_gt_zero_payload_is_accumulated_across_batches(tmp_path):
     module.enqueue_payload({"records": [_make_record(gt_codes=[1, 1, 1, 1])]})
     module.enqueue_payload({"records": [_make_record(gt_codes=[2, 2, 2, 2])]})
 
-    callback.on_validation_batch_end(trainer, module, outputs=None, batch=None, batch_idx=0)
-    callback.on_validation_batch_end(trainer, module, outputs=None, batch=None, batch_idx=1)
+    callback.on_validation_batch_end(
+        trainer, module, outputs=None, batch=None, batch_idx=0
+    )
+    callback.on_validation_batch_end(
+        trainer, module, outputs=None, batch=None, batch_idx=1
+    )
 
     assert callback.global_cache.sample_count() == 2
     all_codes = callback.global_cache.get_all_gt_codes()
@@ -165,7 +174,9 @@ def test_bucket_routing_applies_metric_suffix(tmp_path):
             ]
         }
     )
-    callback.on_validation_batch_end(trainer, module, outputs=None, batch=None, batch_idx=0)
+    callback.on_validation_batch_end(
+        trainer, module, outputs=None, batch=None, batch_idx=0
+    )
     callback.on_validation_epoch_end(trainer, module)
 
     merged = {}
@@ -234,7 +245,9 @@ def test_pipeline_soft_fail_continues_running_remaining_checks(tmp_path):
 
         callback.on_validation_epoch_start(trainer, module)
         module.enqueue_payload({"records": [_make_record(gt_codes=[1, 2, 3, 4])]})
-        callback.on_validation_batch_end(trainer, module, outputs=None, batch=None, batch_idx=0)
+        callback.on_validation_batch_end(
+            trainer, module, outputs=None, batch=None, batch_idx=0
+        )
 
         callback.on_validation_epoch_end(trainer, module)
 
@@ -264,7 +277,9 @@ def test_sample_panels_check_writes_artifacts(tmp_path):
 
     callback.on_validation_epoch_start(trainer, module)
     module.enqueue_payload({"records": [_make_record(gt_codes=[3, 1, 7, 0])]})
-    callback.on_validation_batch_end(trainer, module, outputs=None, batch=None, batch_idx=0)
+    callback.on_validation_batch_end(
+        trainer, module, outputs=None, batch=None, batch_idx=0
+    )
     callback.on_validation_epoch_end(trainer, module)
 
     viz_dir = tmp_path / "visualizations"
@@ -288,7 +303,9 @@ def test_sample_panels_check_writes_artifacts_without_backend_image_adapter(tmp_
 
     callback.on_validation_epoch_start(trainer, module)
     module.enqueue_payload({"records": [_make_record(gt_codes=[3, 1, 7, 0])]})
-    callback.on_validation_batch_end(trainer, module, outputs=None, batch=None, batch_idx=0)
+    callback.on_validation_batch_end(
+        trainer, module, outputs=None, batch=None, batch_idx=0
+    )
     callback.on_validation_epoch_end(trainer, module)
 
     viz_dir = tmp_path / "visualizations"
@@ -307,12 +324,16 @@ def test_sample_panels_check_writes_artifacts_when_adapter_returns_tensor(tmp_pa
         }
     )
     module = _DummyModule()
-    module.frames_to_images = lambda frames: torch.rand((int(frames.shape[0]), 3, 16, 16), dtype=torch.float32)
+    module.frames_to_images = lambda frames: torch.rand(
+        (int(frames.shape[0]), 3, 16, 16), dtype=torch.float32
+    )
     trainer = _trainer(tmp_path)
 
     callback.on_validation_epoch_start(trainer, module)
     module.enqueue_payload({"records": [_make_record(gt_codes=[3, 1, 7, 0])]})
-    callback.on_validation_batch_end(trainer, module, outputs=None, batch=None, batch_idx=0)
+    callback.on_validation_batch_end(
+        trainer, module, outputs=None, batch=None, batch_idx=0
+    )
     callback.on_validation_epoch_end(trainer, module)
 
     viz_dir = tmp_path / "visualizations"
@@ -338,7 +359,9 @@ def test_pipeline_counts_no_output_result_as_skip(tmp_path, caplog):
 
         callback.on_validation_epoch_start(trainer, module)
         module.enqueue_payload({"records": [_make_record(gt_codes=[1, 2, 3, 4])]})
-        callback.on_validation_batch_end(trainer, module, outputs=None, batch=None, batch_idx=0)
+        callback.on_validation_batch_end(
+            trainer, module, outputs=None, batch=None, batch_idx=0
+        )
         with caplog.at_level(logging.INFO, logger="stage2.training"):
             callback.on_validation_epoch_end(trainer, module)
 

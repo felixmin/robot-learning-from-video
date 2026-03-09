@@ -34,7 +34,9 @@ def test_dataset_usage_logger_counts_and_prints_on_validation(capsys):
 
 
 def test_dataset_usage_logger_can_log_every_n_steps(capsys):
-    cb = DatasetUsageLoggerCallback(enabled=True, log_on_validation_end=False, log_every_n_steps=2)
+    cb = DatasetUsageLoggerCallback(
+        enabled=True, log_on_validation_end=False, log_every_n_steps=2
+    )
     trainer = SimpleNamespace(global_step=0)
 
     cb.on_train_batch_end(
@@ -89,7 +91,9 @@ def test_dataset_usage_logger_can_print_batch_mix(capsys):
 
 
 def test_dataset_usage_logger_accepts_stage1_batch_meta(capsys):
-    cb = DatasetUsageLoggerCallback(enabled=True, log_on_validation_end=False, log_every_n_steps=1)
+    cb = DatasetUsageLoggerCallback(
+        enabled=True, log_on_validation_end=False, log_every_n_steps=1
+    )
     trainer = SimpleNamespace(global_step=0)
     batch = Stage1Batch(
         image_streams={"primary": torch.zeros((2, 2, 3, 8, 8), dtype=torch.uint8)},
@@ -103,7 +107,9 @@ def test_dataset_usage_logger_accepts_stage1_batch_meta(capsys):
 
 
 def test_dataset_usage_logger_accepts_stage2_batch_meta(capsys):
-    cb = DatasetUsageLoggerCallback(enabled=True, log_on_validation_end=False, log_every_n_steps=1)
+    cb = DatasetUsageLoggerCallback(
+        enabled=True, log_on_validation_end=False, log_every_n_steps=1
+    )
     trainer = SimpleNamespace(global_step=0)
     batch = Stage2Batch(meta={"dataset_name": ["nyu", "asu"]})
     cb.on_train_batch_end(trainer, None, outputs=None, batch=batch, batch_idx=0)

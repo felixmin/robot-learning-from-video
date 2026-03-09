@@ -24,7 +24,9 @@ def reduce_action_chunk_sum(
     if action_t.ndim == 1:
         return action_t
     if action_t.ndim != 2:
-        raise ValueError(f"Expected action tensor rank 1 or 2, got {tuple(action_t.shape)}")
+        raise ValueError(
+            f"Expected action tensor rank 1 or 2, got {tuple(action_t.shape)}"
+        )
     if action_is_pad is None:
         valid = torch.ones((int(action_t.shape[0]),), dtype=torch.bool)
     else:
@@ -39,11 +41,15 @@ def reduce_action_chunk_sum(
     return action_t[valid].sum(dim=0)
 
 
-def image_stream_metrics(reference: torch.Tensor, candidate: torch.Tensor) -> dict[str, float | bool]:
+def image_stream_metrics(
+    reference: torch.Tensor, candidate: torch.Tensor
+) -> dict[str, float | bool]:
     ref = torch.as_tensor(reference, dtype=torch.float32)
     cand = torch.as_tensor(candidate, dtype=torch.float32)
     if tuple(ref.shape) != tuple(cand.shape):
-        raise ValueError(f"Image shape mismatch: {tuple(ref.shape)} vs {tuple(cand.shape)}")
+        raise ValueError(
+            f"Image shape mismatch: {tuple(ref.shape)} vs {tuple(cand.shape)}"
+        )
     diff = (ref - cand).abs()
     mse = torch.mean((ref - cand) ** 2).item()
     return {
@@ -63,8 +69,12 @@ def vector_metrics(
     if reference is None or candidate is None:
         return {
             "present_in_both": False,
-            "reference_dim": 0 if reference is None else int(torch.as_tensor(reference).numel()),
-            "candidate_dim": 0 if candidate is None else int(torch.as_tensor(candidate).numel()),
+            "reference_dim": (
+                0 if reference is None else int(torch.as_tensor(reference).numel())
+            ),
+            "candidate_dim": (
+                0 if candidate is None else int(torch.as_tensor(candidate).numel())
+            ),
         }
 
     ref = torch.as_tensor(reference, dtype=torch.float32).reshape(-1)
@@ -90,14 +100,18 @@ def vector_metrics(
         "exact_match": bool(torch.equal(ref, cand)),
         "mean_abs_diff": float(diff.mean().item()),
         "max_abs_diff": float(diff.max().item()),
-        "l2": float(torch.linalg.vector_norm(ref[:shared_dim] - cand[:shared_dim]).item()),
+        "l2": float(
+            torch.linalg.vector_norm(ref[:shared_dim] - cand[:shared_dim]).item()
+        ),
     }
 
 
 def _legacy_frames_to_tchw(frames: torch.Tensor) -> torch.Tensor:
     frames_t = torch.as_tensor(frames)
     if frames_t.ndim != 4:
-        raise ValueError(f"Expected legacy pair frames rank 4, got {tuple(frames_t.shape)}")
+        raise ValueError(
+            f"Expected legacy pair frames rank 4, got {tuple(frames_t.shape)}"
+        )
     if int(frames_t.shape[0]) == 3:
         return frames_t.permute(1, 0, 2, 3).contiguous()
     if int(frames_t.shape[-1]) == 3:
@@ -111,7 +125,10 @@ def compare_legacy_and_lerobot_pair_samples(
     *,
     camera_role: str,
 ) -> dict[str, Any]:
-    if lerobot_sample.image_streams is None or camera_role not in lerobot_sample.image_streams:
+    if (
+        lerobot_sample.image_streams is None
+        or camera_role not in lerobot_sample.image_streams
+    ):
         raise KeyError(f"Missing camera role {camera_role!r} in LeRobot sample")
 
     legacy_frames = _legacy_frames_to_tchw(torch.as_tensor(legacy_sample["frames"]))
@@ -124,8 +141,13 @@ def compare_legacy_and_lerobot_pair_samples(
 
     legacy_mask = torch.ones((int(legacy_frames.shape[0]),), dtype=torch.bool)
     lerobot_mask = None
-    if lerobot_sample.image_padding_masks is not None and camera_role in lerobot_sample.image_padding_masks:
-        lerobot_mask = torch.as_tensor(lerobot_sample.image_padding_masks[camera_role], dtype=torch.bool)
+    if (
+        lerobot_sample.image_padding_masks is not None
+        and camera_role in lerobot_sample.image_padding_masks
+    ):
+        lerobot_mask = torch.as_tensor(
+            lerobot_sample.image_padding_masks[camera_role], dtype=torch.bool
+        )
     if lerobot_mask is None:
         lerobot_mask = torch.ones((int(lerobot_frames.shape[0]),), dtype=torch.bool)
 
@@ -134,19 +156,25 @@ def compare_legacy_and_lerobot_pair_samples(
         state = torch.as_tensor(lerobot_sample.state, dtype=torch.float32)
         lerobot_state = state[0] if state.ndim > 1 else state
 
-    lerobot_action = reduce_action_chunk_sum(lerobot_sample.action, lerobot_sample.action_is_pad)
+    lerobot_action = reduce_action_chunk_sum(
+        lerobot_sample.action, lerobot_sample.action_is_pad
+    )
 
     return {
         "language_exact_match": normalize_text(legacy_sample.get("language"))
         == normalize_text(lerobot_sample.task_text),
         "image_mask_exact_match": bool(torch.equal(legacy_mask, lerobot_mask)),
         "image_metrics": image_stream_metrics(legacy_frames, lerobot_frames),
-        "state_metrics": vector_metrics(legacy_sample.get("initial_state"), lerobot_state),
+        "state_metrics": vector_metrics(
+            legacy_sample.get("initial_state"), lerobot_state
+        ),
         "action_metrics": vector_metrics(legacy_sample.get("action"), lerobot_action),
         "legacy_frame_idx": int(legacy_sample.get("frame_idx", -1)),
-        "lerobot_frame_idx": None
-        if lerobot_sample.meta is None or "frame_idx" not in lerobot_sample.meta
-        else int(lerobot_sample.meta["frame_idx"]),
+        "lerobot_frame_idx": (
+            None
+            if lerobot_sample.meta is None or "frame_idx" not in lerobot_sample.meta
+            else int(lerobot_sample.meta["frame_idx"])
+        ),
     }
 
 
@@ -166,8 +194,12 @@ def summarize_parity_reports(reports: Sequence[dict[str, Any]]) -> dict[str, Any
 
     return {
         "num_reports": int(len(reports)),
-        "language_exact_matches": int(sum(bool(report["language_exact_match"]) for report in reports)),
-        "image_mask_exact_matches": int(sum(bool(report["image_mask_exact_match"]) for report in reports)),
+        "language_exact_matches": int(
+            sum(bool(report["language_exact_match"]) for report in reports)
+        ),
+        "image_mask_exact_matches": int(
+            sum(bool(report["image_mask_exact_match"]) for report in reports)
+        ),
         "mean_image_mean_abs_diff": _mean("mean_abs_diff", section="image_metrics"),
         "mean_image_max_abs_diff": _mean("max_abs_diff", section="image_metrics"),
         "mean_state_l2": _mean("l2", section="state_metrics"),

@@ -4,7 +4,10 @@ from types import SimpleNamespace
 
 import torch
 
-from common.callbacks import DataSampleVisualizationCallback, DataSampleVisualizationConfig
+from common.callbacks import (
+    DataSampleVisualizationCallback,
+    DataSampleVisualizationConfig,
+)
 from common.lerobot_v3_types import Stage1Batch
 from stage2.backends.interfaces import Stage2Batch
 
@@ -30,7 +33,9 @@ def test_data_sample_visualization_callback_stage1_logs_frame_pairs() -> None:
         )
     )
     batch = Stage1Batch(
-        image_streams={"primary": torch.randint(0, 256, (3, 2, 8, 8, 3), dtype=torch.uint8)},
+        image_streams={
+            "primary": torch.randint(0, 256, (3, 2, 8, 8, 3), dtype=torch.uint8)
+        },
         task_text=["pick", "place", "push"],
         meta={
             "dataset_short": ["bridge", "language_table", "rt1"],
@@ -39,7 +44,9 @@ def test_data_sample_visualization_callback_stage1_logs_frame_pairs() -> None:
         },
     )
 
-    callback.on_train_batch_end(trainer, pl_module=None, outputs=None, batch=batch, batch_idx=0)
+    callback.on_train_batch_end(
+        trainer, pl_module=None, outputs=None, batch=batch, batch_idx=0
+    )
 
     assert len(logger.calls) == 1
     call = logger.calls[0]
@@ -64,7 +71,9 @@ def test_data_sample_visualization_callback_stage2_logs_single_frames() -> None:
         )
     )
     batch = Stage2Batch(
-        image_streams={"primary": torch.randint(0, 256, (4, 2, 8, 8, 3), dtype=torch.uint8)},
+        image_streams={
+            "primary": torch.randint(0, 256, (4, 2, 8, 8, 3), dtype=torch.uint8)
+        },
         task_text=["pick", "place", "push", "pull"],
         meta={
             "dataset_short": ["bridge", "language_table", "rt1", "roboturk"],
@@ -73,7 +82,9 @@ def test_data_sample_visualization_callback_stage2_logs_single_frames() -> None:
         },
     )
 
-    callback.on_train_batch_end(trainer, pl_module=None, outputs=None, batch=batch, batch_idx=0)
+    callback.on_train_batch_end(
+        trainer, pl_module=None, outputs=None, batch=batch, batch_idx=0
+    )
 
     assert len(logger.calls) == 1
     call = logger.calls[0]

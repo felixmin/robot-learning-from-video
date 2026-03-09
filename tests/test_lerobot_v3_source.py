@@ -33,7 +33,9 @@ class _FakeLeRobotDataset:
                 ],
                 dtype=torch.uint8,
             ),
-            "observation.images.image_is_pad": torch.tensor([False, True], dtype=torch.bool),
+            "observation.images.image_is_pad": torch.tensor(
+                [False, True], dtype=torch.bool
+            ),
             "observation.state": torch.tensor([1.0, 2.0, 3.0], dtype=torch.float32),
             "observation.state_is_pad": torch.tensor([False], dtype=torch.bool),
             "action": torch.tensor([[4.0, 5.0], [6.0, 7.0]], dtype=torch.float32),
@@ -47,7 +49,9 @@ class _FakeLeRobotDataset:
 class _FakeFloatImageLeRobotDataset(_FakeLeRobotDataset):
     def __getitem__(self, index: int):
         item = super().__getitem__(index)
-        item["observation.images.image"] = item["observation.images.image"].to(torch.float32) / 255.0
+        item["observation.images.image"] = (
+            item["observation.images.image"].to(torch.float32) / 255.0
+        )
         return item
 
 
@@ -93,7 +97,9 @@ def test_single_source_get_sample_shapes_images_masks_and_metadata(monkeypatch) 
         "common.lerobot_v3_source.load_lerobot_meta",
         lambda repo_id, root, revision: make_test_meta(
             repo_id=repo_id,
-            episodes=[{"episode_index": 0, "dataset_from_index": 0, "dataset_to_index": 8}],
+            episodes=[
+                {"episode_index": 0, "dataset_from_index": 0, "dataset_to_index": 8}
+            ],
         ),
     )
     monkeypatch.setattr("common.lerobot_v3_source.LeRobotDataset", _FakeLeRobotDataset)
@@ -131,7 +137,9 @@ def test_single_source_get_sample_shapes_images_masks_and_metadata(monkeypatch) 
     )
     assert tuple(sample.state.shape) == (1, 3)
     assert torch.equal(sample.state_is_pad, torch.tensor([False], dtype=torch.bool))
-    assert torch.equal(sample.action_is_pad, torch.tensor([False, True], dtype=torch.bool))
+    assert torch.equal(
+        sample.action_is_pad, torch.tensor([False, True], dtype=torch.bool)
+    )
     assert sample.task_text == "rotate"
     assert sample.meta == {
         "dataset_name": "test/repo",
@@ -146,10 +154,14 @@ def test_single_source_get_sample_accepts_float_image_streams(monkeypatch) -> No
         "common.lerobot_v3_source.load_lerobot_meta",
         lambda repo_id, root, revision: make_test_meta(
             repo_id=repo_id,
-            episodes=[{"episode_index": 0, "dataset_from_index": 0, "dataset_to_index": 8}],
+            episodes=[
+                {"episode_index": 0, "dataset_from_index": 0, "dataset_to_index": 8}
+            ],
         ),
     )
-    monkeypatch.setattr("common.lerobot_v3_source.LeRobotDataset", _FakeFloatImageLeRobotDataset)
+    monkeypatch.setattr(
+        "common.lerobot_v3_source.LeRobotDataset", _FakeFloatImageLeRobotDataset
+    )
 
     source = LeRobotSingleSource(
         repo_id="test/repo",
@@ -180,10 +192,14 @@ def test_single_source_uses_custom_action_key_pad_mask(monkeypatch) -> None:
         "common.lerobot_v3_source.load_lerobot_meta",
         lambda repo_id, root, revision: make_test_meta(
             repo_id=repo_id,
-            episodes=[{"episode_index": 0, "dataset_from_index": 0, "dataset_to_index": 8}],
+            episodes=[
+                {"episode_index": 0, "dataset_from_index": 0, "dataset_to_index": 8}
+            ],
         ),
     )
-    monkeypatch.setattr("common.lerobot_v3_source.LeRobotDataset", _FakeCustomActionKeyLeRobotDataset)
+    monkeypatch.setattr(
+        "common.lerobot_v3_source.LeRobotDataset", _FakeCustomActionKeyLeRobotDataset
+    )
 
     source = LeRobotSingleSource(
         repo_id="test/repo",
@@ -206,15 +222,21 @@ def test_single_source_uses_custom_action_key_pad_mask(monkeypatch) -> None:
 
     sample = source.get_sample(0)
 
-    assert torch.equal(sample.action_is_pad, torch.tensor([False, True], dtype=torch.bool))
+    assert torch.equal(
+        sample.action_is_pad, torch.tensor([False, True], dtype=torch.bool)
+    )
 
 
-def test_single_source_dataset_short_uses_repo_suffix_without_alias_mapping(monkeypatch) -> None:
+def test_single_source_dataset_short_uses_repo_suffix_without_alias_mapping(
+    monkeypatch,
+) -> None:
     monkeypatch.setattr(
         "common.lerobot_v3_source.load_lerobot_meta",
         lambda repo_id, root, revision: make_test_meta(
             repo_id=repo_id,
-            episodes=[{"episode_index": 0, "dataset_from_index": 0, "dataset_to_index": 8}],
+            episodes=[
+                {"episode_index": 0, "dataset_from_index": 0, "dataset_to_index": 8}
+            ],
         ),
     )
     monkeypatch.setattr("common.lerobot_v3_source.LeRobotDataset", _FakeLeRobotDataset)

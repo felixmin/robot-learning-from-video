@@ -6,7 +6,12 @@ from types import SimpleNamespace
 import torch
 import pytest
 
-from stage2.backends.interfaces import BackendMode, Stage2Batch, LatentOutput, LossOutput
+from stage2.backends.interfaces import (
+    BackendMode,
+    Stage2Batch,
+    LatentOutput,
+    LossOutput,
+)
 from stage2.policy_module import PolicyLightningModule, PolicyOptimizerConfig
 from common.lerobot_v3_types import Stage1Batch
 from lam.task import LAMTask
@@ -28,7 +33,9 @@ class _CaptureBackend:
         self.last_batch = batch
         return LossOutput(loss=torch.tensor(0.0), metrics={"loss": 0.0})
 
-    def latent_from_batch(self, batch: Stage2Batch, *, mode: BackendMode) -> LatentOutput:
+    def latent_from_batch(
+        self, batch: Stage2Batch, *, mode: BackendMode
+    ) -> LatentOutput:
         del batch, mode
         return LatentOutput()
 
@@ -43,9 +50,13 @@ class _DummyCodeProvider:
         assert tuple(video.shape[:3]) == (2, 3, 2)
         return torch.zeros((2, 1), dtype=torch.long)
 
-    def codes_and_vectors_from_video(self, video: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    def codes_and_vectors_from_video(
+        self, video: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         assert tuple(video.shape[:3]) == (2, 3, 2)
-        return torch.zeros((2, 1), dtype=torch.long), torch.zeros((2, 1, self.codebook_dim), dtype=torch.float32)
+        return torch.zeros((2, 1), dtype=torch.long), torch.zeros(
+            (2, 1, self.codebook_dim), dtype=torch.float32
+        )
 
 
 def test_policy_module_accepts_stage2_batch_inputs() -> None:
@@ -62,7 +73,9 @@ def test_policy_module_accepts_stage2_batch_inputs() -> None:
     )
 
     batch = Stage2Batch(
-        image_streams={"primary": torch.randint(0, 255, (2, 2, 3, 8, 8), dtype=torch.uint8)},
+        image_streams={
+            "primary": torch.randint(0, 255, (2, 2, 3, 8, 8), dtype=torch.uint8)
+        },
         image_padding_masks={"primary": torch.ones((2, 2), dtype=torch.bool)},
         task_text=["pick", "place"],
         state=torch.tensor([[[3.0, 3.0]], [[1.0, -1.0]]], dtype=torch.float32),
@@ -103,7 +116,9 @@ def test_policy_module_actions_mode_does_not_require_code_provider() -> None:
     )
 
     batch = Stage2Batch(
-        image_streams={"primary": torch.randint(0, 255, (2, 2, 3, 8, 8), dtype=torch.uint8)},
+        image_streams={
+            "primary": torch.randint(0, 255, (2, 2, 3, 8, 8), dtype=torch.uint8)
+        },
         image_padding_masks={"primary": torch.ones((2, 2), dtype=torch.bool)},
         task_text=["pick", "place"],
         state=torch.tensor([[[3.0, 3.0]], [[1.0, -1.0]]], dtype=torch.float32),
@@ -143,7 +158,9 @@ def test_policy_module_latent_flow_requires_code_provider() -> None:
     )
 
     batch = Stage2Batch(
-        image_streams={"primary": torch.randint(0, 255, (2, 2, 3, 8, 8), dtype=torch.uint8)},
+        image_streams={
+            "primary": torch.randint(0, 255, (2, 2, 3, 8, 8), dtype=torch.uint8)
+        },
         image_padding_masks={"primary": torch.ones((2, 2), dtype=torch.bool)},
         task_text=["pick", "place"],
         state=torch.tensor([[[3.0, 3.0]], [[1.0, -1.0]]], dtype=torch.float32),
@@ -186,8 +203,18 @@ def test_lam_task_accepts_stage1_batch() -> None:
         {
             "max_steps": 10,
             "metrics": {"log_every_n_steps": 1, "num_unique_codes_every_n_steps": 1},
-            "optimizer": {"lr": 1e-4, "betas": [0.9, 0.999], "weight_decay": 0.01, "eps": 1e-8},
-            "scheduler": {"type": "cosine", "min_lr": 1e-6, "warmup_steps": 0, "warmup_start_lr": 1e-6},
+            "optimizer": {
+                "lr": 1e-4,
+                "betas": [0.9, 0.999],
+                "weight_decay": 0.01,
+                "eps": 1e-8,
+            },
+            "scheduler": {
+                "type": "cosine",
+                "min_lr": 1e-6,
+                "warmup_steps": 0,
+                "warmup_start_lr": 1e-6,
+            },
             "gradient": {"clip_val": 1.0},
         }
     )
@@ -237,21 +264,35 @@ def test_lam_task_transfer_batch_to_device_accepts_stage1_batch() -> None:
         {
             "max_steps": 10,
             "metrics": {"log_every_n_steps": 1, "num_unique_codes_every_n_steps": 1},
-            "optimizer": {"lr": 1e-4, "betas": [0.9, 0.999], "weight_decay": 0.01, "eps": 1e-8},
-            "scheduler": {"type": "cosine", "min_lr": 1e-6, "warmup_steps": 0, "warmup_start_lr": 1e-6},
+            "optimizer": {
+                "lr": 1e-4,
+                "betas": [0.9, 0.999],
+                "weight_decay": 0.01,
+                "eps": 1e-8,
+            },
+            "scheduler": {
+                "type": "cosine",
+                "min_lr": 1e-6,
+                "warmup_steps": 0,
+                "warmup_start_lr": 1e-6,
+            },
             "gradient": {"clip_val": 1.0},
         }
     )
 
     task = LAMTask(model_config=model_config, training_config=training_config)
     batch = Stage1Batch(
-        image_streams={"primary": torch.randint(0, 255, (2, 2, 3, 32, 32), dtype=torch.uint8)},
+        image_streams={
+            "primary": torch.randint(0, 255, (2, 2, 3, 32, 32), dtype=torch.uint8)
+        },
         image_padding_masks={"primary": torch.ones((2, 2), dtype=torch.bool)},
         task_text=["pick", "place"],
         meta={"dataset_name": ["a", "b"]},
     )
 
-    moved = task.transfer_batch_to_device(batch, device=torch.device("cpu"), dataloader_idx=0)
+    moved = task.transfer_batch_to_device(
+        batch, device=torch.device("cpu"), dataloader_idx=0
+    )
 
     assert isinstance(moved, Stage1Batch)
     assert moved.image_streams["primary"].dtype == torch.float32
@@ -265,7 +306,9 @@ def test_policy_module_converts_stage2_uint8_video_for_online_lam() -> None:
             super().__init__()
             self.last_video: torch.Tensor | None = None
 
-        def codes_and_vectors_from_video(self, video: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        def codes_and_vectors_from_video(
+            self, video: torch.Tensor
+        ) -> tuple[torch.Tensor, torch.Tensor]:
             self.last_video = video
             return super().codes_and_vectors_from_video(video)
 
@@ -282,7 +325,9 @@ def test_policy_module_converts_stage2_uint8_video_for_online_lam() -> None:
     )
 
     batch = Stage2Batch(
-        image_streams={"primary": torch.randint(0, 255, (2, 2, 3, 8, 8), dtype=torch.uint8)},
+        image_streams={
+            "primary": torch.randint(0, 255, (2, 2, 3, 8, 8), dtype=torch.uint8)
+        },
         image_padding_masks={"primary": torch.ones((2, 2), dtype=torch.bool)},
         task_text=["pick", "place"],
         state=torch.tensor([[[1.0, 2.0]], [[3.0, 4.0]]], dtype=torch.float32),
@@ -303,7 +348,9 @@ def test_policy_module_resizes_online_lam_video_to_teacher_image_size() -> None:
             self.last_video: torch.Tensor | None = None
             self.image_size = (4, 4)
 
-        def codes_and_vectors_from_video(self, video: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        def codes_and_vectors_from_video(
+            self, video: torch.Tensor
+        ) -> tuple[torch.Tensor, torch.Tensor]:
             self.last_video = video
             return super().codes_and_vectors_from_video(video)
 
@@ -320,7 +367,9 @@ def test_policy_module_resizes_online_lam_video_to_teacher_image_size() -> None:
     )
 
     batch = Stage2Batch(
-        image_streams={"primary": torch.randint(0, 255, (2, 2, 3, 8, 8), dtype=torch.uint8)},
+        image_streams={
+            "primary": torch.randint(0, 255, (2, 2, 3, 8, 8), dtype=torch.uint8)
+        },
         image_padding_masks={"primary": torch.ones((2, 2), dtype=torch.bool)},
         task_text=["pick", "place"],
         state=torch.tensor([[[1.0, 2.0]], [[3.0, 4.0]]], dtype=torch.float32),
@@ -334,7 +383,9 @@ def test_policy_module_resizes_online_lam_video_to_teacher_image_size() -> None:
 
 def test_policy_module_validation_step_accepts_stage2_batch() -> None:
     class _CaptureCodeProvider(_DummyCodeProvider):
-        def codes_and_vectors_from_video(self, video: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        def codes_and_vectors_from_video(
+            self, video: torch.Tensor
+        ) -> tuple[torch.Tensor, torch.Tensor]:
             return super().codes_and_vectors_from_video(video)
 
     backend = _CaptureBackend()
@@ -349,7 +400,9 @@ def test_policy_module_validation_step_accepts_stage2_batch() -> None:
     )
 
     batch = Stage2Batch(
-        image_streams={"primary": torch.randint(0, 255, (2, 2, 3, 8, 8), dtype=torch.uint8)},
+        image_streams={
+            "primary": torch.randint(0, 255, (2, 2, 3, 8, 8), dtype=torch.uint8)
+        },
         image_padding_masks={"primary": torch.ones((2, 2), dtype=torch.bool)},
         task_text=["pick", "place"],
         state=torch.tensor([[[3.0, 3.0]], [[1.0, -1.0]]], dtype=torch.float32),
@@ -380,7 +433,9 @@ def test_policy_module_validation_step_reads_stage2_batch_metadata() -> None:
     module.__dict__["_trainer"] = SimpleNamespace(global_step=7)
 
     batch = Stage2Batch(
-        image_streams={"primary": torch.randint(0, 255, (2, 2, 3, 8, 8), dtype=torch.uint8)},
+        image_streams={
+            "primary": torch.randint(0, 255, (2, 2, 3, 8, 8), dtype=torch.uint8)
+        },
         image_padding_masks={"primary": torch.ones((2, 2), dtype=torch.bool)},
         task_text=["pick", "place"],
         state=torch.tensor([[[1.0, 2.0]], [[3.0, 4.0]]], dtype=torch.float32),
@@ -423,7 +478,9 @@ def test_policy_module_validation_step_enqueues_payload_for_all_batches() -> Non
     module.__dict__["_trainer"] = SimpleNamespace(global_step=13)
 
     batch = Stage2Batch(
-        image_streams={"primary": torch.randint(0, 255, (2, 2, 3, 8, 8), dtype=torch.uint8)},
+        image_streams={
+            "primary": torch.randint(0, 255, (2, 2, 3, 8, 8), dtype=torch.uint8)
+        },
         image_padding_masks={"primary": torch.ones((2, 2), dtype=torch.bool)},
         task_text=["pick", "place"],
         state=torch.tensor([[[1.0, 2.0]], [[3.0, 4.0]]], dtype=torch.float32),
