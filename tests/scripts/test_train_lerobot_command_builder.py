@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import importlib.util
-from pathlib import Path
 
 import pytest
 from hydra import compose, initialize_config_dir

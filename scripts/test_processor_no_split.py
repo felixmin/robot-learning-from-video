@@ -3,7 +3,6 @@
 
 import hydra
 import numpy as np
-import torch
 from omegaconf import DictConfig
 from PIL import Image
 
@@ -88,8 +87,8 @@ def main(cfg: DictConfig):
         # Try setting a smaller max size that might avoid splitting
         processor2.image_processor.max_image_size = {"longest_edge": 256}
         processor2.image_processor.do_image_splitting = False
-        print(f"  Set max_image_size = {{'longest_edge': 256}}")
-        print(f"  Set do_image_splitting = False")
+        print("  Set max_image_size = {'longest_edge': 256}")
+        print("  Set do_image_splitting = False")
 
         inputs3 = processor2(
             text=[text], images=[[img]], return_tensors="pt", padding=True
@@ -111,7 +110,7 @@ def main(cfg: DictConfig):
     import inspect
 
     sig = inspect.signature(processor.__call__)
-    print(f"  Processor __call__ parameters:")
+    print("  Processor __call__ parameters:")
     for name, param in sig.parameters.items():
         if param.default is not inspect.Parameter.empty:
             print(f"    {name}: default={param.default}")

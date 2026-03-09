@@ -352,10 +352,6 @@ class PolicyLightningModule(pl.LightningModule):
         pred_vector = latent.vector
         pred_actions = latent.actions
 
-        vector_stats: dict[str, float] | None = None
-        action_stats: dict[str, float] | None = None
-        dataset_mix: dict[str, int] | None = None
-
         meta = latent.meta if isinstance(latent.meta, dict) else {}
         gen_debug = (
             meta.get("parse_debug")
@@ -394,7 +390,7 @@ class PolicyLightningModule(pl.LightningModule):
                         prog_bar=True,
                         sync_dist=True,
                     )
-                    vector_stats = self._log_vector_stats(
+                    self._log_vector_stats(
                         prefix="val/latent_vector_stats", pred=pred_vector, gt=gt_vec
                     )
 
@@ -410,7 +406,7 @@ class PolicyLightningModule(pl.LightningModule):
                         prog_bar=True,
                         sync_dist=True,
                     )
-                    action_stats = self._log_vector_stats(
+                    self._log_vector_stats(
                         prefix="val/action_stats", pred=pred_actions, gt=gt_actions
                     )
 
@@ -474,7 +470,6 @@ class PolicyLightningModule(pl.LightningModule):
                 )
                 total = float(len(dataset_names))
                 top = counts.most_common(8)
-                dataset_mix = {name: int(count) for name, count in top}
                 self.log(
                     "val/dataset_mix_unique",
                     float(len(counts)),

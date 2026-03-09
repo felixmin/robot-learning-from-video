@@ -4,7 +4,7 @@ Unified filter logic for matching metadata against filter conditions.
 Used by both data loading (SceneFilter) and validation (bucket filtering).
 """
 
-from typing import Any, Callable, Dict, Union
+from typing import Any, Callable, Dict
 
 
 def matches_filters(

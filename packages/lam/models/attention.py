@@ -148,7 +148,7 @@ class Attention(nn.Module):
         self.to_out = nn.Linear(inner_dim, dim, bias=False)
 
     def forward(self, x, mask=None, context=None, attn_bias=None):
-        batch, device, dtype = x.shape[0], x.device, x.dtype
+        batch, device = x.shape[0], x.device
 
         if exists(context):
             context = self.context_norm(context)

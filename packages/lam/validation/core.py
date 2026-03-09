@@ -17,9 +17,9 @@ import lightning.pytorch as pl
 from common.filters import matches_filters
 
 try:
-    import wandb
+    import importlib.util
 
-    WANDB_AVAILABLE = True
+    WANDB_AVAILABLE = importlib.util.find_spec("wandb") is not None
 except ImportError:
     WANDB_AVAILABLE = False
 

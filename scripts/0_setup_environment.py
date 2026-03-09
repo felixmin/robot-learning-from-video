@@ -1,10 +1,6 @@
 #!/usr/bin/env python3
-"""
-Script 0: Environment Setup and Validation
-
-Verifies that all dependencies are installed correctly and the environment is ready.
-Run this first before starting any training.
-"""
+# ruff: noqa: E402
+"""Environment setup and validation for the current HLRP repository."""
 
 import sys
 from pathlib import Path
@@ -13,8 +9,6 @@ from pathlib import Path
 workspace_root = Path(__file__).parent.parent
 sys.path.insert(0, str(workspace_root / "packages"))
 
-import hydra
-from omegaconf import DictConfig, OmegaConf
 from rich.console import Console
 from rich.table import Table
 
@@ -64,11 +58,9 @@ def check_cuda():
 
     import torch
 
-    gpu_available = False
-
     # Check CUDA (NVIDIA GPUs on Linux/Windows)
     if torch.cuda.is_available():
-        console.print(f"[green]✓ CUDA is available[/green]")
+        console.print("[green]✓ CUDA is available[/green]")
         console.print(f"  CUDA version: {torch.version.cuda}")
         console.print(f"  Number of GPUs: {torch.cuda.device_count()}")
         for i in range(torch.cuda.device_count()):
@@ -76,20 +68,17 @@ def check_cuda():
             console.print(
                 f"  GPU {i}: {props.name} ({props.total_memory / 1e9:.2f} GB)"
             )
-        gpu_available = True
-
     # Check MPS (Apple Silicon on macOS)
     elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
-        console.print(f"[green]✓ MPS (Apple Silicon) is available[/green]")
-        console.print(f"  Device: Apple Silicon GPU")
-        console.print(f"  Note: Training will use Metal Performance Shaders")
-        gpu_available = True
+        console.print("[green]✓ MPS (Apple Silicon) is available[/green]")
+        console.print("  Device: Apple Silicon GPU")
+        console.print("  Note: Training will use Metal Performance Shaders")
 
     else:
         console.print("[yellow]⚠ No GPU available (CPU only)[/yellow]")
         console.print("  Training will be slow on CPU")
 
-    return gpu_available
+    return True
 
 
 def check_hydra_config():
@@ -99,15 +88,17 @@ def check_hydra_config():
     from hydra import compose, initialize_config_dir
 
     config_dir = workspace_root / "config"
+    experiments = ["stage1_local", "stage2_local", "stage3_local"]
 
     try:
         with initialize_config_dir(version_base=None, config_dir=str(config_dir)):
-            cfg = compose(config_name="config", overrides=["experiment=lam_debug"])
-            console.print("[green]✓ Hydra configuration is valid[/green]")
-            console.print(f"  Experiment: {cfg.experiment.name}")
-            console.print(f"  Data batch size: {cfg.data.loader.batch_size}")
-            console.print(f"  Training epochs: {cfg.training.epochs}")
-            return True
+            for experiment in experiments:
+                cfg = compose(
+                    config_name="config",
+                    overrides=[f"experiment={experiment}"],
+                )
+                console.print(f"[green]✓ Loaded {cfg.experiment.name}[/green]")
+        return True
     except Exception as e:
         console.print(f"[red]✗ Hydra configuration error: {e}[/red]")
         return False
@@ -121,15 +112,14 @@ def check_directories():
         "packages/common",
         "packages/lam",
         "packages/stage2",
-        "packages/low_level",
         "config/experiment",
         "config/model",
         "config/data",
         "config/training",
         "config/cluster",
         "scripts",
-        "slurm",
         "containers",
+        "tests",
     ]
 
     all_ok = True
@@ -146,7 +136,7 @@ def check_directories():
 
 def main():
     """Run all checks."""
-    console.print("[bold magenta]LAPA Environment Setup and Validation[/bold magenta]")
+    console.print("[bold magenta]HLRP Environment Setup and Validation[/bold magenta]")
     console.print(f"Workspace: {workspace_root}")
 
     checks = [

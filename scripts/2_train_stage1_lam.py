@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# ruff: noqa: E402
 """
 Script 2: Train Stage-1 LAM (Latent Action Model)
 
@@ -29,7 +30,6 @@ import lightning.pytorch as pl
 from lightning.pytorch.callbacks import (
     ModelCheckpoint,
     LearningRateMonitor,
-    Callback,
     TQDMProgressBar,
 )
 from lightning.fabric.plugins.io.torch_io import TorchCheckpointIO
@@ -141,7 +141,7 @@ def main(cfg: DictConfig):
     )
 
     num_params = count_parameters(task.model)
-    logger.info(f"✓ Stage-1 LAM model initialized")
+    logger.info("✓ Stage-1 LAM model initialized")
     logger.info(f"  - Total parameters: {num_params:,}")
     logger.info(f"  - Codebook size: {model_config.codebook_size}")
     logger.info(f"  - Code sequence length: {model_config.code_seq_len}")
@@ -362,12 +362,12 @@ def main(cfg: DictConfig):
             from lightning.pytorch.profilers import SimpleProfiler
 
             profiler = SimpleProfiler(dirpath=dirpath, filename=filename)
-            logger.info(f"✓ SimpleProfiler enabled")
+            logger.info("✓ SimpleProfiler enabled")
         elif profiler_type == "advanced":
             from lightning.pytorch.profilers import AdvancedProfiler
 
             profiler = AdvancedProfiler(dirpath=dirpath, filename=filename)
-            logger.info(f"✓ AdvancedProfiler enabled")
+            logger.info("✓ AdvancedProfiler enabled")
         elif profiler_type == "pytorch":
             from lightning.pytorch.profilers import PyTorchProfiler
 
@@ -378,7 +378,7 @@ def main(cfg: DictConfig):
                 export_to_chrome=True,
                 row_limit=20,
             )
-            logger.info(f"✓ PyTorchProfiler enabled (high overhead!)")
+            logger.info("✓ PyTorchProfiler enabled (high overhead!)")
         logger.info(f"  - Output: {dirpath}/{filename}")
     else:
         logger.info("✓ Profiler disabled")
@@ -425,14 +425,14 @@ def main(cfg: DictConfig):
         enable_model_summary=bool(model_summary_cfg.enabled),
     )
 
-    logger.info(f"✓ Trainer initialized")
+    logger.info("✓ Trainer initialized")
     logger.info(f"  - Max epochs: {training_config.epochs}")
     logger.info(f"  - Val check interval: {val_check_interval}")
     logger.info(f"  - Limit val batches: {limit_val_batches}")
     logger.info(f"  - Check val every n epoch: {check_val_every_n_epoch}")
     logger.info(f"  - Precision: {cfg.precision}")
-    logger.info(f"  - Accelerator: auto")
-    logger.info(f"  - Devices: auto")
+    logger.info("  - Accelerator: auto")
+    logger.info("  - Devices: auto")
     logger.info(f"  - Profiler: {profiler_type if profiler else 'disabled'}")
 
     # Train

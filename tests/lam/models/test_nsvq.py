@@ -84,7 +84,7 @@ def test_nsvq_forward_training(nsvq_module, nsvq_config):
     # Check perplexity is positive
     assert perplexity.item() > 0
 
-    print(f"✓ Forward pass successful")
+    print("✓ Forward pass successful")
     print(f"  - Quantized shape: {quantized.shape}")
     print(f"  - Indices: {indices[0].tolist()}")
     print(f"  - Perplexity: {perplexity.item():.4f}")
@@ -117,7 +117,7 @@ def test_nsvq_inference_mode(nsvq_module, nsvq_config):
     # Check indices are discrete
     assert indices.dtype == torch.long
 
-    print(f"✓ Inference mode successful")
+    print("✓ Inference mode successful")
     print(f"  - Indices: {indices[0].tolist()}")
 
 
@@ -154,7 +154,7 @@ def test_nsvq_gradient_flow(nsvq_module, nsvq_config):
     assert input_first.grad.abs().mean() > 1e-6, "Gradient too small"
     assert nsvq_module.codebooks.grad.abs().mean() > 1e-6, "Codebook gradient too small"
 
-    print(f"✓ Gradient flow verified")
+    print("✓ Gradient flow verified")
     print(f"  - Input grad mean: {input_first.grad.abs().mean():.6f}")
     print(f"  - Codebook grad mean: {nsvq_module.codebooks.grad.abs().mean():.6f}")
 
@@ -187,7 +187,7 @@ def test_nsvq_codebook_usage(nsvq_module, nsvq_config):
     num_used_codes = (nsvq_module.codebooks_used > 0).sum().item()
     assert num_used_codes > 0, "At least one codebook entry should be used"
 
-    print(f"✓ Codebook usage tracking works")
+    print("✓ Codebook usage tracking works")
     print(f"  - Total uses: {total_usage}")
     print(f"  - Unique codes used: {num_used_codes}/{nsvq_config['num_embeddings']}")
     print(f"  - Usage distribution: {nsvq_module.codebooks_used.tolist()}")
@@ -225,8 +225,6 @@ def test_nsvq_different_code_seq_lengths(device):
 
 def test_nsvq_replace_unused_codebooks(nsvq_module, nsvq_config):
     """Test codebook replacement mechanism."""
-    device = nsvq_config["device"]
-
     # Manually set some codebooks as unused
     nsvq_module.codebooks_used[0] = 100  # Used
     nsvq_module.codebooks_used[1] = 0  # Unused
@@ -245,7 +243,7 @@ def test_nsvq_replace_unused_codebooks(nsvq_module, nsvq_config):
     # Check counters reset
     assert nsvq_module.codebooks_used.sum() == 0
 
-    print(f"✓ Codebook replacement works")
+    print("✓ Codebook replacement works")
 
 
 def test_nsvq_get_indices_no_counter_update(nsvq_module, nsvq_config):

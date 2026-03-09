@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# ruff: noqa: E402
 """
 Script 7: Stage-3 LeRobot rollout/evaluation entrypoint.
 

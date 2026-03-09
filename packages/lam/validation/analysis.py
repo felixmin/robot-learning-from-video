@@ -3,7 +3,7 @@ Analysis strategies for LAM validation (latent space, clustering, histograms).
 """
 
 from collections import Counter
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 import io
 
 import torch
@@ -111,8 +111,6 @@ class LatentTransferStrategy(ValidationStrategy):
 
             # Get ground truth
             target_s1_true = target_frames[:, :, 1]  # s_b' (true)
-            source_s1_true = source_frames[:, :, 1]  # s_a' (true)
-
             # Compute transfer error (pred vs true target)
             transfer_mse = F.mse_loss(transferred_recons, target_s1_true)
 
@@ -488,7 +486,7 @@ class LatentSequenceHistogramStrategy(ValidationStrategy):
 
             labels, values = zip(*most_common)
             # Convert tuple labels to strings "1-2-3-4"
-            str_labels = ["-".join(map(str, l)) for l in labels]
+            str_labels = ["-".join(map(str, label)) for label in labels]
 
             fig, ax = plt.subplots(figsize=(12, 6))
 
@@ -733,7 +731,6 @@ class CodebookEmbeddingStrategy(ValidationStrategy):
 
     def _reduce_dimensions(self, codebook, embedding_dim):
         """Apply t-SNE (or UMAP) with optional PCA preprocessing."""
-        import numpy as np
 
         n_samples = len(codebook)
 

@@ -36,7 +36,7 @@ def main(cfg: DictConfig):
     # Check pixel_values range and characteristics
     if "pixel_values" in inputs:
         pv = inputs["pixel_values"]
-        print(f"\npixel_values stats:")
+        print("\npixel_values stats:")
         print(f"  min: {pv.min().item():.4f}")
         print(f"  max: {pv.max().item():.4f}")
         print(f"  mean: {pv.mean().item():.4f}")
@@ -85,7 +85,7 @@ def main(cfg: DictConfig):
     # Normalize to [-1, 1] (SigLIP style)
     normalized = padded * 2.0 - 1.0
 
-    print(f"\nGPU preprocessed stats:")
+    print("\nGPU preprocessed stats:")
     print(f"  shape: {normalized.shape}")
     print(f"  min: {normalized.min().item():.4f}")
     print(f"  max: {normalized.max().item():.4f}")

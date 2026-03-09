@@ -39,7 +39,6 @@ def create_datamodule(cfg_data: Any):
     data = _to_dict(cfg_data)
 
     backend = data["backend"]
-    preprocess = data["preprocess"]
     loader = data["loader"]
     dataset = data["dataset"]
 

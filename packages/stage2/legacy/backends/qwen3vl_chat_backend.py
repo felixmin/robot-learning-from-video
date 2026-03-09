@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Callable, List, Sequence
+from typing import Any, Callable, List
 
 import torch
 

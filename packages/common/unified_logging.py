@@ -201,7 +201,7 @@ def setup_unified_logging(
         except (OSError, PermissionError) as e:
             print(f"WARNING: Failed to create log file handler: {e}")
             print(f"  - Attempted to write to: {log_file}")
-            print(f"  - Logging will continue to console only")
+            print("  - Logging will continue to console only")
 
         # Install excepthook to capture uncaught exceptions in log file
         sys.excepthook = _make_excepthook(sys.excepthook)

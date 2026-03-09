@@ -117,7 +117,9 @@ def test_rollout_command_inherits_saved_train_env_overrides(tmp_path) -> None:
     assert "--env.control_mode=relative" in cmd
 
 
-def test_rollout_command_prefers_explicit_env_extra_args_over_inherited(tmp_path) -> None:
+def test_rollout_command_prefers_explicit_env_extra_args_over_inherited(
+    tmp_path,
+) -> None:
     mod = _load_script_module("7_rollout_lerobot.py", "stage3_rollout_script")
     policy_dir = tmp_path / "pretrained_model"
     policy_dir.mkdir()

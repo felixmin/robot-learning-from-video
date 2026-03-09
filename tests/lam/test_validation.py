@@ -5,7 +5,7 @@ Tests for LAM validation strategies.
 import logging
 import pytest
 import torch
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from common.lerobot_v3_types import Stage1Batch
 from lam.validation import (
@@ -19,7 +19,6 @@ from lam.validation import (
     SequenceExamplesStrategy,
     create_validation_strategies,
     prune_metadata,
-    ESSENTIAL_METADATA_KEYS,
     STRATEGY_REGISTRY,
 )
 from lam.callbacks import ValidationStrategyCallback, TrainPreviewBufferCallback

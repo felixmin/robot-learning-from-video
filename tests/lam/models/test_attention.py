@@ -66,7 +66,7 @@ class TestLayerNorm:
         assert output.mean(dim=-1).abs().max() < 0.1
         assert (output.std(dim=-1) - 1.0).abs().max() < 0.1
 
-        print(f"✓ LayerNorm forward pass successful")
+        print("✓ LayerNorm forward pass successful")
         print(f"  - Mean: {output.mean(dim=-1).abs().max():.6f}")
         print(f"  - Std: {output.std(dim=-1).mean():.6f}")
 
@@ -92,7 +92,7 @@ class TestFeedForward:
 
         assert output.shape == x.shape
 
-        print(f"✓ FeedForward forward pass successful")
+        print("✓ FeedForward forward pass successful")
 
 
 class TestPEG:
@@ -104,7 +104,7 @@ class TestPEG:
         peg = PEG(dim, causal=False)
 
         assert hasattr(peg, "dsconv")
-        assert peg.causal == False
+        assert not peg.causal
 
     def test_peg_forward_with_shape(self, device):
         """Test PEG forward pass with explicit shape."""
@@ -118,7 +118,7 @@ class TestPEG:
 
         assert output.shape == x.shape
 
-        print(f"✓ PEG forward pass successful")
+        print("✓ PEG forward pass successful")
 
     def test_peg_causal_mode(self, device):
         """Test PEG in causal mode."""
@@ -130,7 +130,7 @@ class TestPEG:
 
         assert output.shape == x.shape
 
-        print(f"✓ PEG causal mode works")
+        print("✓ PEG causal mode works")
 
 
 class TestContinuousPositionBias:
@@ -157,7 +157,7 @@ class TestContinuousPositionBias:
         # Expected shape: [heads, height*width, height*width]
         assert bias.shape == (heads, height * width, height * width)
 
-        print(f"✓ ContinuousPositionBias forward pass successful")
+        print("✓ ContinuousPositionBias forward pass successful")
         print(f"  - Output shape: {bias.shape}")
 
 
@@ -184,7 +184,7 @@ class TestAttention:
 
         assert output.shape == x.shape
 
-        print(f"✓ Self-attention forward pass successful")
+        print("✓ Self-attention forward pass successful")
 
     def test_attention_cross_attention(self, device):
         """Test cross-attention forward pass."""
@@ -199,7 +199,7 @@ class TestAttention:
 
         assert output.shape == x.shape
 
-        print(f"✓ Cross-attention forward pass successful")
+        print("✓ Cross-attention forward pass successful")
 
     def test_attention_with_bias(self, attention_config, device):
         """Test attention with positional bias."""
@@ -214,7 +214,7 @@ class TestAttention:
 
         assert output.shape == x.shape
 
-        print(f"✓ Attention with bias successful")
+        print("✓ Attention with bias successful")
 
     def test_attention_gradient_flow(self, attention_config, device):
         """Test gradients flow through attention."""
@@ -237,7 +237,7 @@ class TestAttention:
         assert x.grad is not None
         assert x.grad.abs().mean() > 1e-6
 
-        print(f"✓ Attention gradient flow verified")
+        print("✓ Attention gradient flow verified")
 
 
 class TestTransformer:
@@ -261,7 +261,7 @@ class TestTransformer:
 
         assert output.shape == x.shape
 
-        print(f"✓ Transformer forward pass successful")
+        print("✓ Transformer forward pass successful")
 
     def test_transformer_with_position_bias(self, transformer_config, device):
         """Test Transformer with continuous position bias."""
@@ -276,7 +276,7 @@ class TestTransformer:
 
         assert output.shape == x.shape
 
-        print(f"✓ Transformer with position bias successful")
+        print("✓ Transformer with position bias successful")
 
     def test_transformer_with_peg(self, device):
         """Test Transformer with PEG (position encoding generator)."""
@@ -300,7 +300,7 @@ class TestTransformer:
 
         assert output.shape == x.shape
 
-        print(f"✓ Transformer with PEG successful")
+        print("✓ Transformer with PEG successful")
 
     def test_transformer_cross_attention(self, device):
         """Test Transformer with cross-attention."""
@@ -323,7 +323,7 @@ class TestTransformer:
 
         assert output.shape == x.shape
 
-        print(f"✓ Transformer with cross-attention successful")
+        print("✓ Transformer with cross-attention successful")
 
     def test_transformer_gradient_flow(self, transformer_config, device):
         """Test gradients flow through full transformer."""
@@ -353,7 +353,7 @@ class TestTransformer:
         # Deep transformers can have very small gradients (vanishing gradient)
         assert x.grad.abs().mean() > 1e-10
 
-        print(f"✓ Transformer gradient flow verified")
+        print("✓ Transformer gradient flow verified")
         print(f"  - Gradient mean: {x.grad.abs().mean():.10f}")
 
 

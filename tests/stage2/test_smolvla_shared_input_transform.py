@@ -34,10 +34,10 @@ class _FakeTokenizer:
         assert padding in {"longest", "max_length"}
         self.last_texts = [str(x) for x in texts]
         b = len(texts)
-        l = min(8, max_length)
+        seq_len = min(8, max_length)
         return {
-            "input_ids": torch.ones((b, l), dtype=torch.long),
-            "attention_mask": torch.ones((b, l), dtype=torch.long),
+            "input_ids": torch.ones((b, seq_len), dtype=torch.long),
+            "attention_mask": torch.ones((b, seq_len), dtype=torch.long),
         }
 
 

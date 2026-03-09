@@ -3,7 +3,6 @@
 
 import logging
 import torch
-import torch.distributions.normal as normal_dist
 import torch.distributions.uniform as uniform_dist
 
 logger = logging.getLogger(__name__)

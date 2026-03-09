@@ -4,7 +4,6 @@ from pathlib import Path
 from typing import Any
 
 from hydra.core.hydra_config import HydraConfig
-from omegaconf import OmegaConf
 
 from common.cache_env import configure_cache_env, resolve_cache_dir
 from common.unified_logging import resolve_runs_dir, setup_unified_logging

@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from types import SimpleNamespace
-from typing import Any, List
+from typing import List
 
 import torch
 
@@ -45,9 +44,9 @@ class FakeProcessor:
         max_len = max(lengths)
         input_ids = torch.zeros((b, max_len), dtype=torch.long)
         attention_mask = torch.zeros_like(input_ids)
-        for i, l in enumerate(lengths):
-            input_ids[i, :l] = torch.arange(1, l + 1, dtype=torch.long)
-            attention_mask[i, :l] = 1
+        for i, seq_len in enumerate(lengths):
+            input_ids[i, :seq_len] = torch.arange(1, seq_len + 1, dtype=torch.long)
+            attention_mask[i, :seq_len] = 1
         pixel_values = torch.zeros((b, 3, 8, 8), dtype=torch.float32)
         return {
             "input_ids": input_ids,
@@ -74,8 +73,12 @@ class DummyVLM(torch.nn.Module):
     ):
         assert output_hidden_states is True
         assert return_dict is True
-        b, l = input_ids.shape
-        x = torch.ones((b, l, 1), dtype=torch.float32, device=input_ids.device)
+        batch_size, seq_len = input_ids.shape
+        x = torch.ones(
+            (batch_size, seq_len, 1),
+            dtype=torch.float32,
+            device=input_ids.device,
+        )
         last = self.proj(x)
         # mimic HF: tuple of hidden states, last at [-1]
         return SimpleNamespace(hidden_states=(last,))

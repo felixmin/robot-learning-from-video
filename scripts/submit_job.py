@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# ruff: noqa: E402
 """
 Submit training jobs to Slurm by generating sbatch scripts.
 
@@ -341,7 +342,7 @@ def main():
         print(f"\nScript: {script}.py")
         print(f"Experiment: {cfg.experiment.name}")
         print(f"Description: {cfg.experiment.description}")
-        print(f"\nPaths:")
+        print("\nPaths:")
         print(f"  Runs dir: {runs_dir}")
         print(f"  Cache dir: {cache_dir}")
         if pre_commands:
@@ -536,11 +537,11 @@ def main():
 
     if is_sweep:
         print(f"\n🔄 SWEEP MODE: {len(sweep_combinations)} jobs")
-        print(f"  Sweep parameters:")
+        print("  Sweep parameters:")
         for param, values in sweep_params.items():
             print(f"    {param}: {values}")
 
-    print(f"\nSlurm settings:")
+    print("\nSlurm settings:")
     print(f"  Partition: {partition}")
     if qos:
         print(f"  QoS: {qos}")

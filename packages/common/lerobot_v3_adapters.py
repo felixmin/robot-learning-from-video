@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import torch
 
 from common.lerobot_v3_types import BatchedDatasetSample, Stage1Batch
 from stage2.backends.interfaces import Stage2Batch

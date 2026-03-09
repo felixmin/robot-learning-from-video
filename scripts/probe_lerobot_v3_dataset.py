@@ -13,7 +13,6 @@ import argparse
 import hashlib
 import json
 import pickle
-import shutil
 import sys
 import tarfile
 from pathlib import Path

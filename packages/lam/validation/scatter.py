@@ -365,7 +365,12 @@ class ActionSequenceScatterStrategy(MetadataScatterStrategy):
         wandb_logger = self._get_wandb_logger(trainer)
         if wandb_logger is not None:
             self._create_sequence_scatter(
-                actions, seq_ids, wandb_logger, trainer.global_step, num_unique_seqs
+                actions,
+                seq_ids,
+                wandb_logger,
+                trainer.global_step,
+                num_unique_seqs,
+                metric_suffix,
             )
 
         return self.success(produced=int(len(actions)))
@@ -377,6 +382,7 @@ class ActionSequenceScatterStrategy(MetadataScatterStrategy):
         wandb_logger,
         global_step: int,
         num_unique: int,
+        metric_suffix: str = "",
     ):
         """Create scatter plot colored by sequence ID."""
         try:
@@ -504,7 +510,6 @@ class TopSequencesScatterStrategy(MetadataScatterStrategy):
         # Find top N sequences
         counter = Counter(sequences)
         top_seqs_counts = counter.most_common(self.num_top_sequences)
-        top_seqs = {seq for seq, _ in top_seqs_counts}
         seq_to_cat = {seq: i for i, (seq, _) in enumerate(top_seqs_counts)}
 
         # Map to categories: 0..N-1 for top, -1 for others
@@ -519,7 +524,12 @@ class TopSequencesScatterStrategy(MetadataScatterStrategy):
         wandb_logger = self._get_wandb_logger(trainer)
         if wandb_logger is not None:
             self._create_top_scatter(
-                actions, categories, top_seqs_counts, wandb_logger, trainer.global_step
+                actions,
+                categories,
+                top_seqs_counts,
+                wandb_logger,
+                trainer.global_step,
+                metric_suffix,
             )
 
         return self.success(produced=int(len(actions)))
@@ -531,6 +541,7 @@ class TopSequencesScatterStrategy(MetadataScatterStrategy):
         top_seqs_counts: List[Tuple[Tuple[int, ...], int]],
         wandb_logger,
         global_step: int,
+        metric_suffix: str = "",
     ):
         """Create scatter plot with top sequences highlighted."""
         try:
@@ -666,7 +677,12 @@ class StateSequenceScatterStrategy(MetadataScatterStrategy):
         wandb_logger = self._get_wandb_logger(trainer)
         if wandb_logger is not None:
             self._create_state_scatter(
-                states, categories, top_seqs_counts, wandb_logger, trainer.global_step
+                states,
+                categories,
+                top_seqs_counts,
+                wandb_logger,
+                trainer.global_step,
+                metric_suffix,
             )
 
         return self.success(produced=int(len(states)))
@@ -678,6 +694,7 @@ class StateSequenceScatterStrategy(MetadataScatterStrategy):
         top_seqs_counts: List[Tuple[Tuple[int, ...], int]],
         wandb_logger,
         global_step: int,
+        metric_suffix: str = "",
     ):
         """Create scatter plot."""
         try:

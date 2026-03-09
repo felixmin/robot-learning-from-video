@@ -7,7 +7,9 @@ import pytest
 from lerobot_policy_hlrp.policies.hlrp_smolvla_shared import checkpoint_stats
 
 
-def test_require_saved_normalization_stats_raises_for_scratch_when_missing(tmp_path) -> None:
+def test_require_saved_normalization_stats_raises_for_scratch_when_missing(
+    tmp_path,
+) -> None:
     with pytest.raises(RuntimeError, match="missing hlrp_normalization_stats.json"):
         checkpoint_stats.require_saved_normalization_stats(
             tmp_path,
@@ -54,7 +56,9 @@ def test_write_normalization_stats_from_train_config_rebuilds_sidecar(
     }
 
     class _FakeDatasetMetadata:
-        def __init__(self, repo_id: str, root: str | None = None, revision: str | None = None):
+        def __init__(
+            self, repo_id: str, root: str | None = None, revision: str | None = None
+        ):
             assert repo_id == "HuggingFaceVLA/libero"
             assert root == str(tmp_path / "dataset_root")
             assert revision == "v3.0"

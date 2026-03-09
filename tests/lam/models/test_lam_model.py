@@ -65,7 +65,7 @@ class TestLAMInitialization:
         assert hasattr(lam_model, "aux_decoder")
         assert hasattr(lam_model, "aux_to_pixels")
 
-        print(f"✓ LAM model initialized successfully")
+        print("✓ LAM model initialized successfully")
 
     def test_lam_components(self, lam_model, lam_model_config):
         """Test LAM model components are correct types."""
@@ -78,7 +78,7 @@ class TestLAMInitialization:
         assert isinstance(lam_model.dino_decoder, Transformer)
         assert isinstance(lam_model.vq, NSVQ)
 
-        print(f"✓ LAM components verified")
+        print("✓ LAM components verified")
 
 
 class TestLAMForward:
@@ -100,7 +100,7 @@ class TestLAMForward:
         assert "unique_codes_in_batch" in metrics
         assert metrics["unique_codes_in_batch"] > 0
 
-        print(f"✓ Forward pass successful")
+        print("✓ Forward pass successful")
         print(f"  - Loss: {loss.item():.6f}")
         print(f"  - Unique codes used: {metrics['unique_codes_in_batch']}")
 
@@ -115,7 +115,7 @@ class TestLAMForward:
         # Check shape: should be [B, C, H, W] (single frame reconstruction)
         assert recon.shape == (batch_size, 3, 256, 256)
 
-        print(f"✓ Reconstruction-only mode works")
+        print("✓ Reconstruction-only mode works")
         print(f"  - Reconstruction shape: {recon.shape}")
 
     def test_forward_returns_codebook_ids(self, lam_model, device):
@@ -132,7 +132,7 @@ class TestLAMForward:
         assert indices.min() >= 0
         assert indices.max() < 8  # codebook_size
 
-        print(f"✓ Codebook IDs extraction works")
+        print("✓ Codebook IDs extraction works")
         print(f"  - Indices shape: {indices.shape}")
         print(f"  - Sample indices: {indices[0].tolist()}")
 
@@ -151,7 +151,7 @@ class TestLAMInference:
         # Check reconstruction shape
         assert recon.shape == (batch_size, 3, 256, 256)
 
-        print(f"✓ Inference mode works")
+        print("✓ Inference mode works")
 
     def test_inference_with_codebook_ids(self, lam_model, device):
         """Test inference returns codebook IDs."""
@@ -164,7 +164,7 @@ class TestLAMInference:
         assert indices.shape == (batch_size, 4)
         assert indices.dtype == torch.long
 
-        print(f"✓ Inference codebook extraction works")
+        print("✓ Inference codebook extraction works")
 
 
 class TestLAMGradients:
@@ -197,7 +197,7 @@ class TestLAMGradients:
             grad_params / total_params > 0.8
         ), f"Only {grad_params}/{total_params} params have gradients"
 
-        print(f"✓ Gradients flow through full model")
+        print("✓ Gradients flow through full model")
         print(f"  - Input gradient mean: {video.grad.abs().mean():.8f}")
         print(f"  - Params with gradients: {grad_params}/{total_params}")
 
@@ -228,7 +228,7 @@ class TestLAMShapes:
         loss, metrics = lam_model(video, step=0)
 
         assert loss.item() >= 0
-        print(f"✓ Video input (2 frames) works")
+        print("✓ Video input (2 frames) works")
 
 
 class TestLAMCodebookManagement:
@@ -250,7 +250,7 @@ class TestLAMCodebookManagement:
         assert total_usage > 0, "Codebook should be used"
 
         used_codes = (codebook_used > 0).sum().item()
-        print(f"✓ Codebook tracking works")
+        print("✓ Codebook tracking works")
         print(f"  - Total uses: {total_usage}")
         print(f"  - Unique codes used: {used_codes}/8")
 
@@ -262,7 +262,7 @@ class TestLAMCodebookManagement:
         # This should print "update codebook 10"
         loss, metrics = lam_model(video, step=10)
 
-        print(f"✓ Codebook replacement triggered at step 10")
+        print("✓ Codebook replacement triggered at step 10")
 
     def test_vq_discarding_threshold_schedule(self, lam_model_config, device):
         """Test step-based replacement threshold schedule."""
@@ -340,7 +340,7 @@ class TestLAMStateDict:
             assert name1 == name2
             assert torch.allclose(param1, param2)
 
-        print(f"✓ Model load from checkpoint works")
+        print("✓ Model load from checkpoint works")
 
 
 class TestLAMPatchProperties:
