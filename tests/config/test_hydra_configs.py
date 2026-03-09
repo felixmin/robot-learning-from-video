@@ -1,15 +1,14 @@
 """Tests for Hydra configuration composition."""
 
-from pathlib import Path
-
 import pytest
 from hydra import compose, initialize_config_dir
 from omegaconf import OmegaConf
+from tests.helpers.paths import CONFIG_DIR
 
 
 @pytest.fixture
 def config_dir():
-    return str(Path(__file__).parent.parent / "config")
+    return str(CONFIG_DIR)
 
 
 class TestExperimentConfigs:

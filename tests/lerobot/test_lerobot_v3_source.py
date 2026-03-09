@@ -6,7 +6,7 @@ import torch
 
 from common.lerobot_v3_source import LeRobotSingleSource
 
-from tests.common.lerobot_v3_fixtures import make_test_meta, make_test_request
+from tests.helpers.lerobot_v3_fixtures import make_test_meta, make_test_request
 
 
 class _FakeLeRobotDataset:

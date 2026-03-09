@@ -7,7 +7,7 @@ from lerobot.datasets.compute_stats import aggregate_stats
 
 from common.lerobot_v3_stats import build_run_normalization_stats, merge_weighted_stats
 
-from tests.common.lerobot_v3_fixtures import make_test_source_stats
+from tests.helpers.lerobot_v3_fixtures import make_test_source_stats
 
 
 def test_merge_weighted_stats_returns_single_source_stats_unchanged() -> None:

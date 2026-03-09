@@ -10,7 +10,7 @@ from common.lerobot_v3_sampler import (
 )
 from common.lerobot_v3_source import compile_source_index
 
-from tests.common.lerobot_v3_fixtures import make_test_meta, make_test_request
+from tests.helpers.lerobot_v3_fixtures import make_test_meta, make_test_request
 
 
 def _build_source(*, start: int, lengths: list[int], request=None):

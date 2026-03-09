@@ -5,13 +5,14 @@ from pathlib import Path
 
 import pytest
 from hydra import compose, initialize_config_dir
+from tests.helpers.paths import CONFIG_DIR, script_path
 
 
 def _load_stage3_script_module():
-    script_path = Path(__file__).resolve().parents[1] / "scripts" / "6_train_lerobot.py"
-    spec = importlib.util.spec_from_file_location("stage3_train_script", script_path)
+    path = script_path("6_train_lerobot.py")
+    spec = importlib.util.spec_from_file_location("stage3_train_script", path)
     if spec is None or spec.loader is None:
-        raise RuntimeError(f"Failed to load script module from {script_path}")
+        raise RuntimeError(f"Failed to load script module from {path}")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -19,7 +20,7 @@ def _load_stage3_script_module():
 
 @pytest.fixture
 def config_dir() -> str:
-    return str(Path(__file__).resolve().parents[1] / "config")
+    return str(CONFIG_DIR)
 
 
 def test_command_builder_artifact_mode_includes_stage2_artifact(

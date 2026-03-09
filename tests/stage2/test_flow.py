@@ -15,6 +15,7 @@ from lam.models.flow import (
     compute_flow_summary_loss,
     compute_weighted_mean_flow,
 )
+from tests.helpers.paths import CONFIG_DIR
 
 
 class TestFlowConfig:
@@ -510,9 +511,7 @@ class TestHydraConfigWithFlow:
     @pytest.fixture
     def config_dir(self):
         """Get path to config directory."""
-        from pathlib import Path
-
-        return str(Path(__file__).parent.parent / "config")
+        return str(CONFIG_DIR)
 
     def test_stage1_local_loads(self, config_dir):
         """Test that stage1_local config loads correctly."""

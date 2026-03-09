@@ -4,7 +4,7 @@ import pytest
 
 from common.lerobot_v3_source import resolve_request_to_delta_timestamps
 
-from tests.common.lerobot_v3_fixtures import make_test_request
+from tests.helpers.lerobot_v3_fixtures import make_test_request
 
 
 def test_resolve_request_to_delta_timestamps_maps_camera_roles() -> None:

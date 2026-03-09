@@ -4,7 +4,7 @@ import numpy as np
 
 from common.lerobot_v3_source import compile_source_index
 
-from tests.common.lerobot_v3_fixtures import make_test_meta, make_test_request
+from tests.helpers.lerobot_v3_fixtures import make_test_meta, make_test_request
 
 
 def test_compile_source_index_computes_valid_anchor_ranges_for_strict_pair_request() -> (
