@@ -1,0 +1,7 @@
+interface:
+  display_name: "Planning"
+  short_description: "Create or refine a dated plan with reviewer passes."
+  default_prompt: "Use $planning to create or refine a dated canonical plan in docs/plan for this change."
+
+policy:
+  allow_implicit_invocation: true

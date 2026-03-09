@@ -1,0 +1,42 @@
+[features]
+multi_agent = true
+
+[agents]
+max_depth = 1
+max_threads = 8
+
+[agents.planner]
+description = "Use for planning only in this repository. This role creates or refines one dated canonical plan file in docs/plan and must not change code or non-plan files."
+config_file = "agents/planner.toml"
+
+[agents.main_reviewer]
+description = "Use for the main pragmatic review of a plan, focused on repo fit, simplicity, testing strategy, cleanup, and documentation impact."
+config_file = "agents/main-reviewer.toml"
+
+[agents.big_picture_reviewer]
+description = "Use for big-picture review of a plan, focused on cross-stage consistency, system shape, config surface growth, and long-term repo maintainability."
+config_file = "agents/big-picture-reviewer.toml"
+
+[agents.research_reviewer]
+description = "Use for deep-learning and experiment-design review of a plan or implementation, focused on objective correctness, data handling, metrics, evaluation validity, and reproducibility."
+config_file = "agents/research-reviewer.toml"
+
+[agents.compute_reviewer]
+description = "Use for compute and runtime review of a plan, focused on memory, throughput, dataloading, cluster usage, caching, and scaling risk."
+config_file = "agents/compute-reviewer.toml"
+
+[agents.devils_advocate_reviewer]
+description = "Use for a skeptical review of a plan or implementation, focused on hidden assumptions, brittle steps, and likely failure modes."
+config_file = "agents/devils-advocate-reviewer.toml"
+
+[agents.implementer]
+description = "Use for implementing an approved plan in small verified increments while keeping code, config, docs, and cleanup aligned with repo conventions."
+config_file = "agents/implementer.toml"
+
+[agents.test_runner]
+description = "Use for independent validation of an implementation through targeted tests, smoke runs, and exact command reporting without editing source files."
+config_file = "agents/test-runner.toml"
+
+[agents.final_reviewer]
+description = "Use for final review of an implementation against the approved plan, including correctness, regression risk, documentation freshness, and verification quality."
+config_file = "agents/final-reviewer.toml"
