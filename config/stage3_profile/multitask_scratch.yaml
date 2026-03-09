@@ -9,6 +9,6 @@ policy:
   stage3_training_mode: multitask
   action_subset_ratio: 1.0
   latent_scope: all
-  lam_checkpoint_path: /mnt/data/workspace/code/high-level-robot-planner/runs/2026-02-24_10-41-51_lam_oxe_local/checkpoints/last.ckpt
+  lam_checkpoint_path: ${artifacts.lam_checkpoint_path}
   lam_future_frames: 10
   lam_camera_keys: [observation.images.image]

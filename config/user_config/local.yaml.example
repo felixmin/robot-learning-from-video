@@ -16,15 +16,25 @@ logging:
   #   - Local: /home/username/experiments/hlrp
   #   - LRZ DSS: /dss/dssmcmlfs01/pn57pi/pn57pi-dss-0001/username
   root_dir: null
+  # Usually you do not need to set `runs_dir` manually.
+  # By default it is derived from `logging.root_dir` as:
+  #   ${logging.root_dir}/runs/${now:%Y-%m-%d_%H-%M-%S}_${experiment.name}
 
 # Cache directory for large downloads (HF hub weights, torch hub, TFDS cache, etc.).
-# If relative, resolved against `logging.root_dir` if set, else project root.
+# If relative, resolved against `logging.root_dir`.
 paths:
   cache_dir: cache
+
+# Optional: user-local artifact defaults used by profiles that need a
+# long-lived checkpoint. This is the right place for machine-specific
+# reused artifacts, for example a preferred Stage 1 LAM checkpoint that
+# Stage 3 multitask runs should use by default.
+artifacts:
+  lam_checkpoint_path: null  # e.g. /mnt/data/workspace/runs_root/runs/.../checkpoints/last.ckpt
 
 # Optional: override cluster container image per user.
 # Most experiments include this file as optional `/user_config: local`,
 # so this value cleanly overrides `cluster.container.image`.
 cluster:
   container:
-    image: null            # e.g. /dss/.../enroot/hlrp_stage12.sqsh
+    image: null            # e.g. /dss/.../enroot/hlrp_stage12.sqsh or hlrp_stage3_lerobot.sqsh

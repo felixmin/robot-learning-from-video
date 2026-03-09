@@ -128,6 +128,14 @@ Uses [Hydra](https://hydra.cc) for composable configuration. Experiments compose
 python scripts/2_train_stage1_lam.py experiment=stage1_local data.loader.batch_size=32 training.optimizer.lr=5e-5
 ```
 
+Machine-specific paths should go into `config/user_config/local.yaml`, not into shared experiment or profile configs.
+That file is gitignored and is the right place for things like:
+- local storage roots
+- cache locations
+- long-lived checkpoint paths you reuse across many runs, such as a preferred Stage 1 LAM checkpoint for Stage 3 multitask training
+
+Start from `config/user_config/local.yaml.example` if you need to create or update your local file.
+
 See `CLAUDE.md` for architecture and config structure details.
 
 ## Dataset Sources and Downloads

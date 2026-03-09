@@ -52,6 +52,11 @@ paths:
   # If relative, resolved against `logging.root_dir` if set, else project root.
   cache_dir: cache
 
+# User-/machine-specific artifact locations. Keep defaults null in shared config
+# and override them in `config/user_config/local.yaml` when available.
+artifacts:
+  lam_checkpoint_path: null
+
 # Job submission defaults (used by scripts/submit_job.py)
 submit:
   # Training entrypoint (without .py). Experiments can override this.
