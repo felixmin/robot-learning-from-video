@@ -54,19 +54,28 @@ https://github.com/user-attachments/assets/0cc694b1-ff8c-406d-b5a7-a6815fe8c1af
 
 ### Installation
 
+The default LAM config uses gated DINOv3 weights (`facebook/dinov3-vits16-pretrain-lvd1689m`).
+Before running Stage 1 or DINO-backed tests:
+
+1. Request access to the DINOv3 model on Hugging Face.
+2. Log in locally with `huggingface-cli login` (or `python -m huggingface_hub login`).
+
 ```bash
-# Create conda environment (Python 3.12)
-conda env create -f environment.yml
+# Create a fresh conda environment
+conda create -n hlrp python=3.12
 conda activate hlrp
 
-# Install PyTorch 2.9.1 with CUDA support
-pip install torch==2.9.1 torchvision==0.24.1 torchaudio==2.9.1 --index-url https://download.pytorch.org/whl/cu130
+# Install Python dependencies
+pip install -r requirements.txt
 
-# Install project packages
-pip install -e .
+# Install the current PyTorch build with GPU support for your system.
+# Pick the right command for your CUDA/runtime from:
+# https://pytorch.org/get-started/locally/
+# Example for CUDA 12.8:
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
 
-# Verify setup
-python scripts/0_setup_environment.py
+# Quick sanity check
+python -m pytest -q tests/test_hydra_configs.py
 ```
 
 ### Running Training
@@ -114,13 +123,16 @@ See `CLAUDE.md` for architecture and config structure details.
 
 ```bash
 # Run tests
-pytest tests/
+python -m pytest tests/
+
+# Fast config sanity check
+python -m pytest -q tests/test_hydra_configs.py
 
 # Format code
-black packages/ scripts/ tests/
+python -m black packages/ scripts/ tests/
 
 # Lint
-ruff check packages/ scripts/ tests/
+python -m ruff check packages/ scripts/ tests/
 ```
 
 ## Documentation
@@ -130,9 +142,9 @@ ruff check packages/ scripts/ tests/
 
 ## Dependencies
 
-Python 3.12 with PyTorch 2.9.1. Key packages: pytorch-lightning, transformers, webdataset, hydra-core, wandb, accelerate.
+Python 3.12. Install base dependencies from `requirements.txt`, then install a current GPU-enabled PyTorch build from the official PyTorch selector.
 
-See `environment.yml` for complete dependency list.
+Key packages: lightning, transformers, webdataset, hydra-core, wandb, accelerate.
 
 
 
