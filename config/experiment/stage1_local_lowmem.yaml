@@ -1,0 +1,35 @@
+# @package _global_
+
+defaults:
+  - _stage1_base
+  - /validation@validation: stage1_local_rich
+  - /cluster@cluster: local_dev
+  - optional /user_config: local
+
+experiment:
+  name: stage1_local_lowmem
+  description: "Local Stage 1 training with reduced GPU memory footprint"
+
+logging:
+  tags: ["stage1", "lerobot_v3", "octo24", "local", "lowmem"]
+
+data:
+  loader:
+    batch_size: 8
+    num_workers: 4
+
+precision: "16-mixed"
+
+model:
+  flow:
+    model: raft_small
+    teacher_num_flow_updates: 2
+    teacher_chunk_size: 8
+
+validation:
+  limit_batches: 10
+  max_cached_samples: 32
+
+training:
+  train_preview_buffer:
+    max_samples: 64

@@ -59,6 +59,11 @@ Before running Stage 1 or DINO-backed tests:
 
 1. Request access to the DINOv3 model on Hugging Face.
 2. Log in locally with `huggingface-cli login` (or `python -m huggingface_hub login`).
+3. You might need to provide the token via a symlink or an environment variable to be able to use dino:
+```bash 
+mkdir -p ~/.huggingface
+ln -s ~/.cache/huggingface/token ~/.huggingface/token
+```
 
 ```bash
 # Create a fresh conda environment
@@ -100,6 +105,9 @@ https://pytorch.org/get-started/locally/
 ```bash
 # Stage 1 (LAM) local
 python scripts/2_train_stage1_lam.py experiment=stage1_local
+
+# Stage 1 (LAM) local low-memory preset
+python scripts/2_train_stage1_lam.py experiment=stage1_local_lowmem
 
 # Stage 2 (policy SmolVLA flow) local
 python scripts/4_train_stage2_policy.py experiment=stage2_local
