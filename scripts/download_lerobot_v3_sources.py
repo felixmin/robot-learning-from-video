@@ -59,8 +59,12 @@ def main() -> None:
 
     for idx, source in enumerate(sources, start=1):
         repo_id = str(source["repo_id"])
+        revision = source.get("revision")
         local_dir = _repo_local_dir(str(root), repo_id)
-        print(f"[{idx}/{len(sources)}] repo_id={repo_id} weight={float(source['weight']):.2f} local_dir={local_dir}")
+        print(
+            f"[{idx}/{len(sources)}] repo_id={repo_id} revision={revision or 'default'} "
+            f"weight={float(source['weight']):.2f} local_dir={local_dir}"
+        )
         if _is_downloaded(local_dir):
             print("  already present, skipping")
             continue
@@ -69,6 +73,7 @@ def main() -> None:
         snapshot_download(
             repo_id=repo_id,
             repo_type="dataset",
+            revision=revision,
             local_dir=str(local_dir),
             allow_patterns=["meta/*", "data/*", "videos/*", "README.md", ".gitattributes"],
             max_workers=4,

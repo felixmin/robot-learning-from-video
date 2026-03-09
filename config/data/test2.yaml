@@ -10,6 +10,7 @@ dataset:
   lerobot:
     sources:
       - repo_id: FedorX8/berkeley_cable_routing_lerobot
+        revision: main
         weight: 0.363
         camera_map:
           primary: observation.images.image
@@ -19,6 +20,7 @@ dataset:
         val_episode_count: 2
 
       - repo_id: lerobot/nyu_door_opening_surprising_effectiveness
+        revision: v3.0
         weight: 0.121
         camera_map:
           primary: observation.images.image

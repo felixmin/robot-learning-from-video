@@ -10,6 +10,7 @@ dataset:
   lerobot:
     sources:
       - repo_id: FedorX8/fractal20220817_data_lerobot
+        revision: main
         weight: 20.544
         camera_map:
           primary: observation.images.image
@@ -19,6 +20,7 @@ dataset:
         val_episode_count: 2
 
       - repo_id: FedorX8/bridge_v2_lerobot
+        revision: main
         weight: 20.544
         camera_map:
           primary: observation.images.primary
@@ -28,6 +30,7 @@ dataset:
         val_episode_count: 2
 
       - repo_id: FedorX8/bc_z_lerobot
+        revision: main
         weight: 10.997
         camera_map:
           primary: observation.images.image
@@ -37,6 +40,7 @@ dataset:
         val_episode_count: 2
 
       - repo_id: FedorX8/stanford_hydra_dataset_lerobot
+        revision: main
         weight: 7.251
         camera_map:
           primary: observation.images.image
@@ -46,6 +50,7 @@ dataset:
         val_episode_count: 2
 
       - repo_id: FedorX8/language_table_lerobot
+        revision: main
         weight: 7.13
         camera_map:
           primary: observation.images.rgb
@@ -55,6 +60,7 @@ dataset:
         val_episode_count: 2
 
       - repo_id: FedorX8/taco_play_lerobot
+        revision: main
         weight: 4.35
         camera_map:
           primary: observation.images.rgb_static
@@ -64,6 +70,7 @@ dataset:
         val_episode_count: 2
 
       - repo_id: FedorX8/furniture_bench_dataset_lerobot
+        revision: main
         weight: 3.988
         camera_map:
           primary: observation.images.image
@@ -74,6 +81,7 @@ dataset:
         val_episode_count: 2
 
       - repo_id: FedorX8/utaustin_mutex_lerobot
+        revision: main
         weight: 3.625
         camera_map:
           primary: observation.images.image
@@ -83,6 +91,7 @@ dataset:
         val_episode_count: 2
 
       - repo_id: FedorX8/austin_sailor_dataset_lerobot
+        revision: main
         weight: 3.505
         camera_map:
           primary: observation.images.image
@@ -92,6 +101,7 @@ dataset:
         val_episode_count: 2
 
       - repo_id: FedorX8/roboturk_lerobot
+        revision: main
         weight: 3.384
         camera_map:
           primary: observation.images.front_rgb
@@ -101,6 +111,7 @@ dataset:
         val_episode_count: 2
 
       - repo_id: FedorX8/toto_lerobot
+        revision: main
         weight: 2.9
         camera_map:
           primary: observation.images.image
@@ -110,6 +121,7 @@ dataset:
         val_episode_count: 2
 
       - repo_id: lerobot/austin_sirius_dataset
+        revision: v3.0
         weight: 2.779
         camera_map:
           primary: observation.images.image
@@ -119,6 +131,7 @@ dataset:
         val_episode_count: 2
 
       - repo_id: FedorX8/berkeley_autolab_ur5_lerobot
+        revision: main
         weight: 1.813
         camera_map:
           primary: observation.images.image
@@ -128,6 +141,7 @@ dataset:
         val_episode_count: 2
 
       - repo_id: FedorX8/iamlab_cmu_pickup_insert_lerobot
+        revision: main
         weight: 1.45
         camera_map:
           primary: observation.images.image
@@ -137,6 +151,7 @@ dataset:
         val_episode_count: 2
 
       - repo_id: FedorX8/viola_lerobot
+        revision: main
         weight: 1.45
         camera_map:
           primary: observation.images.agentview_rgb
@@ -146,6 +161,7 @@ dataset:
         val_episode_count: 2
 
       - repo_id: lerobot/berkeley_fanuc_manipulation
+        revision: v3.0
         weight: 1.208
         camera_map:
           primary: observation.images.image
@@ -155,6 +171,7 @@ dataset:
         val_episode_count: 2
 
       - repo_id: lerobot/nyu_franka_play_dataset
+        revision: v3.0
         weight: 1.088
         camera_map:
           primary: observation.images.image
@@ -164,6 +181,7 @@ dataset:
         val_episode_count: 2
 
       - repo_id: lerobot/jaco_play
+        revision: v3.0
         weight: 0.725
         camera_map:
           primary: observation.images.image
@@ -173,6 +191,7 @@ dataset:
         val_episode_count: 2
 
       - repo_id: FedorX8/berkeley_cable_routing_lerobot
+        revision: main
         weight: 0.363
         camera_map:
           primary: observation.images.image
@@ -182,6 +201,7 @@ dataset:
         val_episode_count: 2
 
       - repo_id: lerobot/austin_buds_dataset
+        revision: v3.0
         weight: 0.363
         camera_map:
           primary: observation.images.image
@@ -191,6 +211,7 @@ dataset:
         val_episode_count: 2
 
       - repo_id: lerobot/cmu_stretch
+        revision: v3.0
         weight: 0.242
         camera_map:
           primary: observation.images.image
@@ -200,6 +221,7 @@ dataset:
         val_episode_count: 2
 
       - repo_id: lerobot/nyu_door_opening_surprising_effectiveness
+        revision: v3.0
         weight: 0.121
         camera_map:
           primary: observation.images.image
@@ -209,6 +231,7 @@ dataset:
         val_episode_count: 2
 
       - repo_id: lerobot/dlr_edan_shared_control
+        revision: v3.0
         weight: 0.121
         camera_map:
           primary: observation.images.image
@@ -218,6 +241,7 @@ dataset:
         val_episode_count: 2
 
       - repo_id: lerobot/ucsd_kitchen_dataset
+        revision: v3.0
         weight: 0.06
         camera_map:
           primary: observation.images.image
