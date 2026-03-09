@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 from pathlib import Path
 
 from huggingface_hub import snapshot_download
@@ -26,17 +27,28 @@ def _is_downloaded(path: Path) -> bool:
     return (path / "meta" / "info.json").exists() and (path / "data").exists() and (path / "videos").exists()
 
 
+def _resolve_root(cli_root: str | None) -> Path:
+    root = cli_root or os.environ.get("HF_LEROBOT_HOME")
+    if not root:
+        raise SystemExit(
+            "Download root not provided. Pass `--root /path/to/huggingface/lerobot` "
+            "or export `HF_LEROBOT_HOME` first."
+        )
+    return Path(root)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", default="config/data/octo24.yaml")
-    parser.add_argument("--root", required=True)
+    parser.add_argument("--root", default=None)
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--start-from", default=None)
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 
-    root = Path(args.root)
+    root = _resolve_root(args.root)
     root.mkdir(parents=True, exist_ok=True)
+    print(f"Using download root: {root}")
 
     sources = _load_sources(args.config)
     if args.start_from is not None:
