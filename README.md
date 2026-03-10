@@ -80,7 +80,7 @@ pip install -r requirements.txt
 pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
 
 # Quick sanity check
-python -m pytest -q tests/test_hydra_configs.py
+python -m pytest
 ```
 
 #### PyTorch / CUDA troubleshooting
@@ -94,7 +94,7 @@ If that happens, reinstall PyTorch with a newer CUDA build. For example:
 
 ```bash
 pip uninstall -y torch torchvision torchaudio
-pip3 install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu128
+pip install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu128
 ```
 
 Check the official PyTorch install selector for the current recommended command:
