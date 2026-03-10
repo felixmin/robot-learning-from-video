@@ -100,7 +100,7 @@ pip3 install --pre torch torchvision torchaudio --index-url https://download.pyt
 Check the official PyTorch install selector for the current recommended command:
 https://pytorch.org/get-started/locally/
 
-### Running Training
+### Running Training and Rollout
 
 ```bash
 # Stage 1 (LAM) local
@@ -115,9 +115,18 @@ python scripts/4_train_stage2_policy.py experiment=stage2_local
 # Stage 3 (LeRobot action-only) local
 python scripts/6_train_lerobot.py experiment=stage3_local
 
+# Stage 3 rollout/eval local
+python scripts/7_rollout_lerobot.py \
+  experiment=stage3_rollout_local \
+  lerobot_eval.policy_path=/mnt/data/.../lerobot/checkpoints/last/pretrained_model
+
 # Cluster submit (all stages)
 python scripts/submit_job.py experiment=stage3_cluster cluster=lrz_x100
 ```
+
+For Stage 3 rollout, `lerobot_eval.policy_path` must point to the exported
+`pretrained_model` directory inside a saved checkpoint, not to the checkpoint
+root itself.
 
 ## Configuration
 

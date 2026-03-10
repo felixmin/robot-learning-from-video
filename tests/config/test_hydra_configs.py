@@ -162,7 +162,6 @@ class TestExperimentConsistency:
     @pytest.mark.parametrize(
         ("experiment", "cluster_name", "mujoco_gl"),
         [
-            ("stage3_rollout", "mcml_h100", "osmesa"),
             ("stage3_rollout_local", "local_dev", "egl"),
             ("stage3_rollout_cluster", "mcml_h100", "osmesa"),
         ],

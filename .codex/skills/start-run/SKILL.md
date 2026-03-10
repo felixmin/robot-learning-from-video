@@ -65,6 +65,11 @@ Pick the base experiment and entrypoint from this table:
   - base experiment: `stage3_rollout_cluster`
   - submit script: `7_rollout_lerobot`
 
+Rollout-specific contract:
+- `lerobot_eval.policy_path` must point to the exported `pretrained_model` directory inside a saved checkpoint.
+- Use paths such as `.../lerobot/checkpoints/last/pretrained_model` or `.../lerobot/checkpoints/100000/pretrained_model`.
+- Do not point `lerobot_eval.policy_path` at the checkpoint root such as `.../checkpoints/last` without the trailing `pretrained_model`.
+
 ## Naming contract
 
 Use an expressive stem:
@@ -95,6 +100,7 @@ Important:
    - update `experiment.description`
    - keep the config minimal and fail-fast
    - set `logging.runs_dir: ${logging.root_dir}/runs/${experiment.name}`
+   - keep the base config's `defaults` entries directly in the run config; do not compose the run config via `defaults: - /experiment: <base_experiment>` from inside `config/experiment/runs`, because that can recurse through the experiment group
 4. Create `docs/runs/<stem>.md` from `docs/runs/TEMPLATE.md`.
 5. Fill in the metadata before launch:
    - date
@@ -121,6 +127,11 @@ conda run -n <env> python <script> experiment=runs/<stem> [extra overrides]
 Use:
 - `hlrp` for Stage 1 and Stage 2
 - `lerobot` for Stage 3 and rollout
+
+Durability rule for long local runs:
+- Prefer launching from `tmux`, not from an ad hoc background job.
+- If a long-lived session already exists, create a new window in that session.
+- Otherwise create a dedicated detached session before starting the command.
 
 ## Major cluster-run workflow
 
@@ -235,6 +246,13 @@ If the user is resuming a run:
 - keep `experiment.name` aligned with the documented stem unless there is a deliberate new run
 - set resume-specific CLI overrides explicitly
 - ensure any step-based limits still allow additional work
+
+If the user asks to start rollouts from an existing Stage 3 training run:
+- treat the rollout as a new documented rollout run unless the user explicitly says `test` or `debug`
+- derive the rollout config from `stage3_rollout_local` or `stage3_rollout_cluster`
+- point `lerobot_eval.policy_path` at the source run's saved `pretrained_model` directory
+- document the source training run stem and resolved checkpoint path in the rollout note
+- for local rollout launches, record the `tmux` session and window used for monitoring
 
 ## Output standard
 

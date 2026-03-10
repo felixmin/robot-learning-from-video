@@ -99,20 +99,35 @@ Rollout/eval entrypoint:
 
 Experiment config:
 
-- `config/experiment/stage3_hlrp_libero_rollout.yaml`
+- `config/experiment/stage3_rollout_local.yaml`
+- `config/experiment/stage3_rollout_cluster.yaml`
 
 Required field:
 
-- `lerobot_eval.policy_path` (path to `pretrained_model` dir)
+- `lerobot_eval.policy_path` (path to the exported `pretrained_model` dir inside a saved checkpoint)
+
+Examples of valid policy paths:
+
+- `/dss/.../checkpoints/000050/pretrained_model`
+- `/mnt/data/.../lerobot/checkpoints/last/pretrained_model`
 
 Example:
 
 ```bash
+conda run -n lerobot python scripts/7_rollout_lerobot.py \
+  experiment=stage3_rollout_local \
+  lerobot_eval.policy_path=/mnt/data/.../lerobot/checkpoints/last/pretrained_model \
+  experiment.name=stage3_rollout_local_example
+```
+
+Cluster example:
+
+```bash
 python scripts/submit_job.py \
-  experiment=stage3_hlrp_libero_rollout \
+  experiment=stage3_rollout_cluster \
   cluster=lrz_x100 \
   lerobot_eval.policy_path=/dss/.../checkpoints/000050/pretrained_model \
-  experiment.name=stage3_hlrp_libero_rollout
+  experiment.name=stage3_rollout_cluster_example
 ```
 
 ## Known Open Item
