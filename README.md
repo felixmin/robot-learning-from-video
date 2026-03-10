@@ -185,10 +185,9 @@ python -m black packages/ scripts/ tests/
 python -m ruff check packages/ scripts/ tests/
 ```
 
-## Documentation
+## Agents
 
-- **[CLAUDE.md](CLAUDE.md)** - Project architecture, development commands, and setup for Claude Code
-- **[AGENTS.md](AGENTS.md)** - Operational rules and runbook for local and cluster execution
+- The repo is generally designed for smooth agent usage and comes with AGENTS.md Codex CLI and CLAUDE.md for Claude Code. Generally the preferred agent is codex. In .codex skills and agents for various tasks can be found.
 
 ## Dependencies
 
