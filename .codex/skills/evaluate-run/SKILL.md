@@ -113,6 +113,7 @@ For Stage 3 train runs:
 For rollout runs:
 - focus on rollout success, task-wise behavior, and failure patterns
 - use aggregate success and qualitative artifacts when available
+- for completed documented rollout runs, add markdown tables to the docs note for overall and per-group metrics, plus a compact task-outcome bucket table when those counts are available
 
 ## Active runs
 
@@ -133,6 +134,7 @@ When updating the docs note:
 - fill in final status
 - add the resolved run directory
 - add concise factual findings under `Results / Findings`
+- for rollout runs, include the rollout metrics tables from the template when the underlying artifacts support them
 - include enough detail to support later ablations or experiment writeups
 
 Do not write docs when:

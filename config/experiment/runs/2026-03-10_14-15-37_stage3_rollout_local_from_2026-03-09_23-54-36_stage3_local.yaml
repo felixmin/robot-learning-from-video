@@ -1,0 +1,17 @@
+# @package _global_
+
+defaults:
+  - _stage3_rollout_base
+  - /cluster@cluster: local_dev
+  - /runtime: stage3_local
+  - optional /user_config: local
+
+experiment:
+  name: 2026-03-10_14-15-37_stage3_rollout_local_from_2026-03-09_23-54-36_stage3_local
+  description: "Local Stage 3 rollout for 2026-03-09_23-54-36_stage3_local final checkpoint"
+
+logging:
+  runs_dir: ${logging.root_dir}/runs/${experiment.name}
+
+lerobot_eval:
+  policy_path: /mnt/data/workspace/runs_root/runs/2026-03-09_23-54-36_stage3_local/lerobot/checkpoints/last/pretrained_model

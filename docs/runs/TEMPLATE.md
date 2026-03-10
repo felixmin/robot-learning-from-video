@@ -43,3 +43,17 @@
 ## Results / Findings
 
 - Pending.
+
+For completed rollout runs, add rollout metrics tables such as:
+
+| Scope | Success % | Successes | Episodes | Avg Sum Reward | Avg Max Reward |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Overall |  |  |  |  |  |
+| <task_group> |  |  |  |  |  |
+| <task_group> |  |  |  |  |  |
+
+| Task Outcome Bucket | Count |
+| --- | ---: |
+| 0/10 success tasks |  |
+| Partial-success tasks |  |
+| 10/10 success tasks |  |
