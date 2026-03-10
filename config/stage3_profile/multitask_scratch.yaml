@@ -7,8 +7,6 @@ batch_size: 32
 policy:
   repo_id: felixmin/hlrp_smolvla_shared_libero_cotrain_scratch
   stage3_training_mode: multitask
-  action_subset_ratio: 1.0
-  latent_scope: all
   lam_checkpoint_path: ${artifacts.lam_checkpoint_path}
   lam_future_frames: 10
   lam_camera_keys: [observation.images.image]

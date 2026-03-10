@@ -20,6 +20,7 @@ from pathlib import Path
 
 import hydra
 from omegaconf import DictConfig, OmegaConf
+import yaml
 
 workspace_root = Path(__file__).parent.parent
 sys.path.insert(0, str(workspace_root / "packages"))
@@ -39,6 +40,78 @@ def _episodes_arg(value: object) -> str | None:
         return json.dumps(list(value), separators=(",", ":"))
     s = str(value).strip()
     return s if s else None
+
+
+def _resolve_dataset_mix_path(cfg: DictConfig) -> Path | None:
+    raw_path = OmegaConf.select(cfg, "lerobot.dataset.mix_path")
+    if raw_path is None:
+        return None
+    mix_path = Path(str(raw_path))
+    if not mix_path.is_absolute():
+        mix_path = workspace_root / mix_path
+    mix_path = mix_path.resolve()
+    if not mix_path.is_file():
+        raise FileNotFoundError(f"Stage-3 dataset mix file not found: {mix_path}")
+    return mix_path
+
+
+def _load_dataset_mix_payload(mix_path: Path) -> dict:
+    with open(mix_path) as f:
+        payload = yaml.safe_load(f)
+    if not isinstance(payload, dict):
+        raise ValueError(
+            f"Expected mapping payload in mix file {mix_path}, got {type(payload).__name__}"
+        )
+    sources = payload.get("sources")
+    if not isinstance(sources, list) or len(sources) == 0:
+        raise ValueError(f"Mix file {mix_path} must define one or more sources")
+    return payload
+
+
+def _validate_stage3_mix_for_training_mode(cfg: DictConfig, mix_path: Path) -> None:
+    payload = _load_dataset_mix_payload(mix_path)
+    mode = str(OmegaConf.select(cfg, "lerobot.policy.stage3_training_mode") or "")
+    sources = payload["sources"]
+    if not all(isinstance(source, dict) for source in sources):
+        raise ValueError(f"Mix file {mix_path} has non-mapping source entries")
+
+    supervision_modes = [str(source.get("supervision")) for source in sources]
+    valid_modes = {"latent_only", "multitask"}
+    invalid_modes = [mode_name for mode_name in supervision_modes if mode_name not in valid_modes]
+    if invalid_modes:
+        raise ValueError(
+            f"Mix file {mix_path} contains unsupported supervision values: {invalid_modes}"
+        )
+
+    has_multitask = any(mode_name == "multitask" for mode_name in supervision_modes)
+    has_latent = any(mode_name in {"latent_only", "multitask"} for mode_name in supervision_modes)
+
+    if mode == "action":
+        if not has_multitask:
+            raise ValueError(
+                f"stage3_training_mode='action' requires at least one multitask source in {mix_path}"
+            )
+        if any(mode_name != "multitask" for mode_name in supervision_modes):
+            raise ValueError(
+                "stage3_training_mode='action' is incompatible with latent_only mix sources; "
+                f"found supervision modes {supervision_modes} in {mix_path}"
+            )
+    elif mode == "latent":
+        if not has_latent:
+            raise ValueError(
+                f"stage3_training_mode='latent' requires at least one latent-supervised source in {mix_path}"
+            )
+    elif mode in {"multitask", "alternating"}:
+        if not has_multitask:
+            raise ValueError(
+                f"stage3_training_mode={mode!r} requires at least one multitask source in {mix_path}"
+            )
+        if not has_latent:
+            raise ValueError(
+                f"stage3_training_mode={mode!r} requires at least one latent-supervised source in {mix_path}"
+            )
+    else:
+        raise ValueError(f"Unsupported stage3_training_mode={mode!r}")
 
 
 def _format_cli_value(value: object) -> str:
@@ -255,6 +328,9 @@ def _runtime_cwd_from_cfg(cfg: DictConfig) -> Path:
 
 def _lerobot_run_command_from_cfg(cfg: DictConfig) -> list[str]:
     train_cmd_raw = OmegaConf.select(cfg, "lerobot.command")
+    resolved_mix_path = _resolve_dataset_mix_path(cfg)
+    if resolved_mix_path is not None:
+        _validate_stage3_mix_for_training_mode(cfg, resolved_mix_path)
 
     policy_type = OmegaConf.select(cfg, "lerobot.policy.type")
     policy_repo_id = OmegaConf.select(cfg, "lerobot.policy.repo_id")
@@ -346,6 +422,8 @@ def _lerobot_run_command_from_cfg(cfg: DictConfig) -> list[str]:
     episodes = _episodes_arg(OmegaConf.select(cfg, "lerobot.dataset.episodes"))
     if episodes is not None:
         cmd.append(f"--dataset.episodes={episodes}")
+    if resolved_mix_path is not None:
+        cmd.append(f"--dataset.mix_path={resolved_mix_path}")
 
     env_type = OmegaConf.select(cfg, "lerobot.env.type")
     if env_type:
@@ -373,7 +451,7 @@ def _lerobot_run_command_from_cfg(cfg: DictConfig) -> list[str]:
         cfg,
         cfg_path="lerobot.dataset",
         cli_prefix="dataset",
-        skip_keys={"id", "repo_id", "episodes"},
+        skip_keys={"id", "repo_id", "episodes", "mix_path"},
     )
     _append_group_args(
         cmd,

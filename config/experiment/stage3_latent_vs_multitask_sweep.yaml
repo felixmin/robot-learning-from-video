@@ -1,0 +1,4 @@
+# @package _global_
+
+defaults:
+  - stage3__latent_vs_multitask_sweep

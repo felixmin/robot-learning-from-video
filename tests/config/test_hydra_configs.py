@@ -142,7 +142,8 @@ class TestExperimentConsistency:
             assert cfg.lerobot.policy.type is not None
             assert cfg.lerobot.policy.init_mode in {"artifact", "scratch"}
             assert cfg.lerobot.dataset.id == "libero"
-            assert cfg.lerobot.dataset.repo_id == "HuggingFaceVLA/libero"
+            assert cfg.lerobot.dataset.repo_id == "hlrp/libero_full_multitask"
+            assert cfg.lerobot.dataset.mix_path == "config/stage3_dataset_mix/libero_full_multitask.yaml"
 
     def test_stage3_dataset_override_loads(self, config_dir):
         with initialize_config_dir(version_base=None, config_dir=config_dir):
@@ -155,9 +156,11 @@ class TestExperimentConsistency:
             )
 
             assert cfg.lerobot.dataset.id == "libero_5pct"
-            assert len(cfg.lerobot.dataset.episodes) == 84
-            assert cfg.lerobot.dataset.episodes[:5] == [13, 51, 54, 61, 65]
-            assert cfg.lerobot.dataset.episodes[-3:] == [1650, 1652, 1657]
+            assert cfg.lerobot.dataset.repo_id == "hlrp/libero_5pct_multitask_only"
+            assert (
+                cfg.lerobot.dataset.mix_path
+                == "config/stage3_dataset_mix/libero_5pct_multitask_only.yaml"
+            )
 
     @pytest.mark.parametrize(
         ("experiment", "cluster_name", "mujoco_gl"),
@@ -201,8 +204,11 @@ class TestExperimentConsistency:
             assert hasattr(cfg, "lerobot")
             assert cfg.variant_id == "mt10_lat100"
             assert cfg.lerobot.policy.stage3_training_mode == "multitask"
-            assert cfg.lerobot.policy.action_subset_ratio == 0.1
-            assert cfg.lerobot.policy.latent_scope == "all"
+            assert cfg.lerobot.dataset.id == "libero_5pct_latent_rest_natural"
+            assert (
+                cfg.lerobot.dataset.mix_path
+                == "config/stage3_dataset_mix/libero_5pct_latent_rest_natural.yaml"
+            )
 
     def test_stage3_runtime_override_switches_gl_backend(self, config_dir):
         with initialize_config_dir(version_base=None, config_dir=config_dir):

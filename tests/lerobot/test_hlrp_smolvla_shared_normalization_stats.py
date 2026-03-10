@@ -23,9 +23,6 @@ def _make_config() -> HLRPSmolVLASharedConfig:
         stage3_training_mode="action",
         action_loss_weight=1.0,
         latent_loss_weight=1.0,
-        action_subset_ratio=1.0,
-        action_subset_key="episode_index",
-        latent_scope="all",
         stage2_artifact=None,
         input_features={
             "observation.images.image": PolicyFeature(

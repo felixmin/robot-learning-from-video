@@ -9,7 +9,7 @@ defaults:
 
 experiment:
   name: ${latent_split_variants.${variant_id}.experiment_name}
-  description: "Stage 3 Libero 3-way sweep: 10% multitask-only vs 100% split (10% multitask + 90% latent-only) vs 100% full multitask baseline"
+  description: "Stage 3 Libero 3-way sweep: 5% multitask-only vs natural 5% multitask + latent-rest vs full multitask baseline"
 
 variant_id: mt10_only
 
@@ -19,24 +19,29 @@ sweep:
 
 latent_split_variants:
   mt10_only:
-    experiment_name: stage3_hlrp_libero_10pct_multitask_only
-    action_subset_ratio: 0.1
-    latent_scope: action_subset
+    experiment_name: stage3_hlrp_libero_5pct_multitask_only
+    dataset_id: libero_5pct
+    dataset_repo_id: hlrp/libero_5pct_multitask_only
+    dataset_mix_path: config/stage3_dataset_mix/libero_5pct_multitask_only.yaml
   mt10_lat100:
-    experiment_name: stage3_hlrp_libero_100pct_10pct_multitask_90pct_latent
-    action_subset_ratio: 0.1
-    latent_scope: all
+    experiment_name: stage3_hlrp_libero_100pct_5pct_multitask_95pct_latent_natural
+    dataset_id: libero_5pct_latent_rest_natural
+    dataset_repo_id: hlrp/libero_5pct_latent_rest_natural
+    dataset_mix_path: config/stage3_dataset_mix/libero_5pct_latent_rest_natural.yaml
   mt100_full_multitask:
     experiment_name: stage3_hlrp_libero_100pct_full_multitask_baseline
-    action_subset_ratio: 1.0
-    latent_scope: all
+    dataset_id: libero
+    dataset_repo_id: hlrp/libero_full_multitask
+    dataset_mix_path: config/stage3_dataset_mix/libero_full_multitask.yaml
 
 logging:
   tags: ["stage3", "lerobot", "libero", "hlrp-policy", "smolvla", "scratch", "cotrain", "latent-vs-multitask"]
 
 lerobot:
   output_dir: ${logging.runs_dir}/lerobot_smolvla_shared_libero_latent_vs_multitask
+  dataset:
+    id: ${latent_split_variants.${variant_id}.dataset_id}
+    repo_id: ${latent_split_variants.${variant_id}.dataset_repo_id}
+    mix_path: ${latent_split_variants.${variant_id}.dataset_mix_path}
   policy:
     repo_id: felixmin/hlrp_smolvla_shared_libero_latent_vs_multitask
-    action_subset_ratio: ${latent_split_variants.${variant_id}.action_subset_ratio}
-    latent_scope: ${latent_split_variants.${variant_id}.latent_scope}

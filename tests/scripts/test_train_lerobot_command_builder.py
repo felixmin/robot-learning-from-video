@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import importlib.util
+from pathlib import Path
 
 import pytest
 from hydra import compose, initialize_config_dir
-from tests.helpers.paths import CONFIG_DIR, script_path
+from tests.helpers.paths import CONFIG_DIR, REPO_ROOT, script_path
 
 
 def _load_stage3_script_module():
@@ -102,7 +103,7 @@ def test_command_builder_forwards_grad_accum_steps(config_dir: str) -> None:
     assert "--grad_accum_steps=2" in cmd
 
 
-def test_command_builder_forwards_stage3_dataset_episode_subset(
+def test_command_builder_forwards_stage3_dataset_mix_path(
     config_dir: str,
 ) -> None:
     mod = _load_stage3_script_module()
@@ -115,8 +116,26 @@ def test_command_builder_forwards_stage3_dataset_episode_subset(
             ],
         )
     cmd = mod._lerobot_run_command_from_cfg(cfg)
-    assert (
-        "--dataset.episodes=[13,51,54,61,65,88,93,142,161,163,178,189,191,198,206,209,228,255,285,318,326,333,393,407,429,440,447,451,457,466,476,501,541,563,569,592,600,689,696,704,727,735,740,747,758,775,778,859,864,865,919,928,940,1034,1098,1116,1130,1149,1182,1206,1209,1232,1236,1266,1287,1301,1309,1330,1354,1385,1429,1436,1442,1466,1494,1508,1516,1518,1554,1563,1583,1650,1652,1657]"
-        in cmd
-    )
+    expected_mix_path = (
+        Path(REPO_ROOT) / "config" / "stage3_dataset_mix" / "libero_5pct_multitask_only.yaml"
+    ).resolve()
+    assert f"--dataset.mix_path={expected_mix_path}" in cmd
+    assert "--dataset.repo_id=hlrp/libero_5pct_multitask_only" in cmd
     assert "--dataset.id=libero_5pct" not in cmd
+
+
+def test_command_builder_rejects_action_profile_with_latent_only_sources(
+    config_dir: str,
+) -> None:
+    mod = _load_stage3_script_module()
+    with initialize_config_dir(version_base=None, config_dir=config_dir):
+        cfg = compose(
+            config_name="config",
+            overrides=[
+                "experiment=stage3_local",
+                "stage3_profile=action_scratch",
+                "stage3_dataset=libero_5pct_latent_rest_balanced",
+            ],
+        )
+    with pytest.raises(ValueError, match="incompatible with latent_only mix sources"):
+        mod._lerobot_run_command_from_cfg(cfg)

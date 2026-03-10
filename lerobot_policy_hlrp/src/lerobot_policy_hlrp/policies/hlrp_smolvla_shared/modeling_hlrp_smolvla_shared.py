@@ -61,6 +61,9 @@ class HLRPSmolVLASharedPolicy(PreTrainedPolicy):
     config_class = HLRPSmolVLASharedConfig
     name = "hlrp_smolvla_shared"
     _LATENT_TRAINING_MODES = {"latent", "multitask", "alternating"}
+    _ACTION_SUPERVISION_KEY = "hlrp_action_supervised"
+    _LATENT_SUPERVISION_KEY = "hlrp_latent_supervised"
+    _SOURCE_NAME_KEY = "hlrp_source_name"
 
     def __init__(
         self,
@@ -77,7 +80,6 @@ class HLRPSmolVLASharedPolicy(PreTrainedPolicy):
         self.dataset_stats = dataset_stats
         self.normalization_stats = dataset_stats
         self.dataset_meta = dataset_meta
-        self._action_supervision_threshold: int | None = None
 
         self._image_keys = self._resolve_image_keys(config)
         self._action_dim = self._infer_action_dim(config)
@@ -211,33 +213,54 @@ class HLRPSmolVLASharedPolicy(PreTrainedPolicy):
             return "latent"
         return "multitask"
 
-    def _resolve_action_supervision_threshold(self) -> int | None:
-        key = str(self.config.action_subset_key)
-        if key == "index":
-            total = int(self.dataset_meta.total_frames)
-        else:
-            total = int(self.dataset_meta.total_episodes)
-        return int(total * float(self.config.action_subset_ratio))
-
-    def _action_supervision_mask(
+    def _supervision_mask(
         self,
         batch: dict[str, Any],
         *,
+        key: str,
         batch_size: int,
         device: torch.device,
     ) -> torch.Tensor:
-        if float(self.config.action_subset_ratio) == 1.0:
-            return torch.ones((batch_size,), dtype=torch.bool, device=device)
-        if self._action_supervision_threshold is None:
-            self._action_supervision_threshold = self._resolve_action_supervision_threshold()
-        key = str(self.config.action_subset_key)
-        ids = batch[key]
-        if not torch.is_tensor(ids):
-            ids = torch.as_tensor(ids, device=device)
+        if key not in batch:
+            raise KeyError(f"Stage-3 supervision key {key!r} is missing from batch")
+        values = batch[key]
+        if torch.is_tensor(values):
+            mask = values.to(device=device, dtype=torch.bool)
         else:
-            ids = ids.to(device=device)
-        ids = ids.reshape(batch_size)
-        return ids < self._action_supervision_threshold
+            mask = torch.as_tensor(values, device=device, dtype=torch.bool)
+        mask = mask.reshape(batch_size)
+        return mask
+
+    @staticmethod
+    def _sanitize_metric_suffix(value: str) -> str:
+        out = []
+        for char in str(value):
+            out.append(char if char.isalnum() else "_")
+        return "".join(out).strip("_") or "unknown"
+
+    def _source_mix_metrics(self, batch: dict[str, Any], *, batch_size: int) -> dict[str, float]:
+        raw = batch.get(self._SOURCE_NAME_KEY)
+        if raw is None:
+            return {}
+        if isinstance(raw, str):
+            names = [raw] * batch_size
+        elif isinstance(raw, list):
+            if len(raw) != batch_size:
+                raise ValueError(
+                    f"{self._SOURCE_NAME_KEY} length mismatch: expected {batch_size}, got {len(raw)}"
+                )
+            names = [str(value) for value in raw]
+        else:
+            return {}
+
+        counts: dict[str, int] = {}
+        for name in names:
+            counts[name] = counts.get(name, 0) + 1
+        total = float(batch_size)
+        return {
+            f"source_frac_{self._sanitize_metric_suffix(name)}": float(count) / total
+            for name, count in counts.items()
+        }
 
     def _conditioning_step_index(self) -> int:
         return 0 if self._uses_latent_targets() else -1
@@ -684,14 +707,16 @@ class HLRPSmolVLASharedPolicy(PreTrainedPolicy):
             require_image_padding_masks=True,
             conditioning_step_index=self._conditioning_step_index(),
         )
+        batch_size = int(next(iter(stage2_batch.image_streams.values())).shape[0])
         action_loss: torch.Tensor | None = None
         latent_loss: torch.Tensor | None = None
 
         action_supervised_count = 0
         if active_mode in {"action", "multitask"}:
             target_action = self._extract_action_target(batch)
-            action_keep = self._action_supervision_mask(
+            action_keep = self._supervision_mask(
                 batch,
+                key=self._ACTION_SUPERVISION_KEY,
                 batch_size=int(target_action.shape[0]),
                 device=target_action.device,
             )
@@ -712,12 +737,12 @@ class HLRPSmolVLASharedPolicy(PreTrainedPolicy):
             target_latent, valid_pair = self._compute_latent_targets_online(batch)
             keep = valid_pair.to(device=target_latent.device, dtype=torch.bool)
             latent_valid_pairs = int(keep.sum().item())
-            if str(self.config.latent_scope) == "action_subset":
-                keep = keep & self._action_supervision_mask(
-                    batch,
-                    batch_size=int(keep.shape[0]),
-                    device=target_latent.device,
-                )
+            keep = keep & self._supervision_mask(
+                batch,
+                key=self._LATENT_SUPERVISION_KEY,
+                batch_size=int(keep.shape[0]),
+                device=target_latent.device,
+            )
             latent_supervised_count = int(keep.sum().item())
             if latent_supervised_count > 0:
                 latent_batch = self._slice_stage2_batch(stage2_batch, keep)
@@ -749,6 +774,7 @@ class HLRPSmolVLASharedPolicy(PreTrainedPolicy):
             "mode_latent": float(active_mode == "latent"),
             "mode_multitask": float(active_mode == "multitask"),
         }
+        metrics.update(self._source_mix_metrics(batch, batch_size=batch_size))
         if action_loss is not None:
             metrics["action_loss"] = float(action_loss.detach().cpu())
             metrics["action_supervised_samples"] = float(action_supervised_count)

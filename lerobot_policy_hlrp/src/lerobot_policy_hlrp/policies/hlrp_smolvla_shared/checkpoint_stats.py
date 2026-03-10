@@ -2,11 +2,18 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, Mapping
 
 from huggingface_hub import hf_hub_download
 from huggingface_hub.errors import HfHubHTTPError
 
+from lerobot.datasets.mixed_dataset import (
+    _aggregate_selected_stats,
+    _selected_episodes,
+    build_explicit_mixed_stats,
+    load_dataset_mix_config,
+)
 from lerobot.datasets.lerobot_dataset import LeRobotDatasetMetadata
 from lerobot.datasets.utils import serialize_dict
 
@@ -106,6 +113,34 @@ def write_normalization_stats_from_train_config(policy_dir: Path) -> Path:
         raise ValueError(
             f"Expected 'dataset' mapping in {train_config_path}, got {type(dataset_cfg).__name__}"
         )
+
+    mix_path = dataset_cfg.get("mix_path")
+    if isinstance(mix_path, str) and mix_path:
+        mix_file = Path(mix_path)
+        if not mix_file.is_file():
+            raise FileNotFoundError(f"Mixed dataset config not found: {mix_file}")
+        mix_cfg = load_dataset_mix_config(mix_file)
+        sources = []
+        for source_cfg in mix_cfg.sources:
+            ds_meta = LeRobotDatasetMetadata(
+                repo_id=source_cfg.repo_id,
+                root=source_cfg.root,
+                revision=source_cfg.revision,
+            )
+            selected_episodes = _selected_episodes(source_cfg, ds_meta.total_episodes)
+            selected_stats = _aggregate_selected_stats(ds_meta, selected_episodes)
+            if selected_stats is None:
+                raise RuntimeError(
+                    f"Dataset stats are missing for mixed source repo_id={source_cfg.repo_id!r}"
+                )
+            sources.append(
+                SimpleNamespace(
+                    meta=SimpleNamespace(stats=selected_stats),
+                    weight=float(source_cfg.weight),
+                )
+            )
+        stats = build_explicit_mixed_stats(sources)
+        return write_normalization_stats(save_directory=policy_dir, stats=stats)
 
     repo_id = dataset_cfg.get("repo_id")
     if not isinstance(repo_id, str) or not repo_id:

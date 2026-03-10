@@ -1,0 +1,10 @@
+# @package lerobot.dataset
+
+id: libero_5pct_latent_rest_balanced
+repo_id: hlrp/libero_5pct_latent_rest_balanced
+mix_path: config/stage3_dataset_mix/libero_5pct_latent_rest_balanced.yaml
+episodes: null
+root: null
+revision: null
+use_imagenet_stats: false
+video_backend: pyav

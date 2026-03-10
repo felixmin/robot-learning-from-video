@@ -7,7 +7,6 @@ init_mode: scratch
 stage2_artifact: null
 action_loss_weight: 1.0
 latent_loss_weight: 1.0
-action_subset_key: episode_index
 model_name: ${stage2_policy_core.policy.model_name}
 load_vlm_weights: ${stage2_policy_core.policy.load_vlm_weights}
 train_expert_only: true

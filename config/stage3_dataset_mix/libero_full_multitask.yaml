@@ -1,0 +1,12 @@
+logical_dataset_id: hlrp/libero_full_multitask
+sources:
+  - name: libero_full_multitask
+    repo_id: HuggingFaceVLA/libero
+    root: null
+    revision: null
+    weight: 1.0
+    episodes: null
+    exclude_episodes: null
+    supervision: multitask
+    video_backend: pyav
+    tolerance_s: null

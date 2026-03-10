@@ -16,9 +16,6 @@ class HLRPSmolVLASharedConfig(PreTrainedConfig):
     action_loss_weight: float = MISSING
     latent_loss_weight: float = MISSING
     alternating_latent_steps_per_action_step: int | None = None
-    action_subset_ratio: float = MISSING
-    action_subset_key: str = MISSING
-    latent_scope: str = MISSING
 
     n_obs_steps: int = 1
     chunk_size: int = 50
@@ -96,20 +93,6 @@ class HLRPSmolVLASharedConfig(PreTrainedConfig):
             raise ValueError(f"action_loss_weight must be > 0, got {self.action_loss_weight}")
         if self.latent_loss_weight <= 0.0:
             raise ValueError(f"latent_loss_weight must be > 0, got {self.latent_loss_weight}")
-        if self.action_subset_ratio <= 0.0 or self.action_subset_ratio > 1.0:
-            raise ValueError(
-                f"action_subset_ratio must be in (0, 1], got {self.action_subset_ratio}"
-            )
-        if self.action_subset_key not in {"index", "episode_index"}:
-            raise ValueError(
-                "action_subset_key must be one of {'index','episode_index'}, "
-                f"got {self.action_subset_key!r}"
-            )
-        if self.latent_scope not in {"all", "action_subset"}:
-            raise ValueError(
-                "latent_scope must be one of {'all','action_subset'}, "
-                f"got {self.latent_scope!r}"
-            )
         if self.n_obs_steps < 1:
             raise ValueError(f"n_obs_steps must be >= 1, got {self.n_obs_steps}.")
         if self.chunk_size < 1:

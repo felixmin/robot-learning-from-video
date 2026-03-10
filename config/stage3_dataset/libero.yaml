@@ -1,8 +1,10 @@
 # @package lerobot.dataset
 
 id: libero
-repo_id: HuggingFaceVLA/libero
+repo_id: hlrp/libero_full_multitask
+mix_path: config/stage3_dataset_mix/libero_full_multitask.yaml
 episodes: null
 root: null
+revision: null
 use_imagenet_stats: false
 video_backend: pyav

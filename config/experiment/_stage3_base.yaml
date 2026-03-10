@@ -37,8 +37,6 @@ lerobot:
   policy:
     repo_id: ${stage3_profile.policy.repo_id}
     stage3_training_mode: ${stage3_profile.policy.stage3_training_mode}
-    action_subset_ratio: ${stage3_profile.policy.action_subset_ratio}
-    latent_scope: ${stage3_profile.policy.latent_scope}
     lam_checkpoint_path: ${stage3_profile.policy.lam_checkpoint_path}
     lam_future_frames: ${stage3_profile.policy.lam_future_frames}
     lam_camera_keys: ${stage3_profile.policy.lam_camera_keys}

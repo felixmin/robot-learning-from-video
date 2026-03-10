@@ -234,38 +234,37 @@ def test_stage3_policy_inference_batch_allows_missing_image_is_pad() -> None:
     assert torch.equal(mask, torch.ones((2,), dtype=torch.bool))
 
 
-def test_stage3_action_supervision_mask_prefix_ratio() -> None:
+def test_stage3_supervision_mask_reads_reserved_batch_flag() -> None:
     policy = object.__new__(HLRPSmolVLASharedPolicy)
     torch.nn.Module.__init__(policy)
-    policy.config = SimpleNamespace(action_subset_ratio=0.4, action_subset_key="index")
-    policy.dataset_meta = SimpleNamespace(total_frames=10, total_episodes=5)
-    policy._action_supervision_threshold = None
-
-    batch = {"index": torch.tensor([0, 3, 4, 9], dtype=torch.long)}
-    mask = HLRPSmolVLASharedPolicy._action_supervision_mask(
+    batch = {
+        HLRPSmolVLASharedPolicy._ACTION_SUPERVISION_KEY: torch.tensor(
+            [True, True, False, False], dtype=torch.bool
+        )
+    }
+    mask = HLRPSmolVLASharedPolicy._supervision_mask(
         policy,
         batch,
+        key=HLRPSmolVLASharedPolicy._ACTION_SUPERVISION_KEY,
         batch_size=4,
         device=torch.device("cpu"),
     )
     assert torch.equal(mask, torch.tensor([True, True, False, False]))
 
 
-def test_stage3_action_supervision_mask_ratio_one_selects_all() -> None:
+def test_stage3_supervision_mask_accepts_python_bool_lists() -> None:
     policy = object.__new__(HLRPSmolVLASharedPolicy)
     torch.nn.Module.__init__(policy)
-    policy.config = SimpleNamespace(action_subset_ratio=1.0, action_subset_key="index")
-    policy.dataset_meta = None
-    policy._action_supervision_threshold = None
 
-    batch = {"index": torch.tensor([100, 200], dtype=torch.long)}
-    mask = HLRPSmolVLASharedPolicy._action_supervision_mask(
+    batch = {HLRPSmolVLASharedPolicy._LATENT_SUPERVISION_KEY: [True, False]}
+    mask = HLRPSmolVLASharedPolicy._supervision_mask(
         policy,
         batch,
+        key=HLRPSmolVLASharedPolicy._LATENT_SUPERVISION_KEY,
         batch_size=2,
         device=torch.device("cpu"),
     )
-    assert torch.equal(mask, torch.tensor([True, True]))
+    assert torch.equal(mask, torch.tensor([True, False]))
 
 
 def test_stage3_zero_loss_uses_trainable_param_when_first_param_is_frozen() -> None:
