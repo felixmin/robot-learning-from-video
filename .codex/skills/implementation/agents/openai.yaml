@@ -1,0 +1,7 @@
+interface:
+  display_name: "Implementation"
+  short_description: "Implement an approved plan and validate it cleanly."
+  default_prompt: "Use $implementation to execute an approved dated plan from docs/plan with targeted testing and final review."
+
+policy:
+  allow_implicit_invocation: true

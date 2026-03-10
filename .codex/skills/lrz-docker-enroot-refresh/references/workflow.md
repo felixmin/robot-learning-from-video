@@ -1,4 +1,4 @@
-# HLRP Docker Enroot Refresh Workflow
+# LRZ Docker Enroot Refresh Workflow
 
 ## Defaults
 

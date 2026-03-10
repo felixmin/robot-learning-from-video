@@ -220,12 +220,12 @@ Example via submit script:
 
 ### Available skills
 - `planning`: Create or refine one dated canonical plan in `docs/plan/` for a non-trivial change, review it with `main_reviewer`, `big_picture_reviewer`, and `research_reviewer`, and optionally add compute or devil's-advocate review before implementation. (file: `/mnt/data/workspace/code/high-level-robot-planner/.codex/skills/planning/SKILL.md`)
-- `only-implementation-testing`: Execute an approved dated plan from `docs/plan/` through `implementer`, `test_runner`, and `final_reviewer`, with optional research or devil's-advocate review and `docs/progress/` updates when warranted. (file: `/mnt/data/workspace/code/high-level-robot-planner/.codex/skills/only-implementation-testing/SKILL.md`)
+- `implementation`: Execute an approved dated plan from `docs/plan/` through `implementer`, `test_runner`, and `final_reviewer`, with optional research or devil's-advocate review and `docs/progress/` updates when warranted. (file: `/mnt/data/workspace/code/high-level-robot-planner/.codex/skills/implementation/SKILL.md`)
 - `hlrp-code-quality`: Run and repair the workstation QA workflow: `scripts/0_setup_environment.py`, `ruff check`, `black --check`, `pytest`, and the documented coverage run in order. (file: `/mnt/data/workspace/code/high-level-robot-planner/.codex/skills/hlrp-code-quality/SKILL.md`)
-- `hlrp-docker-enroot-refresh`: Build, push, prune, import, and safely swap the HLRP stage-1/2 or stage-3 container using `containers/Dockerfile.stage12` or `containers/Dockerfile.stage3`, the bundled `lerobot/` Docker build context in this repo when needed, and the `felix_minzenmay/enroot/hlrp_stage12.sqsh` or `felix_minzenmay/enroot/hlrp_stage3_lerobot.sqsh` cluster paths. (file: `/mnt/data/workspace/code/high-level-robot-planner/.codex/skills/hlrp-docker-enroot-refresh/SKILL.md`)
+- `lrz-docker-enroot-refresh`: Build, push, prune, import, and safely swap the LRZ stage-1/2 or stage-3 container using `containers/Dockerfile.stage12` or `containers/Dockerfile.stage3`, the bundled `lerobot/` Docker build context in this repo when needed, and the `felix_minzenmay/enroot/hlrp_stage12.sqsh` or `felix_minzenmay/enroot/hlrp_stage3_lerobot.sqsh` cluster paths. (file: `/mnt/data/workspace/code/high-level-robot-planner/.codex/skills/lrz-docker-enroot-refresh/SKILL.md`)
 
 ### How to use repo-local skills
 - If the user asks to plan a non-trivial change or refine an existing plan, open `planning` and follow it.
-- If the user asks to execute an approved plan, implement it, and validate it without re-entering planning, open `only-implementation-testing` and follow it.
+- If the user asks to execute an approved plan, implement it, and validate it without re-entering planning, open `implementation` and follow it.
 - If the user asks to check code quality, validation, lint, formatting, or tests, open `hlrp-code-quality` and follow it.
 - If the user asks to rebuild, push, import, replace, or debug the cluster container workflow, open the skill and follow it.

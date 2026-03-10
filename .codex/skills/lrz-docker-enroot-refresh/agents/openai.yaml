@@ -1,0 +1,4 @@
+interface:
+  display_name: "LRZ Docker Refresh"
+  short_description: "Build, push, prune, import, and swap LRZ Enroot images."
+  default_prompt: "Use $lrz-docker-enroot-refresh to infer whether the request targets the stage-1/2 or stage-3 container, then run the matching LRZ Docker build/push workflow, import the image as an Enroot .sqsh, and swap it into place safely."

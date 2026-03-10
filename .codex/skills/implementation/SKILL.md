@@ -1,9 +1,9 @@
 ---
-name: only-implementation-testing
+name: implementation
 description: "Use when an approved dated plan already exists in `docs/plan/` and you want the repo-local workflow for implementation, targeted testing, optional research or devil's-advocate checks, final review, and progress-note updates without re-entering planning unless the scope changes materially."
 ---
 
-# Only Implementation Testing
+# Implementation
 
 Use this skill when there is already an approved dated plan in `docs/plan/` and the job is to execute it, validate it, and close it out cleanly.
 

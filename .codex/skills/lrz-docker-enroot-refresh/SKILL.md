@@ -1,9 +1,9 @@
 ---
-name: hlrp-docker-enroot-refresh
-description: "Build and refresh the HLRP stage-1/2 or stage-3 container workflow end-to-end: infer the target profile from the task, build and push `felixmin/hlrp:stage12` or `felixmin/hlrp:stage3` from the matching Dockerfile, import the image to the LRZ cluster as an Enroot `.sqsh`, and safely swap it into `hlrp_stage12.sqsh` or `hlrp_stage3_lerobot.sqsh` by renaming backups in place."
+name: lrz-docker-enroot-refresh
+description: "Build and refresh the LRZ stage-1/2 or stage-3 container workflow end-to-end: infer the target profile from the task, build and push `felixmin/hlrp:stage12` or `felixmin/hlrp:stage3` from the matching Dockerfile, import the image to the LRZ cluster as an Enroot `.sqsh`, and safely swap it into `hlrp_stage12.sqsh` or `hlrp_stage3_lerobot.sqsh` by renaming backups in place."
 ---
 
-# HLRP Docker Enroot Refresh
+# LRZ Docker Enroot Refresh
 
 Use this workflow when refreshing the cluster container from the workstation. Infer the target from the user request and the stage context, keep local Docker steps on the workstation, keep cluster work behind `ssh ai`, never delete cluster images, and prefer renaming backups in place.
 

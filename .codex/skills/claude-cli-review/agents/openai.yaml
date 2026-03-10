@@ -1,4 +1,0 @@
-interface:
-  display_name: "Claude CLI Review"
-  short_description: "Run Claude CLI review prompts"
-  default_prompt: "Use $claude-cli-review to ask Claude for a concise review of this code or design."

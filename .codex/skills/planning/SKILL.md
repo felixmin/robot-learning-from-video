@@ -74,4 +74,4 @@ When planning is done, carry forward:
 - any accepted assumptions
 - any explicitly deferred follow-up that is non-blocking
 
-That approved plan becomes the input to `$only-implementation-testing`.
+That approved plan becomes the input to `$implementation`.

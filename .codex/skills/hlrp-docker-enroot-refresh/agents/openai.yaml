@@ -1,4 +1,0 @@
-interface:
-  display_name: "HLRP Docker Refresh"
-  short_description: "Build, push, prune, import, and swap stage-specific HLRP Docker/Enroot images."
-  default_prompt: "Use this skill to infer whether the request targets the stage-1/2 or stage-3 container, then run the matching HLRP Docker build/push workflow, import the image to the LRZ cluster as an Enroot .sqsh, and swap it into place safely."
