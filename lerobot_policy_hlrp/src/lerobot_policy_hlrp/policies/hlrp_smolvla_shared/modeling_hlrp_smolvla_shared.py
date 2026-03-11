@@ -142,7 +142,8 @@ class HLRPSmolVLASharedPolicy(PreTrainedPolicy):
 
         self._stage1_teacher = None
         self._stage1_image_size: tuple[int, int] | None = None
-        self._train_forward_calls = 0
+        self._train_update_calls = 0
+        self._active_training_mode: str | None = None
         self._queues: dict[str, deque[torch.Tensor]] = {}
         self.reset()
 
@@ -201,17 +202,35 @@ class HLRPSmolVLASharedPolicy(PreTrainedPolicy):
     def _uses_latent_targets(self) -> bool:
         return str(self.config.stage3_training_mode) in self._LATENT_TRAINING_MODES
 
-    def _training_mode_for_step(self) -> str:
+    def _peek_training_mode_for_step(self) -> str:
         mode = str(self.config.stage3_training_mode)
         if mode != "alternating":
             return mode
         latent_steps = int(self.config.alternating_latent_steps_per_action_step)
         cycle = latent_steps + 1
-        step = self._train_forward_calls
-        self._train_forward_calls += 1
+        step = int(getattr(self, "_train_update_calls", 0))
         if (step % cycle) < latent_steps:
             return "latent"
         return "multitask"
+
+    def _training_mode_for_step(self) -> str:
+        active_training_mode = getattr(self, "_active_training_mode", None)
+        if active_training_mode is not None:
+            return active_training_mode
+        return self._peek_training_mode_for_step()
+
+    def begin_training_step(self) -> str:
+        mode = self._peek_training_mode_for_step()
+        self._active_training_mode = mode
+        return mode
+
+    def end_training_step(self) -> None:
+        active_training_mode = getattr(self, "_active_training_mode", None)
+        if active_training_mode is None:
+            return
+        if str(self.config.stage3_training_mode) == "alternating":
+            self._train_update_calls = int(getattr(self, "_train_update_calls", 0)) + 1
+        self._active_training_mode = None
 
     def _supervision_mask(
         self,
@@ -414,6 +433,40 @@ class HLRPSmolVLASharedPolicy(PreTrainedPolicy):
         if valid_pair is None:
             raise RuntimeError("Stage-1 LAM camera extraction produced no camera streams.")
         return frame_pairs, valid_pair
+
+    def _extract_stage1_valid_pair(self, batch: dict[str, Any]) -> torch.Tensor:
+        _, valid_pair = self._extract_stage1_frame_pairs(batch)
+        return valid_pair
+
+    def get_accumulation_denominators(self, batch: dict[str, Any]) -> dict[str, float]:
+        active_mode = self._training_mode_for_step()
+        denominators = {"action": 0.0, "latent": 0.0}
+
+        if active_mode in {"action", "multitask"}:
+            target_action = self._extract_action_target(batch)
+            batch_size = int(target_action.shape[0])
+            action_keep = self._supervision_mask(
+                batch,
+                key=self._ACTION_SUPERVISION_KEY,
+                batch_size=batch_size,
+                device=target_action.device,
+            )
+            if bool(action_keep.any().item()):
+                action_is_pad = self._extract_action_is_pad(batch, batch_size=batch_size)[action_keep]
+                valid_steps = (~action_is_pad).sum()
+                denominators["action"] = float(valid_steps.item() * int(target_action.shape[-1]))
+
+        if active_mode in {"latent", "multitask"}:
+            valid_pair = self._extract_stage1_valid_pair(batch).to(dtype=torch.bool)
+            keep = valid_pair & self._supervision_mask(
+                batch,
+                key=self._LATENT_SUPERVISION_KEY,
+                batch_size=int(valid_pair.shape[0]),
+                device=valid_pair.device,
+            )
+            denominators["latent"] = float(keep.sum().item() * int(self.config.latent_vector_dim))
+
+        return denominators
 
     def _ensure_stage1_teacher(self) -> None:
         if self._stage1_teacher is not None:
@@ -776,6 +829,7 @@ class HLRPSmolVLASharedPolicy(PreTrainedPolicy):
         }
         metrics.update(self._source_mix_metrics(batch, batch_size=batch_size))
         if action_loss is not None:
+            action_loss_denom = self.get_accumulation_denominators(batch)["action"]
             metrics["action_loss"] = float(action_loss.detach().cpu())
             metrics["action_supervised_samples"] = float(action_supervised_count)
             metrics["action_supervised_fraction"] = float(action_supervised_count / int(target_action.shape[0]))
@@ -784,8 +838,11 @@ class HLRPSmolVLASharedPolicy(PreTrainedPolicy):
             metrics["batch_action_supervised_fraction"] = float(
                 action_supervised_count / int(target_action.shape[0])
             )
+            metrics["_action_loss_tensor"] = action_loss
+            metrics["_action_loss_denominator_exact"] = float(action_loss_denom)
             metrics["_action_supervised_denominator"] = float(int(target_action.shape[0]))
         if latent_loss is not None:
+            latent_loss_denom = self.get_accumulation_denominators(batch)["latent"]
             metrics["latent_loss"] = float(latent_loss.detach().cpu())
             metrics["latent_valid_pairs"] = float(latent_valid_pairs)
             metrics["latent_supervised_samples"] = float(latent_supervised_count)
@@ -795,6 +852,8 @@ class HLRPSmolVLASharedPolicy(PreTrainedPolicy):
             metrics["batch_latent_supervised_fraction"] = float(
                 latent_supervised_count / int(target_latent.shape[0])
             )
+            metrics["_latent_loss_tensor"] = latent_loss
+            metrics["_latent_loss_denominator_exact"] = float(latent_loss_denom)
             metrics["_latent_supervised_denominator"] = float(int(target_latent.shape[0]))
         return total, metrics
 

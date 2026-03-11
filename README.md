@@ -52,6 +52,30 @@ https://github.com/user-attachments/assets/0cc694b1-ff8c-406d-b5a7-a6815fe8c1af
 
 ## Getting Started
 
+### Clone the repository
+
+This repo uses a git submodule for `lerobot/`.
+A plain `git clone` does not fetch submodules automatically.
+
+Recommended clone:
+
+```bash
+git clone --recurse-submodules <repo-url>
+```
+
+If you already cloned without submodules:
+
+```bash
+git submodule update --init --recursive
+```
+
+After pulling new parent-repo commits, refresh the submodule with:
+
+```bash
+git pull
+git submodule update --init --recursive
+```
+
 ### Installation
 
 The default LAM config uses gated DINOv3 weights (`facebook/dinov3-vits16-pretrain-lvd1689m`).
