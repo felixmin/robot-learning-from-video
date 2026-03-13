@@ -4,6 +4,7 @@ import torch
 import torch.nn.functional as F
 from einops import rearrange
 
+
 def _decode_spatial_tokens(
     *,
     decoder,
@@ -14,6 +15,21 @@ def _decode_spatial_tokens(
     h_dec: int,
     w_dec: int,
 ) -> torch.Tensor:
+    """Decode one frame-sized token grid from frame context + latent action.
+
+    Inputs:
+    - context_tokens: frame token grid [B, 1, h, w, d] for the first frame
+    - action_tokens: action grid [B, 1, ah, aw, d] from the quantized transition
+
+    Output:
+    - decoded next-frame token grid [B, 1, h, w, d]
+
+    Intuition:
+    the decoder keeps the spatial layout of the first-frame grid and uses the
+    action grid only as conditioning information telling it how that grid should
+    change into the second frame.
+    """
+    # Cross-attends frame context [B, 1, h, w, d] to action tokens [B, 1, ah, aw, d].
     video_shape = tuple(context_tokens.shape[:-1])
     context_tokens_flat = rearrange(context_tokens, "b t h w d -> (b t) (h w) d")
     action_tokens_flat = rearrange(action_tokens, "b t h w d -> (b t) (h w) d")
@@ -43,6 +59,7 @@ def compute_dino_loss(
     step: int,
     metrics: Dict[str, Any],
 ) -> Optional[torch.Tensor]:
+    """Predict the second frame in DINO-token space and compare to the true token grid."""
     if model.dino_decoder is None:
         return None
 
@@ -78,6 +95,7 @@ def compute_pixel_loss(
     batch_size: int,
     metrics: Dict[str, Any],
 ) -> Optional[torch.Tensor]:
+    """Predict the second frame directly in pixel space from context grid + action grid."""
     if model.pixel_decoder is None:
         return None
     if pixel_context is None:
@@ -111,6 +129,11 @@ def compute_aux_outputs(
     return_recons_only: bool,
     metrics: Dict[str, Any],
 ) -> tuple[Optional[torch.Tensor], Optional[torch.Tensor]]:
+    """Run the detached visualization decoder.
+
+    This branch uses the same context/action structure as the main decoders, but
+    the action tokens are detached so it does not shape the encoder through this path.
+    """
     if model.aux_decoder is None:
         return None, None
     if pixel_context is None:
@@ -147,6 +170,11 @@ def compute_flow_loss_term(
     step: int,
     metrics: Dict[str, Any],
 ) -> Optional[torch.Tensor]:
+    """Predict optical flow from frame context + latent action and score it vs RAFT.
+
+    Here the decoder output is not a token grid reconstructed back to pixels; it is
+    a dense flow field supervised by the teacher on the same frame transition.
+    """
     if model.flow_decoder is None:
         return None
 

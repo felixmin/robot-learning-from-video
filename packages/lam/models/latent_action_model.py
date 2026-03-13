@@ -70,6 +70,14 @@ class DinoConfig:
 
 @dataclass
 class EncodedFrames:
+    """Pre-VQ encoder outputs for one frame pair.
+
+    Representation summary:
+    - `enc_*_tokens`: frame token grids [B, 1, h, w, d], one token per image patch cell
+    - `first_tokens` / `last_tokens`: the same frame information packed to [B, h*w, d]
+      because the VQ module consumes a flat token sequence per frame
+    """
+
     batch_size: int
     device: torch.device
     first_frame: torch.Tensor
@@ -82,6 +90,8 @@ class EncodedFrames:
 
 @dataclass
 class EncodedBatch(EncodedFrames):
+    """Encoded frame pair plus quantized action tokens [B, code_seq_len, quant_dim]."""
+
     tokens: torch.Tensor
     indices: torch.Tensor
     perplexity: torch.Tensor
@@ -491,6 +501,7 @@ class LatentActionModel(nn.Module):
                 image_width // patch_width,
             )
 
+        # Projects pixels [B, C, 1, H, W] to grid tokens [B, 1, h, w, dim].
         self.pixel_projection = self._build_pixel_projection(
             dim=dim,
             channels=channels,
@@ -719,10 +730,10 @@ class LatentActionModel(nn.Module):
             rest_frames: Second frame [B, C, 1, H, W]
 
         Returns:
-            enc_first_frame_tokens: Encoded first frame tokens [B, 1, h, w, d]
-            enc_rest_frames_tokens: Encoded second frame tokens [B, 1, h, w, d]
-            first_tokens_packed: Packed first frame latents [B, h*w, d]
-            last_tokens_packed: Packed second frame latents [B, h*w, d]
+            enc_first_frame_tokens: frame token grid [B, 1, h, w, d]
+            enc_rest_frames_tokens: frame token grid [B, 1, h, w, d]
+            first_tokens_packed: same grid packed to [B, h*w, d] for VQ
+            last_tokens_packed: same grid packed to [B, h*w, d] for VQ
         """
         enc_first_frame_tokens = self.encoder_projection(first_frame)
         enc_rest_frames_tokens = self.encoder_projection(rest_frames)
@@ -742,23 +753,22 @@ class LatentActionModel(nn.Module):
 
     def encode(self, tokens):
         """
-        Encodes continuous video tokens into latent representations.
+        Encode frame token grids into latent frame token grids.
 
         Args:
-            tokens: Continuous feature vectors (embeddings) of shape [B, T, h, w, d].
-                    These are NOT discrete indices.
-                    h, w = patch_height_width (e.g., 8x8)
-                    d = dim (e.g., 1024)
+            tokens: frame token grids [B, T, h, w, d], where each [h, w] location
+                corresponds to one image patch region and `d` is the feature dim.
 
         Returns:
-            first_tokens: Latent representation of the first frame [B, 1, h, w, d]
-            last_tokens: Latent representation of the last frame [B, 1, h, w, d]
+            first_tokens: latent token grid for frame 1 [B, 1, h, w, d]
+            last_tokens: latent token grid for frame 2 [B, 1, h, w, d]
         """
         b = tokens.shape[0]
         h, w = self.patch_height_width
 
         video_shape = tuple(tokens.shape[:-1])
 
+        # Spatial transformer runs within each frame: [B, T, h, w, d] -> [(B*T), (h*w), d].
         tokens = rearrange(tokens, "b t h w d -> (b t) (h w) d")
 
         attn_bias = self.spatial_rel_pos_bias(h, w, device=tokens.device)
@@ -769,6 +779,7 @@ class LatentActionModel(nn.Module):
 
         tokens = rearrange(tokens, "(b t) (h w) d -> b t h w d", b=b, h=h, w=w)
 
+        # Temporal transformer runs per spatial cell across time: [(B*h*w), T, d].
         tokens = rearrange(tokens, "b t h w d -> (b h w) t d")
 
         tokens = self.enc_temporal_transformer(tokens, video_shape=video_shape)
@@ -827,6 +838,7 @@ class LatentActionModel(nn.Module):
         return recon_video
 
     def _codebook_ids_from_video(self, video: torch.Tensor) -> torch.Tensor:
+        """Encode a frame pair and return only discrete code ids [B, code_seq_len]."""
         encoded = self._encode_video_pair(video)
         return self.vq.get_indices(encoded.first_tokens, encoded.last_tokens)
 
@@ -836,6 +848,13 @@ class LatentActionModel(nn.Module):
         *,
         user_action_token_num=None,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """Encode a frame pair and run VQ inference.
+
+        Returns:
+        - first_frame: [B, C, 1, H, W]
+        - tokens: flat quantized tokens [B, code_seq_len, quant_dim]
+        - indices: discrete ids [B, code_seq_len]
+        """
         encoded = self._encode_video_pair(video)
         if user_action_token_num is not None:
             tokens, indices = self.vq.inference(
@@ -850,6 +869,7 @@ class LatentActionModel(nn.Module):
         return encoded.first_frame, tokens, indices
 
     def _normalize_video_input(self, video: torch.Tensor) -> torch.Tensor:
+        """Normalize input to [B, C, T, H, W] and validate the configured image size."""
         if video.ndim not in {4, 5}:
             raise ValueError(f"Expected 4D or 5D input, got {video.ndim}D")
         if video.ndim == 4:
@@ -861,10 +881,16 @@ class LatentActionModel(nn.Module):
         return video
 
     def _encode_video_pair(self, video: torch.Tensor) -> EncodedFrames:
+        """Encode a 2-frame video into frame features and packed latent tokens.
+
+        The model first builds a frame token grid [B, 1, h, w, d] for each frame,
+        then packs each grid to [B, h*w, d] so VQ can treat it as a token sequence.
+        """
         first_frame, rest_frames = video[:, :, :1], video[:, :, 1:]
         enc_first_frame_tokens, enc_rest_frames_tokens, first_tokens, last_tokens = (
             self._encode_frames(first_frame, rest_frames)
         )
+        # first_tokens / last_tokens are packed per-frame grids: [B, h*w, dim].
         return EncodedFrames(
             batch_size=int(video.shape[0]),
             device=video.device,
@@ -877,11 +903,24 @@ class LatentActionModel(nn.Module):
         )
 
     def _quantize_encoded_video(self, encoded: EncodedFrames) -> EncodedBatch:
+        """Quantize packed frame latents into an action representation.
+
+        Inputs:
+        - `first_tokens` / `last_tokens`: packed frame latents [B, h*w, d]
+
+        Outputs:
+        - `tokens`: quantized action embeddings [B, code_seq_len, quant_dim]
+        - `indices`: discrete code ids [B, code_seq_len]
+
+        This action sequence is the compressed representation of the transition
+        from the first frame to the second frame.
+        """
         tokens, perplexity, _, indices = self.vq(
             encoded.first_tokens,
             encoded.last_tokens,
             codebook_training_only=False,
         )
+        # VQ returns a flat action sequence [B, code_seq_len, quant_dim].
         return EncodedBatch(
             batch_size=encoded.batch_size,
             device=encoded.device,
@@ -897,7 +936,14 @@ class LatentActionModel(nn.Module):
         )
 
     def _prepare_action_tokens(self, encoded: EncodedBatch) -> torch.Tensor:
+        """Reshape the flat action sequence into an action grid for decoder cross-attention.
+
+        `tokens` starts as [B, code_seq_len, quant_dim]. We reshape it to
+        [B, 1, ah, aw, quant_dim] so the decoder can treat the latent action as a
+        small 2D layout of action slots rather than a flat list.
+        """
         action_h, action_w = self.action_shape
+        # Decoder branches consume a spatial action grid [B, 1, ah, aw, quant_dim].
         action_tokens = rearrange(
             encoded.tokens,
             "b (t h w) d -> b t h w d",
@@ -910,6 +956,7 @@ class LatentActionModel(nn.Module):
         return action_tokens
 
     def _update_codebook_stats(self, step: int) -> CodebookStats:
+        """Collect replacement-window stats and optionally refresh underused codebook entries."""
         step_i = int(step)
         current_vq_discarding_threshold = self._get_vq_discarding_threshold(step_i)
         window_total = self.vq.codebooks_used.sum().detach()
@@ -956,6 +1003,7 @@ class LatentActionModel(nn.Module):
         step: int,
         codebook: CodebookStats,
     ) -> dict[str, object]:
+        """Build the base per-step metrics dict before decoder-specific losses append to it."""
         metrics: dict[str, object] = {
             "code_usage_perplexity_in_batch": perplexity.detach(),
             "replacement_applied_this_step": codebook.codebook_replaced,
@@ -978,6 +1026,12 @@ class LatentActionModel(nn.Module):
         first_frame: torch.Tensor,
         device: torch.device,
     ) -> tuple[int, int, torch.Tensor, Optional[torch.Tensor]]:
+        """Prepare the decoder context grid built from the first frame.
+
+        `pixel_context` is a frame token grid [B, 1, h, w, d]. Decoder branches use
+        it as the spatial canvas for the predicted next-frame representation, while
+        the action grid supplies the transition information via cross-attention.
+        """
         h_dec, w_dec = self.patch_height_width
         attn_bias = self.spatial_rel_pos_bias(h_dec, w_dec, device=device)
 
@@ -991,6 +1045,7 @@ class LatentActionModel(nn.Module):
                 raise RuntimeError(
                     "decoder_context_projection is required when a pixel-context decoder is enabled"
                 )
+            # Shared decoder context tokens: [B, 1, h, w, dim].
             pixel_context = self.decoder_context_projection(first_frame)
         return h_dec, w_dec, attn_bias, pixel_context
 
