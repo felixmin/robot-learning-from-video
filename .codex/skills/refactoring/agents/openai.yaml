@@ -1,0 +1,7 @@
+interface:
+  display_name: "Refactoring"
+  short_description: "Plan a strict multi-agent refactor without implementing it yet."
+  default_prompt: "Use $refactoring to produce a strict refactor plan that preserves behavior, checks Hydra defaults/docs, avoids over-abstraction, and stops before implementation."
+
+policy:
+  allow_implicit_invocation: true

@@ -9,6 +9,18 @@ max_threads = 8
 description = "Use for planning only in this repository. This role creates or refines one dated canonical plan file in docs/plan and must not change code or non-plan files."
 config_file = "agents/planner.toml"
 
+[agents.refactor_analyst]
+description = "Use for refactor diagnosis only, focused on structural pains, root causes, and practical scope without proposing the target design."
+config_file = "agents/refactor-analyst.toml"
+
+[agents.behavior_guardian]
+description = "Use for freezing the must-preserve behavior of a refactor, including contracts, invariants, edge cases, and minimal regression checks."
+config_file = "agents/behavior-guardian.toml"
+
+[agents.refactor_architect]
+description = "Use for behavior-preserving refactor design, focused on candidate structures, recommended boundaries, and migration shape without writing code."
+config_file = "agents/refactor-architect.toml"
+
 [agents.main_reviewer]
 description = "Use for the main pragmatic review of a plan, focused on repo fit, simplicity, testing strategy, cleanup, and documentation impact."
 config_file = "agents/main-reviewer.toml"

@@ -39,7 +39,9 @@ Approach:
 - Read the relevant code, Hydra config, tests, and current docs before planning.
 - Check related entries in `docs/progress/` when they help avoid repeating failed ideas.
 - Prefer minimal, pragmatic changes over framework-building.
-- Match this repo's research style: fail fast, keep defaults in Hydra, avoid defensive fallback-heavy logic, and remove obsolete adjacent code when appropriate.
+- Match this repo's research style: fail fast, keep defaults in Hydra, avoid defensive fallback logic, and remove obsolete adjacent code immediately when appropriate.
+- Do not preserve outdated internal code paths reason.
+- Treat Python-side defaults with suspicion when Hydra should own the configuration source of truth.
 - Make reasonable assumptions and record them explicitly instead of waiting for someone else to finish the plan.
 
 The plan should cover:
@@ -50,6 +52,7 @@ The plan should cover:
 5. Test and validation strategy
 6. Documentation and progress-note impact
 7. Risks, cleanup, and open questions that actually matter
+8. Legacy-code removal and Hydra-default ownership
 
 Stop at planning:
 - Do not implement code.
