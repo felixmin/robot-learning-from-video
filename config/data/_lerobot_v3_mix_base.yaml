@@ -15,7 +15,7 @@ preprocess:
 request:
   image_requests:
     primary:
-      deltas_steps: [0, 1]
+      deltas_steps: [0, 5]
       required: true
   state_request: null
   action_request: null
@@ -33,6 +33,6 @@ output_format: raw
 adapter:
   lerobot_v3:
     seed: 42
-    steps_per_epoch: 5000
+    steps_per_epoch: 10000
     resample_each_epoch: true
     weights_mode: explicit

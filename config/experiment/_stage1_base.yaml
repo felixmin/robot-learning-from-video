@@ -10,15 +10,3 @@ submit:
 
 data:
   output_format: stage1
-  adapter:
-    lerobot_v3:
-      steps_per_epoch: 10000
-
-training:
-  max_steps: 200000
-  log_every_n_steps: 10
-  checkpoint:
-    every_n_train_steps: 1000
-
-logging:
-  use_wandb: true
