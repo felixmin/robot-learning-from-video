@@ -1,0 +1,57 @@
+FROM nvcr.io/nvidia/cuda:12.4.0-devel-ubuntu22.04
+
+ARG PYTHON_VERSION=3.10
+ARG VENV_PATH=/opt/hlrp-venv
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    MUJOCO_GL=osmesa \
+    PYTHONPATH=/workspace/high-level-robot-planner/packages \
+    VIRTUAL_ENV=${VENV_PATH} \
+    PATH=${VENV_PATH}/bin:${PATH}
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential git curl ca-certificates \
+    libglib2.0-0 \
+    libegl1-mesa-dev libgl1-mesa-dev libgl1-mesa-glx libegl1-mesa libgles2-mesa-dev \
+    libavformat-dev libavcodec-dev libavdevice-dev libavutil-dev \
+    libswscale-dev libswresample-dev libavfilter-dev \
+    ffmpeg \
+    pkg-config cmake ninja-build \
+    libosmesa6-dev libglfw3 xvfb \
+    libusb-1.0-0-dev speech-dispatcher libgeos-dev portaudio19-dev \
+    python${PYTHON_VERSION} python${PYTHON_VERSION}-venv python${PYTHON_VERSION}-dev \
+    && useradd --create-home --shell /bin/bash user_hlrp \
+    && usermod -aG sudo user_hlrp \
+    && mkdir -p /workspace/high-level-robot-planner ${VENV_PATH} \
+    && chown -R user_hlrp:user_hlrp /workspace ${VENV_PATH} \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /workspace/high-level-robot-planner
+
+USER user_hlrp
+
+ENV HOME=/home/user_hlrp \
+    HF_HOME=/home/user_hlrp/.cache/huggingface \
+    HF_LEROBOT_HOME=/home/user_hlrp/.cache/huggingface/lerobot \
+    TORCH_HOME=/home/user_hlrp/.cache/torch \
+    TRITON_CACHE_DIR=/home/user_hlrp/.cache/triton
+
+COPY --chown=user_hlrp:user_hlrp containers/requirements.unified.txt /opt/hlrp-unified.txt
+COPY --chown=user_hlrp:user_hlrp config/ config/
+COPY --chown=user_hlrp:user_hlrp scripts/ scripts/
+COPY --chown=user_hlrp:user_hlrp packages/ packages/
+COPY --chown=user_hlrp:user_hlrp lerobot/pyproject.toml lerobot/README.md lerobot/MANIFEST.in lerobot/setup.py /opt/lerobot-src/
+COPY --chown=user_hlrp:user_hlrp lerobot/src /opt/lerobot-src/src
+COPY --chown=user_hlrp:user_hlrp lerobot_policy_hlrp/pyproject.toml lerobot_policy_hlrp/README.md /opt/lerobot-policy-hlrp-src/
+COPY --chown=user_hlrp:user_hlrp lerobot_policy_hlrp/src /opt/lerobot-policy-hlrp-src/src
+
+RUN python${PYTHON_VERSION} -m venv ${VENV_PATH} \
+    && ${VENV_PATH}/bin/python -m ensurepip --upgrade \
+    && ${VENV_PATH}/bin/python -m pip install --upgrade "pip<26" "setuptools>=71,<81" wheel \
+    && ${VENV_PATH}/bin/python -m pip install --no-build-isolation egl_probe PyOpenGL-accelerate \
+    && ${VENV_PATH}/bin/python -m pip install --no-build-isolation -r /opt/hlrp-unified.txt \
+    && (${VENV_PATH}/bin/python -m pip uninstall -y torchao || true) \
+    && ${VENV_PATH}/bin/python -m pip check \
+    && ${VENV_PATH}/bin/python -c "import importlib; import common, stage2, lam, lerobot, lerobot_policy_hlrp; importlib.import_module('lerobot.scripts.lerobot_train'); print('unified image python env ok')"
+
+CMD ["/bin/bash"]

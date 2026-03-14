@@ -1,0 +1,25 @@
+--extra-index-url https://download.pytorch.org/whl/cu124
+
+# CUDA-matched PyTorch stack for the raw CUDA base image.
+torch==2.7.1
+torchvision==0.22.1
+torchaudio==2.7.1
+
+# Bundled local packages shared across all stages.
+/opt/lerobot-src[libero,smolvla]
+/opt/lerobot-policy-hlrp-src
+
+# Shared HLRP runtime additions not provided by the LeRobot install.
+hydra-core
+omegaconf
+wandb==0.24.0
+transformers==4.57.3
+huggingface-hub==0.35.3
+matplotlib
+rich
+beartype
+nvidia-ml-py
+
+# Stage-1/2-only additions.
+lightning
+lightning-fabric
