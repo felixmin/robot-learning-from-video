@@ -1,0 +1,18 @@
+# @package data
+
+defaults:
+  - _lerobot_v3_mix_base
+  - _self_
+
+dataset:
+  lerobot:
+    sources:
+      - repo_id: HuggingFaceVLA/libero
+        revision: main
+        weight: 5.0
+        camera_map:
+          primary: observation.images.image
+        state_key: observation.state
+        action_key: action
+        video_backend: pyav
+        val_episode_count: 2
