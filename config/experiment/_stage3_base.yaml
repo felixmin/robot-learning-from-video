@@ -3,7 +3,7 @@
 defaults:
   - /model/shared@stage2_policy_core: stage2_policy_core
   - /lerobot_policy@lerobot.policy: smolvla_shared_base
-  - /stage3_profile@stage3_profile: action_scratch
+  - /stage3_profile@stage3_profile: multitask_scratch
   - /stage3_dataset: libero
 
 submit:
@@ -21,7 +21,7 @@ lerobot:
   steps: 100000
   batch_size: ${stage3_profile.batch_size}
   grad_accum_steps: 1
-  num_workers: 4
+  num_workers: 8
   log_freq: 200
   save_freq: 20000
   use_policy_training_preset: false
