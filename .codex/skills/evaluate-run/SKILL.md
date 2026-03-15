@@ -1,6 +1,6 @@
 ---
 name: evaluate-run
-description: Evaluate an HLRP run from a flexible reference such as a job id, run directory, documented run stem, docs note, config path, or the phrase `check last run`. For documented runs, update the matching file in `docs/runs/` once the run has finished. For lightweight or still-active runs, return a normal evaluation summary without writing docs.
+description: Evaluate an HLRP run from a flexible reference such as a job id, run directory, documented run stem, docs note, config path, or the phrase `check last run`. For documented runs, update the matching file in `docs/runs/` once the run has finished. Rollout evaluations launched with `scripts/7_rollout_lerobot.py` should update the source Stage 3 run note instead of creating or expecting a separate rollout note. For lightweight or still-active runs, return a normal evaluation summary without writing docs.
 ---
 
 # Evaluate Run
@@ -113,7 +113,8 @@ For Stage 3 train runs:
 For rollout runs:
 - focus on rollout success, task-wise behavior, and failure patterns
 - use aggregate success and qualitative artifacts when available
-- for completed documented rollout runs, add markdown tables to the docs note for overall and per-group metrics, plus a compact task-outcome bucket table when those counts are available
+- when the rollout is attached to a documented Stage 3 training run, write the rollout findings into that source training note under a rollout-specific section instead of creating a separate rollout note
+- add markdown tables for overall and per-group metrics, plus a compact task-outcome bucket table when those counts are available
 
 ## Active runs
 
@@ -134,7 +135,8 @@ When updating the docs note:
 - fill in final status
 - add the resolved run directory
 - add concise factual findings under `Results / Findings`
-- for rollout runs, include the rollout metrics tables from the template when the underlying artifacts support them
+- for rollout evaluations tied to a documented Stage 3 training run, append a rollout section to that training note instead of treating the rollout as its own canonical note
+- for rollout runs, include the rollout metrics tables when the underlying artifacts support them
 - include enough detail to support later ablations or experiment writeups
 
 Do not write docs when:

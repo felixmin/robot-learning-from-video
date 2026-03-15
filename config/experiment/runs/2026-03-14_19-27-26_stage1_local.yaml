@@ -1,0 +1,16 @@
+# @package _global_
+
+defaults:
+  - _stage1_base
+  - /validation@validation: stage1_local_rich
+  - /cluster@cluster: local_dev
+  - optional /user_config: local
+  - override /data@data: libero
+
+experiment:
+  name: stage1_local
+  description: "Local Stage 1 LAM overfit on Libero-only data for downstream Stage 3 latent supervision"
+
+logging:
+  runs_dir: ${logging.root_dir}/runs/2026-03-14_19-27-26_stage1_local
+

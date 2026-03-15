@@ -1,6 +1,6 @@
 ---
 name: start-run
-description: Start a local or cluster HLRP run across Stage 1, Stage 2, Stage 3, or rollout. Default to a documented major run that creates a dated config in `config/experiment/runs/` and a matching note in `docs/runs/`. Only skip that documentation flow when the user explicitly says `test` or `debug`. Use direct stage scripts for local runs and `scripts/submit_job.py` for cluster runs. For the logical `lrz cluster`, dual-submit to `lrz_x100` and `mcml_x100`, then cancel the losing job with the 1-hour predicted-start rule.
+description: Start a local or cluster HLRP run across Stage 1, Stage 2, Stage 3, or rollout. Default to a documented major run that creates a dated config in `config/experiment/runs/` and a matching note in `docs/runs/`. Only skip that documentation flow when the user explicitly says `test` or `debug`. Post-training rollouts launched with `scripts/7_rollout_lerobot.py` are treated as evaluation attached to the source Stage 3 run note rather than as a new documented run. Use direct stage scripts for local runs and `scripts/submit_job.py` for cluster runs. For the logical `lrz cluster`, dual-submit to `lrz_x100` and `mcml_x100`, then cancel the losing job with the 1-hour predicted-start rule.
 ---
 
 # Start Run
@@ -30,6 +30,7 @@ Only treat the run as lightweight and undocumented when the user explicitly says
 Rules:
 - Major run: create a dated experiment config and a matching docs note before launch.
 - Lightweight run: do not create a new experiment config and do not create a docs note.
+- Post-training rollout for an existing Stage 3 run: do not create a new docs note; append the rollout launch and results to the source Stage 3 run note.
 - Lightweight runs should use the closest existing stage experiment plus CLI overrides.
 
 ## Stage mapping
@@ -69,6 +70,7 @@ Rollout-specific contract:
 - `lerobot_eval.policy_path` must point to the exported `pretrained_model` directory inside a saved checkpoint.
 - Use paths such as `.../lerobot/checkpoints/last/pretrained_model` or `.../lerobot/checkpoints/100000/pretrained_model`.
 - Do not point `lerobot_eval.policy_path` at the checkpoint root such as `.../checkpoints/last` without the trailing `pretrained_model`.
+- When the rollout evaluates a completed or existing Stage 3 training run, treat it as evaluation of that training run, not as a separate experiment lineage.
 
 ## Naming contract
 
@@ -248,11 +250,29 @@ If the user is resuming a run:
 - ensure any step-based limits still allow additional work
 
 If the user asks to start rollouts from an existing Stage 3 training run:
-- treat the rollout as a new documented rollout run unless the user explicitly says `test` or `debug`
-- derive the rollout config from `stage3_rollout_local` or `stage3_rollout_cluster`
+- do not create a new `docs/runs/<stem>.md`
+- append rollout planning, launch details, and eventual results to the source training run note
+- keep the evaluation visually separate inside that note under a new bottom section such as `## Rollout Evaluation` or an additional dated rollout subsection
 - point `lerobot_eval.policy_path` at the source run's saved `pretrained_model` directory
-- document the source training run stem and resolved checkpoint path in the rollout note
+- document the source checkpoint path, rollout command, run directory, and monitoring details in that existing note
+- prefer direct CLI overrides for the rollout command
+- only create a dedicated rollout config when the rollout setup is complex enough that reproducing it from CLI overrides would be error-prone
+- if a dedicated rollout config is created for reproducibility, do not create a separate rollout markdown note for it
 - for local rollout launches, record the `tmux` session and window used for monitoring
+
+## Rollout documentation contract
+
+For post-training rollouts tied to an existing Stage 3 run:
+- the canonical markdown note remains the source Stage 3 training note
+- the rollout should be documented as evaluation attached to that run, because `scripts/7_rollout_lerobot.py` does not produce new weights
+- include at minimum:
+  - rollout date
+  - local or cluster mode
+  - rollout command
+  - rollout run directory
+  - resolved `lerobot_eval.policy_path`
+  - final metrics and qualitative findings when available
+- if there are multiple rollout passes for the same training run, append them chronologically within the same note rather than creating sibling rollout notes
 
 ## Output standard
 

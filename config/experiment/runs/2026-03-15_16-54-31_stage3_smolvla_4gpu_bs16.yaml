@@ -1,0 +1,23 @@
+# @package _global_
+
+defaults:
+  - _stage3_base
+  - /cluster@cluster: lrz_x100
+  - /runtime: stage3_cluster
+  - optional /user_config: local
+  - override /stage3_profile@stage3_profile: action_scratch
+
+experiment:
+  name: stage3_smolvla_4gpu_bs16
+  description: "Cluster Stage 3 Libero action-scratch training (HLRP shared SmolVLA policy) on 4x A100 with global batch size 16"
+
+logging:
+  runs_dir: ${logging.root_dir}/runs/2026-03-15_16-54-31_stage3_smolvla_4gpu_bs16
+
+cluster:
+  compute:
+    gpus_per_node: 4
+    time_limit: "06:20:00"
+
+lerobot:
+  batch_size: 16

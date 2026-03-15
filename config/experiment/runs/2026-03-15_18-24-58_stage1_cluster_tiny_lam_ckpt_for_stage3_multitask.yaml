@@ -1,0 +1,19 @@
+# @package _global_
+
+defaults:
+  - _stage1_base
+  - /validation@validation: stage1_cluster_rich
+  - /cluster@cluster: mcml_x100
+  - optional /user_config: local
+
+experiment:
+  name: 2026-03-15_18-24-58_stage1_cluster_tiny_lam_ckpt_for_stage3_multitask
+  description: "Short cluster Stage 1 run to produce a valid LAM checkpoint for later Stage 3 multitask training."
+
+logging:
+  runs_dir: ${logging.root_dir}/runs/${experiment.name}
+  tags: ["stage1", "cluster", "tiny-ckpt", "lam", "stage3-bootstrap"]
+
+training:
+  max_steps: 50
+  num_sanity_val_steps: 0
