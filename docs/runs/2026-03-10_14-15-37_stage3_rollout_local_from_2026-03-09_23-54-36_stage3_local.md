@@ -38,6 +38,10 @@
   Source Run: `2026-03-09_23-54-36_stage3_local`
   Path: `/mnt/data/workspace/runs_root/runs/2026-03-09_23-54-36_stage3_local/lerobot/checkpoints/last/pretrained_model`
   Notes: Final saved Stage 3 policy used as rollout input; the source training run used the `libero_5pct` dataset subset.
+- Type: `stage1 checkpoint`
+  Source Run: `2026-02-24_10-41-51_laq_oxe_local`
+  Path: `/mnt/data/workspace/runs_root/runs/moved_from_repo_dir/runs/2026-02-24_10-41-51_laq_oxe_local/checkpoints/last.ckpt`
+  Notes: Resolved from the source Stage 3 run's saved Hydra config and launch command as the `policy.lam_checkpoint_path` used for latent supervision.
 
 ## Launch Command
 

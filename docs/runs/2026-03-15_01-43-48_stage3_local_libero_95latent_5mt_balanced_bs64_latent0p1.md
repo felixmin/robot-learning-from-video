@@ -3,7 +3,7 @@
 ## Meta
 
 - Date: 2026-03-15
-- Status: running
+- Status: completed
 - Mode: local
 - Host: tueilsy-st-022
 - Code Commit: 7038b673a6b9752420383941de425c3f1adb0848 (inferred from local `git reflog`; HEAD remained on this commit through the 2026-03-15 01:45 CET launch window)
@@ -54,10 +54,16 @@ conda run -n lerobot python scripts/6_train_lerobot.py experiment=runs/2026-03-1
 - Launched locally on `tueilsy-st-022` at `2026-03-15 01:45:34 CET` according to the LeRobot W&B metadata.
 - W&B run path: `felixmin/lerobot/66px0n4q`.
 - The run uses `hlrp/libero_5pct_latent_rest_balanced` with `1693` episodes and `273465` frames, batch size `64`, and local RTX 5090 training.
-- Training is still active. As of `2026-03-15 17:20:56 CET`, the run has completed checkpoint saves through `80k` steps and is currently inside the `80k` evaluation pass.
-- Checkpoint schedule so far: `20k`, `40k`, `60k`, and `80k`, with `lerobot/checkpoints/last -> 080000`.
-- The last saved training-state snapshot records `step=80000`; the latest scheduler state reports learning rate `1.1738457630498262e-04`.
-- Training loss improved from `0.325` at step `200` to about `0.004` by the `80k` checkpoint interval.
-- Evaluation trend improved from `0%` success at `20k` to `7%` overall success on `libero_10` at `60k` (`100` episodes, `avg_sum_reward=0.07`, `avg_max_reward=0.07`).
-- The `80k` evaluation is not finished yet. The current log tail shows early task batches with provisional running success rates of `0%`, `0%`, and `10%`, so no final `80k` aggregate should be recorded yet.
+- Stage 3 training completed at `2026-03-15 21:32:56 CET` according to `unified.log`, for a runtime of about `19h47m`.
+- Saved checkpoints at `020000`, `040000`, `060000`, `080000`, and `100000`, with `lerobot/checkpoints/last -> 100000`.
+- The final training-state snapshot records `step=100000`; the final scheduler state reports learning rate `2.5e-05`.
+- Training loss improved from `0.325` at step `200` to `0.002716` at step `100000`.
+- Final train-side summary at `100k`: `action_loss=0.001053`, `latent_loss=0.016724`, `grad_norm=0.0373`, `action_supervised_fraction=0.4375`, `latent_supervised_fraction=0.890625`.
+- In-training `libero_10` evaluation improved monotonically across checkpoints:
+  - `20k`: `0%` success, `avg_sum_reward=0.00`
+  - `40k`: `6%` success, `avg_sum_reward=0.06`
+  - `60k`: `7%` success, `avg_sum_reward=0.07`
+  - `80k`: `13%` success, `avg_sum_reward=0.13`
+  - `100k`: `20%` success, `avg_sum_reward=0.20`
+- The run appears stable throughout training: loss decays cleanly, no crash markers appear in the local logs, and the final checkpoint/eval pair completed successfully.
 - An earlier local Stage 3 attempt with the same Stage 1 checkpoint exists at `2026-03-15_01-20-13_stage3_local_libero_95latent_5mt_balanced_bs64_lam50k`; this documented run is the follow-up `latent_loss_weight=0.1` variant.

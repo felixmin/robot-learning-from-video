@@ -1,0 +1,23 @@
+# @package _global_
+
+defaults:
+  - stage3_rollout_local
+
+experiment:
+  name: 2026-03-15_22-09-51_stage3_rollout_local_from_2026-03-15_01-43-48_stage3_local_libero_95latent_5mt_balanced_bs64_latent0p1
+  description: "Local Stage 3 rollout for 2026-03-15_01-43-48_stage3_local_libero_95latent_5mt_balanced_bs64_latent0p1 final checkpoint"
+
+logging:
+  runs_dir: /mnt/data/workspace/runs_root/runs/2026-03-15_22-09-51_stage3_rollout_local_from_2026-03-15_01-43-48_stage3_local_libero_95latent_5mt_balanced_bs64_latent0p1
+
+lerobot_eval:
+  policy_path: /mnt/data/workspace/runs_root/runs/2026-03-15_01-43-48_stage3_local_libero_95latent_5mt_balanced_bs64_latent0p1/lerobot/checkpoints/last/pretrained_model
+  env_task: libero_spatial,libero_object,libero_goal,libero_10
+  eval_n_episodes: 10
+  eval_batch_size: 1
+  seed: 1000
+  policy_device: cuda
+  policy_use_amp: false
+  trust_remote_code: false
+  extra_args:
+    - --env.max_parallel_tasks=1
