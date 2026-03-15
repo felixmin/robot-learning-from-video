@@ -1,0 +1,25 @@
+# @package _global_
+
+defaults:
+  - _stage1_base
+  - /validation@validation: stage1_cluster_rich
+  - /cluster@cluster: mcml_x100
+  - optional /user_config: local
+  - override /data@data: octo24_libero
+
+experiment:
+  name: 2026-03-15_20-08-57_stage1_cluster_octo24_libero_weight5_4gpu_bs64_8h
+  description: "Cluster Stage 1 training on the Octo24+Libero weight-5 mix using 4 GPUs and per-GPU batch size 64."
+
+logging:
+  runs_dir: ${logging.root_dir}/runs/${experiment.name}
+  tags: ["stage1", "lerobot_v3", "octo24_libero", "cluster", "4gpu", "bs64"]
+
+cluster:
+  compute:
+    gpus_per_node: 4
+    time_limit: 08:00:00
+
+data:
+  loader:
+    batch_size: 64
