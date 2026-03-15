@@ -1,4 +1,4 @@
 [submodule "lerobot"]
 	path = lerobot
-	url = git@github.com:felixmin/lerobot-fork.git
+	url = https://github.com/felixmin/lerobot-fork.git
 	branch = main
