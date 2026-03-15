@@ -505,6 +505,59 @@ def _lerobot_run_command_from_cfg(cfg: DictConfig) -> list[str]:
     return [train_cmd_raw]
 
 
+def _resolve_executable(command: str, *, env: dict[str, str]) -> str:
+    resolved = shutil.which(command, path=env.get("PATH"))
+    return resolved if resolved is not None else command
+
+
+def _gpu_launch_count_from_cfg(cfg: DictConfig) -> int:
+    raw_value = OmegaConf.select(cfg, "cluster.compute.gpus_per_node")
+    if raw_value is None:
+        return 1
+    gpu_count = int(raw_value)
+    if gpu_count < 0:
+        raise ValueError("cluster.compute.gpus_per_node must be >= 0")
+    return gpu_count
+
+
+def _build_stage3_launch_cmd(
+    cfg: DictConfig,
+    *,
+    env: dict[str, str],
+    config_path: Path,
+) -> tuple[list[str], str]:
+    raw_cmd = _lerobot_run_command_from_cfg(cfg)
+    if len(raw_cmd) != 1:
+        raise ValueError("lerobot.command must resolve to a single executable name")
+
+    train_executable = _resolve_executable(raw_cmd[0], env=env)
+    gpu_count = _gpu_launch_count_from_cfg(cfg)
+    node_count = int(OmegaConf.select(cfg, "cluster.compute.num_nodes") or 1)
+
+    base_cmd = [train_executable, "--config_path", str(config_path)]
+    if gpu_count <= 1:
+        return base_cmd, "single-process"
+
+    if node_count != 1:
+        raise ValueError(
+            "Stage-3 multi-node launch is not wired yet. "
+            "Use cluster.compute.num_nodes=1 for Accelerate-based multi-GPU runs."
+        )
+
+    launch_cmd = [
+        sys.executable,
+        "-m",
+        "accelerate.commands.launch",
+        "--multi_gpu",
+        f"--num_processes={gpu_count}",
+        "--no_python",
+        train_executable,
+        "--config_path",
+        str(config_path),
+    ]
+    return launch_cmd, f"accelerate-multi-gpu({gpu_count})"
+
+
 @hydra.main(version_base=None, config_path="../config", config_name="config")
 def main(cfg: DictConfig) -> None:
     logger, _ = setup_run_context(
@@ -547,9 +600,9 @@ def main(cfg: DictConfig) -> None:
 
     runtime_cwd = _runtime_cwd_from_cfg(cfg)
     config_path = _write_lerobot_train_config(cfg, runtime_cwd=runtime_cwd)
-    cmd = _lerobot_run_command_from_cfg(cfg)
-    cmd.extend(["--config_path", str(config_path)])
+    cmd, launch_mode = _build_stage3_launch_cmd(cfg, env=env, config_path=config_path)
     logger.info("Launching LeRobot command:")
+    logger.info("  mode=%s", launch_mode)
     logger.info("  %s", shlex.join(cmd))
     logger.info("  cwd=%s", runtime_cwd)
     subprocess.run(cmd, cwd=str(runtime_cwd), env=env, check=True)

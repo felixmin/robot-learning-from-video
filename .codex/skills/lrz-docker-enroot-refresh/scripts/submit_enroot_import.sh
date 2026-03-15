@@ -11,6 +11,7 @@ CPUS="4"
 MAX_PROCESSORS="4"
 JOB_NAME=""
 OUTPUT=""
+TMPDIR_PATH=""
 DRY_RUN=0
 
 usage() {
@@ -20,7 +21,7 @@ Usage: submit_enroot_import.sh [options]
 Submit the validated high-memory Enroot import job on ssh ai.
 
 Options:
-  --profile PROFILE            One of: stage12, stage3.
+  --profile PROFILE            One of: unified, stage12 (legacy), stage3 (legacy).
   --image-uri URI              Enroot image URI. Defaults from --profile.
   --output PATH                Cluster output .sqsh path. Defaults from --profile.
   --partition PARTITION        Slurm partition. Default: lrz-cpu
@@ -30,6 +31,7 @@ Options:
   --cpus N                     Slurm cpus-per-task. Default: 4
   --max-processors N           ENROOT_MAX_PROCESSORS. Default: 4.
   --job-name NAME              Slurm job name. Defaults from --profile.
+  --tmpdir PATH                TMPDIR/PARALLEL_TMPDIR inside the job. Defaults to <output-dir>/tmp.
   --dry-run                    Print the ssh/sbatch command without executing it.
   -h, --help                   Show this message.
 EOF
@@ -37,7 +39,13 @@ EOF
 
 apply_profile_defaults() {
   case "${PROFILE}" in
-    stage12|default|laq|foundation)
+    unified|default)
+      PROFILE="unified"
+      [[ -n "${IMAGE_URI}" ]] || IMAGE_URI="docker://felixmin/hlrp:unified-cuda-cu128"
+      [[ -n "${JOB_NAME}" ]] || JOB_NAME="enroot-import-hlrp-unified-cu128"
+      [[ -n "${OUTPUT}" ]] || OUTPUT="/dss/dssmcmlfs01/pn57pi/pn57pi-dss-0001/felix_minzenmay/enroot/hlrp_unified_cu128_imported_$(date +%F_%H%M%S).sqsh"
+      ;;
+    stage12|laq|foundation)
       PROFILE="stage12"
       [[ -n "${IMAGE_URI}" ]] || IMAGE_URI="docker://felixmin/hlrp:stage12"
       [[ -n "${JOB_NAME}" ]] || JOB_NAME="enroot-import-hlrp-stage12"
@@ -98,6 +106,10 @@ while [[ $# -gt 0 ]]; do
       JOB_NAME="$2"
       shift 2
       ;;
+    --tmpdir)
+      TMPDIR_PATH="$2"
+      shift 2
+      ;;
     --dry-run)
       DRY_RUN=1
       shift
@@ -115,7 +127,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ -z "${PROFILE}" ]]; then
-  echo "--profile is required (stage12 or stage3)" >&2
+  echo "--profile is required (unified, stage12, or stage3)" >&2
   usage >&2
   exit 1
 fi
@@ -128,13 +140,22 @@ if [[ "${IMAGE_URI}" == docker://docker.io/* ]]; then
 fi
 
 OUTPUT_DIR=$(dirname "${OUTPUT}")
-WRAP_RAW="set -eu; test ! -e \"${OUTPUT}\"; mkdir -p \"${OUTPUT_DIR}\"; export ENROOT_MAX_PROCESSORS=\"${MAX_PROCESSORS}\"; enroot import -o \"${OUTPUT}\" \"${IMAGE_URI}\"; ls -lh \"${OUTPUT}\""
+[[ -n "${TMPDIR_PATH}" ]] || TMPDIR_PATH="${OUTPUT_DIR}/tmp"
+ENROOT_CACHE_PATH="${OUTPUT_DIR}/cache"
+WRAP_RAW="set -eu; test ! -e \"${OUTPUT}\"; mkdir -p \"${OUTPUT_DIR}\" \"${TMPDIR_PATH}\" \"${ENROOT_CACHE_PATH}\"; export TMPDIR=\"${TMPDIR_PATH}\"; export PARALLEL_TMPDIR=\"${TMPDIR_PATH}\"; export ENROOT_CACHE_PATH=\"${ENROOT_CACHE_PATH}\"; export ENROOT_MAX_PROCESSORS=\"${MAX_PROCESSORS}\"; enroot import -o \"${OUTPUT}\" \"${IMAGE_URI}\"; ls -lh \"${OUTPUT}\""
 printf -v REMOTE_CMD 'sbatch -p %q -q %q -t %q --mem=%q -c %q -J %q --wrap %q' \
   "${PARTITION}" "${QOS}" "${TIME_LIMIT}" "${MEMORY}" "${CPUS}" "${JOB_NAME}" "${WRAP_RAW}"
 
 printf 'Profile: %s\n' "${PROFILE}"
 printf 'Image URI: %s\n' "${IMAGE_URI}"
 printf 'Output: %s\n' "${OUTPUT}"
+printf 'TMPDIR: %s\n' "${TMPDIR_PATH}"
+printf 'ENROOT cache: %s\n' "${ENROOT_CACHE_PATH}"
+if [[ "${PROFILE}" == "stage12" || "${PROFILE}" == "stage3" ]]; then
+  printf 'Mode: legacy split-image workflow\n'
+else
+  printf 'Mode: canonical unified workflow\n'
+fi
 printf '+ ssh ai %q\n' "${REMOTE_CMD}"
 if [[ "${DRY_RUN}" -eq 0 ]]; then
   ssh ai "${REMOTE_CMD}"

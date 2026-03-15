@@ -213,12 +213,16 @@ python scripts/submit_job.py \
 
 ## Container Configuration
 
-The container image path is required and should live in the selected cluster config:
+The container image path is required. In the normal operator workflow it comes
+from `config/user_config/local.yaml`, which points at a dated imported unified
+`.sqsh` under DSS `enroot/`. One-off Hydra overrides can still replace it for a
+single submission.
 
 ```yaml
-# config/cluster/<cluster>.yaml
-container:
-  image: /path/to/container.sqsh
+# config/user_config/local.yaml
+cluster:
+  container:
+    image: /dss/.../enroot/hlrp_unified_cu128_imported_<timestamp>.sqsh
 ```
 
 ### Override Container
@@ -299,7 +303,7 @@ Each job generates a script like:
 #SBATCH --time=15:00:00
 #SBATCH --output=/dss/.../runs/slurm/%j.out
 #SBATCH --error=/dss/.../runs/slurm/%j.err
-#SBATCH --container-image=/dss/.../enroot/hlrp_stage12.sqsh
+#SBATCH --container-image=/dss/.../enroot/hlrp_unified_cu128_imported_<timestamp>.sqsh
 #SBATCH --container-mounts=/dss/.../high-level-robot-planner:/dss/.../high-level-robot-planner
 #SBATCH --container-workdir=/dss/.../high-level-robot-planner
 
@@ -357,7 +361,8 @@ Submits 6 jobs (2 datasets × 3 seeds).
 
 ### "Container image not found"
 
-Set `cluster.container.image` in your cluster config (or override with `cluster.container.image=/path/to/container.sqsh`).
+Update `config/user_config/local.yaml` to a valid imported `.sqsh` (or override
+with `cluster.container.image=/path/to/container.sqsh` for a one-off run).
 
 ### Job stuck in "Priority" state
 

@@ -170,14 +170,23 @@ Typical sequence:
    - `scancel <other_job_id>`
 
 ## Container/Image Notes
-- Current state: two separate containers are used.
-  - Container A: latent action model (stage-1) and Stage-2 policy training.
-  - Container B: LeRobot/stage-3 environment.
-  - This is work in progress and may be unified later.
-- Stage-1/2 image:
-  - `/dss/dssmcmlfs01/pn57pi/pn57pi-dss-0001/felix_minzenmay/enroot/hlrp_stage12.sqsh`
-- Stage-3 image:
-  - `/dss/dssmcmlfs01/pn57pi/pn57pi-dss-0001/felix_minzenmay/enroot/hlrp_stage3_lerobot.sqsh`
+- Current state: the unified container is the intended runtime for all stages.
+- Canonical Docker build target:
+  - `containers/Dockerfile.unified`
+- Canonical Docker tag:
+  - `felixmin/hlrp:unified-cuda-cu128`
+- Imported cluster images live as dated `.sqsh` files under:
+  - `/dss/dssmcmlfs01/pn57pi/pn57pi-dss-0001/felix_minzenmay/enroot`
+- The default operator config points cluster jobs at the active imported image via:
+  - `config/user_config/local.yaml`
+- On activation of a new image:
+  - move the previously configured `.sqsh` into `enroot/old/`
+  - keep the new `.sqsh` in `enroot/`
+  - update `config/user_config/local.yaml`
+- Keep Enroot import scratch/cache on DSS, not home:
+  - `TMPDIR`
+  - `PARALLEL_TMPDIR`
+  - `ENROOT_CACHE_PATH`
 - If image import/build is needed:
   - Run Enroot import on a compute node (not login node if Enroot unavailable there).
   - Enroot import can OOM; request enough memory.
@@ -222,7 +231,7 @@ Example via submit script:
 - `planning`: Create or refine one dated canonical plan in `docs/plan/` for a non-trivial change, review it with `main_reviewer`, `big_picture_reviewer`, and `research_reviewer`, and optionally add compute or devil's-advocate review before implementation. (file: `/mnt/data/workspace/code/high-level-robot-planner/.codex/skills/planning/SKILL.md`)
 - `implementation`: Execute an approved dated plan from `docs/plan/` through `implementer`, `test_runner`, and `final_reviewer`, with optional research or devil's-advocate review and `docs/progress/` updates when warranted. (file: `/mnt/data/workspace/code/high-level-robot-planner/.codex/skills/implementation/SKILL.md`)
 - `hlrp-code-quality`: Run and repair the workstation QA workflow: `scripts/0_setup_environment.py`, `ruff check`, `black --check`, `pytest`, and the documented coverage run in order. (file: `/mnt/data/workspace/code/high-level-robot-planner/.codex/skills/hlrp-code-quality/SKILL.md`)
-- `lrz-docker-enroot-refresh`: Build, push, prune, import, and safely swap the LRZ stage-1/2 or stage-3 container using `containers/Dockerfile.stage12` or `containers/Dockerfile.stage3`, the bundled `lerobot/` Docker build context in this repo when needed, and the `felix_minzenmay/enroot/hlrp_stage12.sqsh` or `felix_minzenmay/enroot/hlrp_stage3_lerobot.sqsh` cluster paths. (file: `/mnt/data/workspace/code/high-level-robot-planner/.codex/skills/lrz-docker-enroot-refresh/SKILL.md`)
+- `lrz-docker-enroot-refresh`: Build, push, import, archive, and activate the unified LRZ container using `containers/Dockerfile.unified`, `felixmin/hlrp:unified-cuda-cu128`, dated DSS `enroot` imports, and `config/user_config/local.yaml` as the default activation target. (file: `/mnt/data/workspace/code/high-level-robot-planner/.codex/skills/lrz-docker-enroot-refresh/SKILL.md`)
 
 ### How to use repo-local skills
 - If the user asks to plan a non-trivial change or refine an existing plan, open `planning` and follow it.

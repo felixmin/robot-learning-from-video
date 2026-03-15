@@ -15,8 +15,12 @@ can stay parameterized by build args. The currently validated unified image uses
 
 ## Cluster Setup
 
-Cluster presets no longer hardcode a user-specific container path. Set your own
-imported unified image in `config/user_config/local.yaml`:
+Cluster presets no longer hardcode a user-specific container path. The normal
+operator workflow keeps a dated imported `.sqsh` under DSS `enroot/`, archives
+the previously active image into `enroot/old/`, and updates
+`config/user_config/local.yaml` to the new path.
+
+The default operator target config is `config/user_config/local.yaml`:
 
 ```yaml
 cluster:
@@ -40,13 +44,15 @@ unified image.
 1. Build on the workstation.
 2. Push the image tag to Docker Hub.
 3. Import that tag to the cluster with Enroot.
-4. Point your `config/user_config/local.yaml` at the imported `.sqsh`.
+4. Keep Enroot scratch and cache on DSS, not home.
+5. Archive the previously configured image into `enroot/old/`.
+6. Update `config/user_config/local.yaml` to the new imported `.sqsh`.
 
 Example build command:
 
 ```bash
-docker build -f containers/Dockerfile.unified \
-  -t felixmin/hlrp:unified-cuda-cu128 .
+bash .codex/skills/lrz-docker-enroot-refresh/scripts/build_push_prune.sh \
+  --profile unified
 ```
 
 Example Enroot import target:
@@ -54,3 +60,22 @@ Example Enroot import target:
 ```bash
 /dss/dssmcmlfs01/pn57pi/pn57pi-dss-0001/<user>/enroot/hlrp_unified_cu128_imported_<date>.sqsh
 ```
+
+The validated import helper keeps its scratch/cache on DSS by default:
+
+- `TMPDIR=<enroot-dir>/tmp`
+- `PARALLEL_TMPDIR=<enroot-dir>/tmp`
+- `ENROOT_CACHE_PATH=<enroot-dir>/cache`
+
+Activation is handled by:
+
+```bash
+bash .codex/skills/lrz-docker-enroot-refresh/scripts/swap_enroot_image.sh \
+  --replacement /dss/.../enroot/hlrp_unified_cu128_imported_<date>.sqsh \
+  --docker-tag felixmin/hlrp:unified-cuda-cu128 \
+  --digest <pushed-digest> \
+  --import-job-id <jobid>
+```
+
+This keeps the new image in `enroot/`, moves the previously configured image
+into `enroot/old/`, and records provenance in `enroot/old/activation_log.tsv`.

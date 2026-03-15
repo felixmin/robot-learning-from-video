@@ -1,45 +1,54 @@
 ---
 name: lrz-docker-enroot-refresh
-description: "Build and refresh the LRZ stage-1/2 or stage-3 container workflow end-to-end: infer the target profile from the task, build and push `felixmin/hlrp:stage12` or `felixmin/hlrp:stage3` from the matching Dockerfile, import the image to the LRZ cluster as an Enroot `.sqsh`, and safely swap it into `hlrp_stage12.sqsh` or `hlrp_stage3_lerobot.sqsh` by renaming backups in place."
+description: "Build and refresh the unified LRZ container workflow end-to-end: build and push `containers/Dockerfile.unified` as `felixmin/hlrp:unified-cuda-cu128`, import it to DSS as a dated Enroot `.sqsh`, archive the previously configured image into `enroot/old/`, and update `config/user_config/local.yaml`."
 ---
 
 # LRZ Docker Enroot Refresh
 
-Use this workflow when refreshing the cluster container from the workstation. Infer the target from the user request and the stage context, keep local Docker steps on the workstation, keep cluster work behind `ssh ai`, never delete cluster images, and prefer renaming backups in place.
+Use this workflow when refreshing the unified cluster container from the workstation. Keep local Docker steps on the workstation, keep cluster work behind `ssh ai`, never delete cluster images, keep Enroot scratch/cache paths on DSS, and archive old images into `enroot/old/` rather than deleting them.
 
 Read [workflow.md](references/workflow.md) for the defaults, paths, and failure modes. Use the scripts in `scripts/` rather than rewriting the commands.
 
 ## Workflow
 
 1. Verify execution context with `pwd` and `hostname`.
-2. Choose a profile:
-   - `stage12` for LAQ, foundation, VLA, or stage-1/2 work
-   - `stage3` for LeRobot, rollout, or stage-3 work
-3. Run `scripts/build_push_prune.sh --profile <profile>` from the workstation.
-4. Submit the Enroot import with `scripts/submit_enroot_import.sh --profile <profile>`.
+2. Use the canonical unified profile:
+   - Dockerfile: `containers/Dockerfile.unified`
+   - Docker tag: `felixmin/hlrp:unified-cuda-cu128`
+   - Imported image naming: `hlrp_unified_cu128_imported_<timestamp>.sqsh`
+3. Run `scripts/build_push_prune.sh --profile unified` from the workstation.
+4. Submit the Enroot import with `scripts/submit_enroot_import.sh --profile unified`.
 5. Monitor the returned Slurm job with `squeue` and `sacct`.
-6. If the import OOMs, keep the partial file, choose a new output path, and rerun with higher memory.
-7. Before swapping images, check `squeue --me` and avoid replacing the active target while jobs are active unless the user explicitly wants that.
-8. Swap the imported image into place with `scripts/swap_enroot_image.sh --profile <profile>`. This renames the existing stage-specific target to a timestamped backup and moves the new file into place.
+6. Before activation, check `squeue --me` and avoid moving the currently configured image while jobs are queued or running unless the user explicitly wants that.
+7. Activate the new image with `scripts/swap_enroot_image.sh --replacement <new sqsh>`, which:
+   - reads the currently configured image from `config/user_config/local.yaml`
+   - moves the old `.sqsh` into `enroot/old/`
+   - leaves the new `.sqsh` in `enroot/`
+   - updates `config/user_config/local.yaml`
+   - records provenance for the activation
 
 ## Rules
 
-- Infer `stage12` for stage-1/2 requests and `stage3` for LeRobot/stage-3 requests. If the request is ambiguous, inspect the referenced experiment/config first and ask before swapping.
-- `stage12` maps to `containers/Dockerfile.stage12`, `felixmin/hlrp:stage12`, and `.../enroot/hlrp_stage12.sqsh`.
-- `stage3` maps to `containers/Dockerfile.stage3`, `felixmin/hlrp:stage3`, and `.../enroot/hlrp_stage3_lerobot.sqsh`.
-- Treat OOM during `enroot import` as a memory tuning issue, not a registry issue.
-- Default Enroot import settings should be `--mem=128G`, `-c 4`, and `ENROOT_MAX_PROCESSORS=4`.
+- Treat `unified` as the only first-class workflow for this skill.
+- `stage12` / `stage3` helper behavior is legacy-only if it still exists in scripts for recovery.
+- The imported unified image path stays dated and immutable; activation works by updating config, not by renaming the new image into a fixed target name.
+- Default Enroot import settings should keep scratch/cache on DSS:
+  - `TMPDIR`
+  - `PARALLEL_TMPDIR`
+  - `ENROOT_CACHE_PATH`
+- Default Enroot import resource settings should remain `--mem=128G`, `-c 4`, and `ENROOT_MAX_PROCESSORS=4`.
+- `docker push` can sit in repeated `Waiting` state for a long time on large layers; do not treat that alone as a failure.
 - Never delete cluster images or partial outputs. Rename or leave them in place.
-- Do not let a stage-3 request update the stage-1/2 target, or vice versa.
+- Activation must fail fast on nonstandard current-image states unless the caller explicitly uses the bootstrap override.
 
 ## Resources
 
 - `scripts/build_push_prune.sh`
-  Run the local Docker prune -> build -> push -> prune workflow for either profile.
+  Run the local Docker prune -> build -> push -> prune workflow for the unified profile.
 - `scripts/submit_enroot_import.sh`
-  Submit the high-memory `enroot import` job on `ssh ai` for either profile and print the Slurm job id.
+  Submit the high-memory `enroot import` job on `ssh ai` with DSS scratch/cache defaults and print the Slurm job id.
 - `scripts/swap_enroot_image.sh`
-  Rename the old stage-specific target to a timestamped backup and move the new image into place.
+  Archive the previously configured image into `enroot/old/` and update `config/user_config/local.yaml`.
 - `references/workflow.md`
   Read this for the validated command shapes, default paths, and known failure modes.
 

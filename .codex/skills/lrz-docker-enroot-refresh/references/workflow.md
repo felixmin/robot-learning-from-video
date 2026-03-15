@@ -6,57 +6,84 @@
 - Docker build context: `/mnt/data/workspace/code/high-level-robot-planner`
 - Cluster host: `ai`
 - Cluster Enroot dir: `/dss/dssmcmlfs01/pn57pi/pn57pi-dss-0001/felix_minzenmay/enroot`
+- Archive dir: `/dss/dssmcmlfs01/pn57pi/pn57pi-dss-0001/felix_minzenmay/enroot/old`
+- Default activation target config: `/mnt/data/workspace/code/high-level-robot-planner/config/user_config/local.yaml`
 
-### Stage 1/2 Profile
+## Canonical Unified Profile
 
-- Dockerfile: `/mnt/data/workspace/code/high-level-robot-planner/containers/Dockerfile.stage12`
-- Pushed tag: `felixmin/hlrp:stage12`
-- Active cluster image path: `/dss/dssmcmlfs01/pn57pi/pn57pi-dss-0001/felix_minzenmay/enroot/hlrp_stage12.sqsh`
-
-### Stage 3 Profile
-
-- Dockerfile: `/mnt/data/workspace/code/high-level-robot-planner/containers/Dockerfile.stage3`
-- Pushed tag: `felixmin/hlrp:stage3`
-- Active cluster image path: `/dss/dssmcmlfs01/pn57pi/pn57pi-dss-0001/felix_minzenmay/enroot/hlrp_stage3_lerobot.sqsh`
+- Dockerfile: `/mnt/data/workspace/code/high-level-robot-planner/containers/Dockerfile.unified`
+- Pushed tag: `felixmin/hlrp:unified-cuda-cu128`
+- Imported image path shape:
+  `/dss/dssmcmlfs01/pn57pi/pn57pi-dss-0001/felix_minzenmay/enroot/hlrp_unified_cu128_imported_<timestamp>.sqsh`
 
 ## Validated Command Shapes
 
 Local build/push:
 
 ```bash
-docker system prune -a --volumes -f
-docker builder prune -a -f
-docker build \
-  -f /mnt/data/workspace/code/high-level-robot-planner/containers/Dockerfile.stage3 \
-  -t felixmin/hlrp:stage3 \
-  /mnt/data/workspace/code/high-level-robot-planner
-docker push felixmin/hlrp:stage3
-docker system prune -a --volumes -f
-docker builder prune -a -f
+bash .codex/skills/lrz-docker-enroot-refresh/scripts/build_push_prune.sh \
+  --profile unified
 ```
+
+Notes:
+
+- `docker push` can sit in repeated `Waiting` state for a long time on large layers.
+- Do not treat long upload waits as failure unless Docker exits non-zero.
 
 Cluster import:
 
 ```bash
-sbatch -p lrz-cpu -q cpu -t 01:00:00 --mem=128G -c 4 -J enroot-import-hlrp-oli \
-  --wrap "mkdir -p /dss/dssmcmlfs01/pn57pi/pn57pi-dss-0001/felix_minzenmay/enroot && \
-  export ENROOT_MAX_PROCESSORS=4 && \
-  enroot import -o /dss/dssmcmlfs01/pn57pi/pn57pi-dss-0001/felix_minzenmay/enroot/hlrp_stage3_<new-name>.sqsh \
-  docker://felixmin/hlrp:stage3 && \
-  ls -lh /dss/dssmcmlfs01/pn57pi/pn57pi-dss-0001/felix_minzenmay/enroot/hlrp_stage3_<new-name>.sqsh"
+bash .codex/skills/lrz-docker-enroot-refresh/scripts/submit_enroot_import.sh \
+  --profile unified
 ```
 
-Safe swap:
+This keeps all import scratch/cache paths on DSS by default:
+
+- `TMPDIR=<enroot-dir>/tmp`
+- `PARALLEL_TMPDIR=<enroot-dir>/tmp`
+- `ENROOT_CACHE_PATH=<enroot-dir>/cache`
+
+Activation/archive:
 
 ```bash
-mv hlrp_stage3_lerobot.sqsh hlrp_stage3_lerobot_YYYY-MM-DD_pre_refresh.sqsh
-mv <new-name>.sqsh hlrp_stage3_lerobot.sqsh
+bash .codex/skills/lrz-docker-enroot-refresh/scripts/swap_enroot_image.sh \
+  --replacement /dss/dssmcmlfs01/pn57pi/pn57pi-dss-0001/felix_minzenmay/enroot/hlrp_unified_cu128_imported_<timestamp>.sqsh \
+  --docker-tag felixmin/hlrp:unified-cuda-cu128 \
+  --digest <pushed-digest> \
+  --import-job-id <jobid>
 ```
+
+Activation behavior:
+
+- reads the currently configured image from `config/user_config/local.yaml` by default
+- moves the old `.sqsh` into `enroot/old/`
+- leaves the new `.sqsh` in `enroot/`
+- updates the target config file
+- appends provenance to `enroot/old/activation_log.tsv`
 
 ## Known Failure Modes
 
-- `Dockerfile.stage3` installs a pinned baseline `lerobot[libero]` package. Source-tree edits to `lerobot/` are not picked up until runtime editable installs are requested by the stage-3 job config.
-- `docker://docker.io/felixmin/hlrp:stage12` or `docker://docker.io/felixmin/hlrp:stage3` are the wrong Enroot URIs. Use `docker://felixmin/hlrp:stage12` or `docker://felixmin/hlrp:stage3`.
-- `enroot import` can OOM while creating squashfs. The validated fix was `--mem=128G`, `-c 4`, and `ENROOT_MAX_PROCESSORS=4`.
-- If an import job OOMs, the partial `.sqsh` may exist but should be treated as invalid. Do not delete it; create a new output filename for the retry.
-- Do not replace `hlrp_stage12.sqsh` or `hlrp_stage3_lerobot.sqsh` while jobs are active unless the user explicitly accepts that risk.
+- If helper scripts still require a `stage12` override for unified images, the repo is out of sync and the workflow should be updated before the next deployment.
+- `enroot import` can fail if GNU `parallel` writes buffers to home tmp:
+  - `Cannot append to buffer file in /dss/dsshome1/.../tmp`
+  - validated fix: keep `TMPDIR` and `PARALLEL_TMPDIR` on DSS
+- `enroot import` can fail if Enroot cache still points to home:
+  - `mktemp: failed to create file via template '/dss/dsshome1/.../enroot/cache/...`
+  - validated fix: keep `ENROOT_CACHE_PATH` on DSS
+- `enroot import` can OOM while creating squashfs.
+  - validated fix remains `--mem=128G`, `-c 4`, and `ENROOT_MAX_PROCESSORS=4`
+- Activation should not move the currently configured image while jobs are queued or running unless the operator explicitly overrides the guard.
+- `enroot/old/` will grow over time because deletion is forbidden by cluster policy.
+
+## Provenance Expectations
+
+For each activation, preserve:
+
+- previous active image path
+- archived image path
+- new active image path
+- Docker tag
+- pushed digest
+- import job id
+
+The activation helper writes these fields into `enroot/old/activation_log.tsv`.

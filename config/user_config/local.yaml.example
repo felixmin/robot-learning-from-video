@@ -35,7 +35,11 @@ artifacts:
 # Optional: set your own imported unified cluster image here.
 # Most experiments include this file as optional `/user_config: local`,
 # so this value cleanly overrides the shared `cluster.container.image: null`.
-# See containers/README.md for the build/push/import workflow.
+# In the normal LRZ workflow this file is the default activation target for the
+# deployment helper, which archives the previous image into `enroot/old/` and
+# updates this path to the new imported `.sqsh`. Ad hoc CLI overrides can still
+# bypass it for one-off submissions.
+# See containers/README.md for the build/push/import/archive workflow.
 cluster:
   container:
     image: null            # e.g. /dss/.../enroot/hlrp_unified_cu128_imported_2026-03-14_2248.sqsh

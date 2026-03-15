@@ -16,10 +16,10 @@ usage() {
   cat <<'EOF'
 Usage: build_push_prune.sh [options]
 
-Build and push a stage-specific HLRP image from the workstation, then leave Docker empty.
+Build and push an HLRP image from the workstation, then leave Docker empty.
 
 Options:
-  --profile PROFILE             One of: stage12, stage3.
+  --profile PROFILE             One of: unified, stage12 (legacy), stage3 (legacy).
   --image IMAGE                 Docker tag to build and push.
   --dockerfile PATH             Path to Dockerfile. Defaults from --profile.
   --context PATH                Docker build context. Defaults from --profile.
@@ -43,7 +43,13 @@ run() {
 
 apply_profile_defaults() {
   case "${PROFILE}" in
-    stage12|default|laq|foundation)
+    unified|default)
+      PROFILE="unified"
+      [[ -n "${IMAGE}" ]] || IMAGE="felixmin/hlrp:unified-cuda-cu128"
+      [[ -n "${DOCKERFILE}" ]] || DOCKERFILE="${REPO_ROOT}/containers/Dockerfile.unified"
+      [[ -n "${CONTEXT}" ]] || CONTEXT="${REPO_ROOT}"
+      ;;
+    stage12|laq|foundation)
       PROFILE="stage12"
       [[ -n "${IMAGE}" ]] || IMAGE="felixmin/hlrp:stage12"
       [[ -n "${DOCKERFILE}" ]] || DOCKERFILE="${REPO_ROOT}/containers/Dockerfile.stage12"
@@ -105,7 +111,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ -z "${PROFILE}" ]]; then
-  echo "--profile is required (stage12 or stage3)" >&2
+  echo "--profile is required (unified, stage12, or stage3)" >&2
   usage >&2
   exit 1
 fi
@@ -134,6 +140,11 @@ printf 'Profile: %s\n' "${PROFILE}"
 printf 'Image: %s\n' "${IMAGE}"
 printf 'Dockerfile: %s\n' "${DOCKERFILE}"
 printf 'Context: %s\n' "${CONTEXT}"
+if [[ "${PROFILE}" == "stage12" || "${PROFILE}" == "stage3" ]]; then
+  printf 'Mode: legacy split-image workflow\n'
+else
+  printf 'Mode: canonical unified workflow\n'
+fi
 
 if [[ "${DRY_RUN}" -eq 1 ]]; then
   printf '\n'
@@ -145,6 +156,7 @@ if [[ "${PRUNE_BEFORE}" -eq 1 ]]; then
 fi
 
 run docker build -f "${DOCKERFILE}" -t "${IMAGE}" "${CONTEXT}"
+printf 'Note: docker push can take a long time on large layers; repeated Waiting lines are not a failure by themselves.\n'
 run docker push "${IMAGE}"
 
 if [[ "${PRUNE_AFTER}" -eq 1 ]]; then

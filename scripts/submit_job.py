@@ -456,11 +456,22 @@ def main():
         )
     container_image_path = Path(str(container_image))
     if not container_image_path.exists():
-        raise SystemExit(
-            "Container image not found: "
-            f"{container_image_path}\n"
-            "Set `cluster.container.image=/path/to/container.sqsh` (or update your cluster config)."
-        )
+        container_image_str = str(container_image_path)
+        remote_ok = False
+        if container_image_str.startswith("/dss/"):
+            remote_check = subprocess.run(
+                ["ssh", "ai", "test", "-e", container_image_str],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            remote_ok = remote_check.returncode == 0
+        if not remote_ok:
+            raise SystemExit(
+                "Container image not found: "
+                f"{container_image_path}\n"
+                "Set `cluster.container.image=/path/to/container.sqsh` (or update your cluster config)."
+            )
     container_python_bin = str(
         OmegaConf.select(cfg, "cluster.container.python_bin") or "python"
     )
