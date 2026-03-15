@@ -12,3 +12,7 @@ experiment:
 
 lerobot:
   num_workers: 12
+  distributed_timeout_s: 10000
+
+eval:
+  batch_size: 5
