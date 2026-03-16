@@ -8,6 +8,7 @@ defaults:
 
 submit:
   script: 4_train_stage2_policy
+  torchrun: true
 
 data:
   loader:

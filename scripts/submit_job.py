@@ -156,6 +156,7 @@ def generate_sbatch_script(
     python_bin: str = "python",
     *,
     time_limit: str | None = None,
+    use_torchrun: bool = False,
 ) -> str:
     """Generate sbatch script content."""
 
@@ -169,11 +170,8 @@ def generate_sbatch_script(
     # Build the python command with overrides.
     # Quote each override so bash doesn't expand Hydra interpolations like `${now:...}`
     # or `${hydra.job.num}` inside the sbatch script.
-    # Lightning scripts (stages 1 & 2) need torchrun for multi-GPU DDP so that all
-    # ranks are spawned before the script runs (DDP initialized before setup()).
-    # Stage 3 (6_train_lerobot) uses Accelerate which spawns processes itself.
-    torchrun_scripts = {"2_train_stage1_lam", "4_train_stage2_policy"}
-    use_torchrun = gpus > 1 and script in torchrun_scripts
+    # When use_torchrun is True, torchrun spawns one process per GPU for DDP.
+    # The $SLURM_GPUS_ON_NODE variable is NOT quoted so bash expands it at runtime.
     script_args = [f"scripts/{script}.py", *overrides]
     quoted_args = " ".join(shlex.quote(str(arg)) for arg in script_args).strip()
     if use_torchrun:
@@ -631,6 +629,10 @@ def main():
             combined_overrides.append("hydra.sweep.subdir=.")
 
         # Generate sbatch script
+        use_torchrun = (
+            gpus > 1
+            and bool(OmegaConf.select(cfg, "submit.torchrun", default=False))
+        )
         sbatch_content = generate_sbatch_script(
             script=script,
             overrides=combined_overrides,
@@ -650,6 +652,7 @@ def main():
             hf_token_path=hf_token_path,
             pre_commands=pre_commands,
             python_bin=container_python_bin,
+            use_torchrun=use_torchrun,
         )
 
         if dry_run:

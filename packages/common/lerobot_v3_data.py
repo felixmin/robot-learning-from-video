@@ -331,12 +331,12 @@ class LeRobotV3DataModule(pl.LightningDataModule):
 
         if rank == 0:
             for source in self.sources:
-                source.ensure_materialized()
+                source.prepare(lock=True)
         if is_distributed:
             torch.distributed.barrier()
-
-        for source in self.sources:
-            source.warmup_runtime()
+            if rank != 0:
+                for source in self.sources:
+                    source.prepare()
 
         self.normalization_stats = build_run_normalization_stats(
             self.sources,

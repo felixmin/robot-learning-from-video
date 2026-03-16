@@ -99,6 +99,7 @@ def test_single_source_passes_video_backend_to_lerobot_dataset(monkeypatch) -> N
         train_episode_indices={0, 1},
         val_episode_indices={0, 1},
     )
+    source.prepare()
 
     source.get_sample(0)
 
@@ -145,6 +146,7 @@ def test_single_source_get_sample_shapes_images_masks_and_metadata(monkeypatch) 
         train_episode_indices={0},
         val_episode_indices={0},
     )
+    source.prepare()
 
     sample = source.get_sample(0)
 
@@ -202,6 +204,7 @@ def test_single_source_get_sample_accepts_float_image_streams(monkeypatch) -> No
         train_episode_indices={0},
         val_episode_indices={0},
     )
+    source.prepare()
 
     sample = source.get_sample(0)
     assert sample.image_streams is not None
@@ -240,6 +243,7 @@ def test_single_source_uses_custom_action_key_pad_mask(monkeypatch) -> None:
         train_episode_indices={0},
         val_episode_indices={0},
     )
+    source.prepare()
 
     sample = source.get_sample(0)
 
@@ -282,6 +286,7 @@ def test_single_source_dataset_short_uses_repo_suffix_without_alias_mapping(
         train_episode_indices={0},
         val_episode_indices={0},
     )
+    source.prepare()
 
     sample = source.get_sample(0)
     assert sample.meta is not None

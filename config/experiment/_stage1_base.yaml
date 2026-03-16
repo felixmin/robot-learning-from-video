@@ -7,6 +7,10 @@ defaults:
 
 submit:
   script: 2_train_stage1_lam
+  torchrun: true
+
+training:
+  strategy: ddp_find_unused_parameters_true
 
 data:
   output_format: stage1

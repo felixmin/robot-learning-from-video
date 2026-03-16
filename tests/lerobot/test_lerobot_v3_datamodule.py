@@ -83,6 +83,9 @@ class _FakeSource:
             repo_id=self.repo_id, start=8, stop=10
         )
 
+    def prepare(self, *, lock=False):
+        pass
+
     def get_sample(self, anchor_abs_index):
         raise AssertionError(
             "get_sample should not be called in datamodule wiring tests"
@@ -255,6 +258,9 @@ def test_lerobot_v3_datamodule_uses_distributed_sampler_when_initialized(
         "common.lerobot_v3_data.torch.distributed.get_world_size", lambda: 4
     )
     monkeypatch.setattr("common.lerobot_v3_data.torch.distributed.get_rank", lambda: 1)
+    monkeypatch.setattr(
+        "common.lerobot_v3_data.torch.distributed.barrier", lambda: None
+    )
 
     cfg = _cfg(num_sources=2)
     dm = LeRobotV3DataModule(

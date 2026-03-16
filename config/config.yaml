@@ -61,6 +61,9 @@ artifacts:
 submit:
   # Training entrypoint (without .py). Experiments can override this.
   script: 2_train_stage1_lam
+  # Use torchrun for multi-GPU DDP (stages 1 & 2). Set false for frameworks
+  # that handle their own process spawning (e.g. Accelerate in stage 3).
+  torchrun: false
   # If true, prints the generated sbatch script(s) but does not submit.
   dry_run: false
   # Where to persist pretrained model downloads (HF + torch/torchvision).
