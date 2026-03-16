@@ -1,0 +1,24 @@
+# @package _global_
+
+defaults:
+  - _stage3_base
+  - /cluster@cluster: local_dev
+  - /runtime: stage3_local
+  - optional /user_config: local
+  - override /stage3_dataset: libero_5pct_latent_rest_balanced
+
+experiment:
+  name: 2026-03-16_17-24-39_stage3_local_libero_95latent_5mt_balanced_bs64_latent0p1_random_lam3step
+  description: "Local Stage 3 Libero training with balanced 95% latent / 5% multitask mixing, batch size 64, latent loss weight 0.1, and a 3-step Stage 1 random-init ablation checkpoint"
+
+logging:
+  runs_dir: ${logging.root_dir}/runs/${experiment.name}
+
+artifacts:
+  lam_checkpoint_path: /mnt/data/workspace/runs_root/runs/2026-03-16_17-06-13_stage1_local_random_init/checkpoints/last.ckpt
+
+lerobot:
+  batch_size: 64
+  num_workers: 4
+  policy:
+    latent_loss_weight: 0.1

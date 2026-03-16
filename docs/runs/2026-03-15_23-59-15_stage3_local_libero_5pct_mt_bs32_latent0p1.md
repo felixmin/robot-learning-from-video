@@ -3,7 +3,7 @@
 ## Meta
 
 - Date: 2026-03-15
-- Status: running
+- Status: completed
 - Mode: local
 - Host: tueilsy-st-022
 - Code Commit: 04970c0557a41f7b3d76d15cabf04df7ed8f7883 (dirty: config/data/octo24*.yaml, containers/Dockerfile.unified, docs/runs/, scripts/submit_job.py)
@@ -60,4 +60,46 @@ tmux session: `stage3_5pct`
 
 ## Results / Findings
 
-- Pending.
+- Launched locally on `tueilsy-st-022`; `unified.log` records the LeRobot train command launch at `2026-03-15 23:59:17 CET`.
+- Stage 3 training completed successfully at `2026-03-16 13:45:31 CET` according to `unified.log`, for a runtime of about `13h46m` (`49565s` in the W&B summary).
+- Saved checkpoints at `020000`, `040000`, `060000`, `080000`, and `100000`, with `lerobot/checkpoints/last -> 100000`.
+- Training stayed stable throughout: logged loss fell from `0.331` at step `200` to about `0.015` at `20k`, `0.009` at `40k`, `0.005` at `60k`, `0.003` at `80k`, and finished with W&B summary metrics `train/loss=0.001411`, `action_loss=0.001144`, `latent_loss=0.002655`, `grad_norm=0.0388`.
+- Final training summary at `100k`: `samples=3.2M`, `episodes=20049.23`, `epochs=238.68`, `lr=2.5e-05`, `action_supervised_fraction=1.0`, `latent_supervised_fraction=0.96875`.
+- Final in-training `libero_10` evaluation at `100k` reached `15%` success with `avg_sum_reward=0.15`.
+- The run is still weak on held-out rollout quality from the training-time eval alone: only `15/100` successes on `libero_10`, so a full four-suite rollout remains necessary before drawing broader conclusions.
+
+## Rollout Evaluation
+
+### 2026-03-16 local rollout results
+
+- Rollout run: `2026-03-16_14-25-59_stage3_rollout_local_from_2026-03-15_23-59-15_stage3_local_libero_5pct_mt_bs32_latent0p1`
+- Checkpoint: `lerobot/checkpoints/100000/pretrained_model` (step 100k)
+- Launched locally at `2026-03-16 14:27:48 CET` and completed at `2026-03-16 15:37:04 CET` according to `unified.log` (`~69m` wall time).
+- Overall rollout result: `25.0%` success over `400` episodes (`40` tasks x `10` episodes), with `avg_sum_reward=0.25` and `avg_max_reward=0.25`.
+- Group-level success split: `libero_spatial 13%`, `libero_object 38%`, `libero_goal 41%`, `libero_10 8%`.
+- Task outcomes were weak and uneven: `22` tasks had zero successes, `15` were partial-success tasks, and only `3` achieved `10/10` success.
+- `libero_goal` and `libero_object` carried most of the performance; `libero_spatial` and especially `libero_10` remained poor despite the clean training curve.
+- Compared with the balanced `95% latent / 5% multitask` run, this 5%-only rollout underperformed substantially (`25.0%` overall here vs `35.8%` there), which supports the value of the latent-only portion for final control quality.
+- Outputs include `eval_info.json`, `400` rollout videos under `videos/`, and the launcher log in this rollout run directory.
+
+```bash
+conda run -n lerobot python scripts/7_rollout_lerobot.py \
+  experiment=stage3_rollout_local \
+  experiment.name=2026-03-16_14-25-59_stage3_rollout_local_from_2026-03-15_23-59-15_stage3_local_libero_5pct_mt_bs32_latent0p1 \
+  logging.runs_dir=/mnt/data/workspace/runs_root/runs/2026-03-16_14-25-59_stage3_rollout_local_from_2026-03-15_23-59-15_stage3_local_libero_5pct_mt_bs32_latent0p1 \
+  lerobot_eval.policy_path=/mnt/data/workspace/runs_root/runs/2026-03-15_23-59-15_stage3_local/lerobot/checkpoints/100000/pretrained_model
+```
+
+| Scope | Success % | Successes | Episodes | Avg Sum Reward | Avg Max Reward |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Overall | 25.0 | 100 | 400 | 0.25 | 0.25 |
+| libero_spatial | 13.0 | 13 | 100 | 0.13 | 0.13 |
+| libero_object | 38.0 | 38 | 100 | 0.38 | 0.38 |
+| libero_goal | 41.0 | 41 | 100 | 0.41 | 0.41 |
+| libero_10 | 8.0 | 8 | 100 | 0.08 | 0.08 |
+
+| Task Outcome Bucket | Count |
+| --- | ---: |
+| 0/10 success tasks | 22 |
+| Partial-success tasks | 15 |
+| 10/10 success tasks | 3 |
