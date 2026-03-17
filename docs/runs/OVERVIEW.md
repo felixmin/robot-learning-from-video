@@ -59,14 +59,17 @@ Caution: here the latent loss was not underweighted! redo.
 Latent action model: Randomly initialized
 5% action labeled: train multitask action head and latent head at the same time
 95% no action labeles: train latent head only
-Not run
+2026-03-16_17-24-39_stage3_local_libero_95latent_5mt_balanced_bs64_latent0p1_random_lam3step
+Rollout: `2026-03-17_13-48-10_stage3_rollout_local_from_2026-03-16_17-24-39_stage3_local_random_lam3step_bs1`
+Rollout success: `27.25%` (`109/400`)
+
 
 ### 95% for latents balanced 50/50 Libero overfitting
 Latent action model: Pretrained on Libero only (2026-03-14_19-27-26_stage1_local)
 5% action labeled: train multitask action head and latent head at the same time
 95% no action labeles: train latent head only
 2026-03-15_01-43-48_stage3_local_libero_95latent_5mt_balanced_bs64_latent0p1
-
+Rollout success: `35.8%` (`143/400`)
 
 
 
