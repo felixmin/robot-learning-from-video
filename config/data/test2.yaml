@@ -18,7 +18,6 @@ dataset:
           primary: observation.images.image
         state_key: observation.state
         action_key: action
-        video_backend: pyav
         val_episode_count: 2
 
       - repo_id: lerobot/nyu_door_opening_surprising_effectiveness
@@ -28,5 +27,4 @@ dataset:
           primary: observation.images.image
         state_key: observation.state
         action_key: action
-        video_backend: pyav
         val_episode_count: 2

@@ -30,7 +30,19 @@ class TestExperimentConfigs:
             assert cfg.data.output_format == "stage1"
             assert len(cfg.data.dataset.lerobot.sources) == 23  # bc_z_lerobot excluded
             assert cfg.data.loader.batch_size == 64
-            assert cfg.data.dataset.lerobot.sources[0].video_backend == "pyav"
+            assert "video_backend" not in cfg.data.dataset.lerobot.sources[0]
+            assert cfg.training.strategy == "auto"
+            assert cfg.training.devices == 1
+
+    def test_stage1_local_lowmem_config(self, config_dir):
+        with initialize_config_dir(version_base=None, config_dir=config_dir):
+            cfg = compose(config_name="config", overrides=["experiment=stage1_local_lowmem"])
+
+            assert cfg.experiment.name == "stage1_local_lowmem"
+            assert cfg.data.backend == "lerobot_v3"
+            assert cfg.data.output_format == "stage1"
+            assert cfg.training.strategy == "auto"
+            assert cfg.training.devices == 1
 
     def test_stage2_local_octo24_config(self, config_dir):
         with initialize_config_dir(version_base=None, config_dir=config_dir):

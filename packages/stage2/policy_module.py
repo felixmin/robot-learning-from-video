@@ -184,8 +184,15 @@ class PolicyLightningModule(pl.LightningModule):
             "pred_unique_frac": float(pred_unique) / float(pred_flat.shape[0]),
             "gt_unique_frac": float(gt_unique) / float(gt_flat.shape[0]),
         }
+        batch_size = int(pred.shape[0])
         for key, value in stats.items():
-            self.log(f"{prefix}/{key}", value, prog_bar=False, sync_dist=True)
+            self.log(
+                f"{prefix}/{key}",
+                value,
+                prog_bar=False,
+                sync_dist=True,
+                batch_size=batch_size,
+            )
         return stats
 
     @staticmethod
@@ -308,22 +315,48 @@ class PolicyLightningModule(pl.LightningModule):
         out, _codes, _vectors, _actions, _frames, _instructions = (
             self._loss_and_targets_from_batch(batch)
         )
-        self.log("train/loss", out.loss, prog_bar=True, sync_dist=True)
+        batch_size = int(_frames.shape[0])
+        self.log(
+            "train/loss",
+            out.loss.detach(),
+            prog_bar=True,
+            sync_dist=True,
+            batch_size=batch_size,
+        )
         for key, value in out.metrics.items():
             if key == "loss":
                 continue
-            self.log(f"train/{key}", float(value), prog_bar=False, sync_dist=True)
+            self.log(
+                f"train/{key}",
+                float(value),
+                prog_bar=False,
+                sync_dist=True,
+                batch_size=batch_size,
+            )
         return out.loss
 
     def validation_step(self, batch: Any, batch_idx: int) -> torch.Tensor:
         out, codes, vectors, actions, frames, instructions = (
             self._loss_and_targets_from_batch(batch)
         )
-        self.log("val/loss", out.loss, prog_bar=True, sync_dist=True)
+        batch_size = int(frames.shape[0])
+        self.log(
+            "val/loss",
+            out.loss.detach(),
+            prog_bar=True,
+            sync_dist=True,
+            batch_size=batch_size,
+        )
         for key, value in out.metrics.items():
             if key == "loss":
                 continue
-            self.log(f"val/{key}", float(value), prog_bar=False, sync_dist=True)
+            self.log(
+                f"val/{key}",
+                float(value),
+                prog_bar=False,
+                sync_dist=True,
+                batch_size=batch_size,
+            )
 
         if not isinstance(batch, Stage2Batch):
             raise TypeError("Stage 2 validation expects Stage2Batch.")
@@ -370,12 +403,14 @@ class PolicyLightningModule(pl.LightningModule):
                         matches.mean().to(self.device),
                         prog_bar=True,
                         sync_dist=True,
+                        batch_size=batch_size,
                     )
                     self.log(
                         "val/sequence_accuracy",
                         matches.all(dim=1).to(torch.float32).mean().to(self.device),
                         prog_bar=False,
                         sync_dist=True,
+                        batch_size=batch_size,
                     )
 
             if pred_vector is not None and vectors is not None:
@@ -389,6 +424,7 @@ class PolicyLightningModule(pl.LightningModule):
                         vec_mse.to(self.device),
                         prog_bar=True,
                         sync_dist=True,
+                        batch_size=batch_size,
                     )
                     self._log_vector_stats(
                         prefix="val/latent_vector_stats", pred=pred_vector, gt=gt_vec
@@ -405,6 +441,7 @@ class PolicyLightningModule(pl.LightningModule):
                         act_mse.to(self.device),
                         prog_bar=True,
                         sync_dist=True,
+                        batch_size=batch_size,
                     )
                     self._log_vector_stats(
                         prefix="val/action_stats", pred=pred_actions, gt=gt_actions
@@ -446,18 +483,21 @@ class PolicyLightningModule(pl.LightningModule):
                     start_frac,
                     prog_bar=False,
                     sync_dist=True,
+                    batch_size=batch_size,
                 )
                 self.log(
                     "val/gen_has_action_end_frac",
                     end_frac,
                     prog_bar=False,
                     sync_dist=True,
+                    batch_size=batch_size,
                 )
                 self.log(
                     "val/gen_num_codes_parsed_mean",
                     mean_codes,
                     prog_bar=False,
                     sync_dist=True,
+                    batch_size=batch_size,
                 )
 
             batch_meta = batch.meta if isinstance(batch.meta, dict) else None
@@ -475,12 +515,14 @@ class PolicyLightningModule(pl.LightningModule):
                     float(len(counts)),
                     prog_bar=False,
                     sync_dist=True,
+                    batch_size=batch_size,
                 )
                 self.log(
                     "val/dataset_mix_top1_frac",
                     float(top[0][1]) / total,
                     prog_bar=False,
                     sync_dist=True,
+                    batch_size=batch_size,
                 )
                 probs = torch.tensor(
                     [float(count) / total for _, count in counts.items()],
@@ -498,6 +540,7 @@ class PolicyLightningModule(pl.LightningModule):
                         entropy_norm,
                         prog_bar=False,
                         sync_dist=True,
+                        batch_size=batch_size,
                     )
                 for name, count in top:
                     suffix = self._sanitize_metric_suffix(name)
@@ -506,6 +549,7 @@ class PolicyLightningModule(pl.LightningModule):
                         float(count) / total,
                         prog_bar=False,
                         sync_dist=True,
+                        batch_size=batch_size,
                     )
                 details = ", ".join(f"{name}={count}" for name, count in top)
                 print(

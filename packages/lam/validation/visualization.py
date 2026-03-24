@@ -343,13 +343,15 @@ class BasicVisualizationStrategy(ValidationStrategy):
         if len(frames) == 0:
             return None
 
-        # Create a lightweight fallback when aux decoder is disabled.
+        # Create a lightweight fallback when no reconstruction decoder is available.
         # This keeps sample visualization available without reconstruction overhead.
-        has_aux_decoder = (
-            getattr(getattr(pl_module, "model", None), "aux_decoder", None) is not None
+        model = getattr(pl_module, "model", None)
+        has_recon_decoder = (
+            getattr(model, "aux_decoder", None) is not None
+            or getattr(model, "pixel_decoder", None) is not None
         )
         recons = None
-        if has_aux_decoder:
+        if has_recon_decoder:
             was_training = pl_module.training
             pl_module.eval()
             with torch.no_grad():

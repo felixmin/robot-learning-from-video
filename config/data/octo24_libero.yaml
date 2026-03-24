@@ -14,7 +14,6 @@ dataset:
           primary: observation.images.image
         state_key: observation.state
         action_key: action
-        video_backend: pyav
         tolerance_s: 1.0e-2
         val_episode_count: 2
 
@@ -25,7 +24,6 @@ dataset:
           primary: observation.images.primary
         state_key: observation.state
         action_key: action
-        video_backend: pyav
         tolerance_s: 1.0e-2
         val_episode_count: 2
 
@@ -36,7 +34,6 @@ dataset:
       #     primary: observation.images.image
       #   state_key: observation.state
       #   action_key: action
-      #   video_backend: pyav
       #   tolerance_s: 1.0e-2
       #   val_episode_count: 2
 
@@ -47,7 +44,6 @@ dataset:
           primary: observation.images.image
         state_key: observation.state
         action_key: action
-        video_backend: pyav
         val_episode_count: 2
 
       - repo_id: FedorX8/language_table_lerobot
@@ -57,7 +53,6 @@ dataset:
           primary: observation.images.rgb
         state_key: observation.state
         action_key: action
-        video_backend: pyav
         val_episode_count: 2
 
       - repo_id: HuggingFaceVLA/libero
@@ -67,7 +62,6 @@ dataset:
           primary: observation.images.image
         state_key: observation.state
         action_key: action
-        video_backend: pyav
         val_episode_count: 2
 
       - repo_id: FedorX8/taco_play_lerobot
@@ -77,7 +71,6 @@ dataset:
           primary: observation.images.rgb_static
         state_key: observation.state
         action_key: action
-        video_backend: pyav
         val_episode_count: 2
 
       - repo_id: FedorX8/furniture_bench_dataset_lerobot
@@ -87,7 +80,6 @@ dataset:
           primary: observation.images.image
         state_key: observation.state
         action_key: action
-        video_backend: pyav
         tolerance_s: 1.0e-3
         val_episode_count: 2
 
@@ -98,7 +90,6 @@ dataset:
           primary: observation.images.image
         state_key: observation.state
         action_key: action
-        video_backend: pyav
         val_episode_count: 2
 
       - repo_id: FedorX8/austin_sailor_dataset_lerobot
@@ -108,7 +99,6 @@ dataset:
           primary: observation.images.image
         state_key: observation.state
         action_key: action
-        video_backend: pyav
         val_episode_count: 2
 
       - repo_id: FedorX8/roboturk_lerobot
@@ -118,7 +108,6 @@ dataset:
           primary: observation.images.front_rgb
         state_key: observation.state
         action_key: action
-        video_backend: pyav
         val_episode_count: 2
 
       - repo_id: FedorX8/toto_lerobot
@@ -128,7 +117,6 @@ dataset:
           primary: observation.images.image
         state_key: observation.state
         action_key: action
-        video_backend: pyav
         val_episode_count: 2
 
       - repo_id: lerobot/austin_sirius_dataset
@@ -138,7 +126,6 @@ dataset:
           primary: observation.images.image
         state_key: observation.state
         action_key: action
-        video_backend: pyav
         val_episode_count: 2
 
       - repo_id: FedorX8/berkeley_autolab_ur5_lerobot
@@ -148,7 +135,6 @@ dataset:
           primary: observation.images.image
         state_key: observation.state
         action_key: action
-        video_backend: pyav
         val_episode_count: 2
 
       - repo_id: FedorX8/iamlab_cmu_pickup_insert_lerobot
@@ -158,7 +144,6 @@ dataset:
           primary: observation.images.image
         state_key: observation.state
         action_key: action
-        video_backend: pyav
         val_episode_count: 2
 
       - repo_id: FedorX8/viola_lerobot
@@ -168,7 +153,6 @@ dataset:
           primary: observation.images.agentview_rgb
         state_key: observation.state
         action_key: action
-        video_backend: pyav
         val_episode_count: 2
 
       - repo_id: lerobot/berkeley_fanuc_manipulation
@@ -178,7 +162,6 @@ dataset:
           primary: observation.images.image
         state_key: observation.state
         action_key: action
-        video_backend: pyav
         val_episode_count: 2
 
       - repo_id: lerobot/nyu_franka_play_dataset
@@ -188,7 +171,6 @@ dataset:
           primary: observation.images.image
         state_key: observation.state
         action_key: action
-        video_backend: pyav
         val_episode_count: 2
 
       - repo_id: lerobot/jaco_play
@@ -198,7 +180,6 @@ dataset:
           primary: observation.images.image
         state_key: observation.state
         action_key: action
-        video_backend: pyav
         val_episode_count: 2
 
       - repo_id: FedorX8/berkeley_cable_routing_lerobot
@@ -208,7 +189,6 @@ dataset:
           primary: observation.images.image
         state_key: observation.state
         action_key: action
-        video_backend: pyav
         val_episode_count: 2
 
       - repo_id: lerobot/austin_buds_dataset
@@ -218,7 +198,6 @@ dataset:
           primary: observation.images.image
         state_key: observation.state
         action_key: action
-        video_backend: pyav
         val_episode_count: 2
 
       - repo_id: lerobot/cmu_stretch
@@ -228,7 +207,6 @@ dataset:
           primary: observation.images.image
         state_key: observation.state
         action_key: action
-        video_backend: pyav
         val_episode_count: 2
 
       - repo_id: lerobot/nyu_door_opening_surprising_effectiveness
@@ -238,7 +216,6 @@ dataset:
           primary: observation.images.image
         state_key: observation.state
         action_key: action
-        video_backend: pyav
         val_episode_count: 2
 
       - repo_id: lerobot/dlr_edan_shared_control
@@ -248,7 +225,6 @@ dataset:
           primary: observation.images.image
         state_key: observation.state
         action_key: action
-        video_backend: pyav
         val_episode_count: 2
 
       - repo_id: lerobot/ucsd_kitchen_dataset
@@ -258,5 +234,4 @@ dataset:
           primary: observation.images.image
         state_key: observation.state
         action_key: action
-        video_backend: pyav
         val_episode_count: 2

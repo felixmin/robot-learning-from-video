@@ -51,10 +51,9 @@ class _FakeSource:
         camera_map,
         state_key,
         action_key,
-        video_backend,
         tolerance_s,
     ):
-        del root, revision, state_key, action_key, video_backend, tolerance_s
+        del root, revision, state_key, action_key, tolerance_s
         self.repo_id = repo_id
         self.weight = weight
         self.camera_map = dict(camera_map)

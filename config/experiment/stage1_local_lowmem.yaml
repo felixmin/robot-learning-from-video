@@ -29,5 +29,7 @@ validation:
   max_cached_samples: 32
 
 training:
+  strategy: auto
+  devices: 1
   train_preview_buffer:
     max_samples: 64

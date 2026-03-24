@@ -264,18 +264,33 @@ def setup_wandb_with_unified_paths(
         logger.info("WandB disabled")
         return None
 
+    import wandb
     from lightning.pytorch.loggers import WandbLogger
 
     # WandB saves to output_dir/wandb
     wandb_dir = output_dir / "wandb"
     wandb_dir.mkdir(exist_ok=True)
 
+    logger_kwargs = dict(kwargs)
+    logger_kwargs.pop("settings", None)
+    init_kwargs = dict(logger_kwargs)
+    init_kwargs.update(
+        project=project,
+        name=name,
+        dir=str(wandb_dir),
+        tags=tags,
+        reinit="finish_previous",
+    )
+
+    run = wandb.init(**init_kwargs)
+
     wandb_logger = WandbLogger(
         project=project,
         name=name,
         save_dir=str(wandb_dir),
         tags=tags,
-        **kwargs,
+        experiment=run,
+        **logger_kwargs,
     )
 
     logger.info(f"✓ WandB logger initialized (project={project})")

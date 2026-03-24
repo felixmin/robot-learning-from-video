@@ -26,6 +26,7 @@ from torch import nn
 
 from lam.models.attention import ContinuousPositionBias, Transformer
 from lam.models.decoder_losses import (
+    _decode_spatial_tokens,
     compute_aux_outputs,
     compute_dino_loss,
     compute_flow_loss_term,
@@ -799,17 +800,28 @@ class LatentActionModel(nn.Module):
         """
         Decodes latent actions + context frame into reconstructed video.
 
-        This uses the AUXILIARY PIXEL DECODER path for visualization/inference.
-        Returns None if aux_decoder is disabled.
+        This prefers the auxiliary decoder for visualization/inference and falls
+        back to the pixel decoder when aux reconstruction is unavailable.
 
         Args:
             tokens: Continuous embeddings of the first frame (PIXEL CONTEXT) [B, 1, h, w, d]
             actions: Continuous embeddings of the latent action [B, 1, h', w', d].
 
         Returns:
-            recon_video: Reconstructed pixel values [B, C, 1, H, W], or None if aux_decoder disabled
+            recon_video: Reconstructed pixel values [B, C, 1, H, W], or None if no
+                reconstruction decoder is enabled
         """
-        if self.aux_decoder is None:
+        decoder = None
+        projector = None
+        decoder_actions = actions
+        if self.aux_decoder is not None:
+            decoder = self.aux_decoder
+            projector = self.aux_to_pixels
+            decoder_actions = actions.detach()
+        elif self.pixel_decoder is not None:
+            decoder = self.pixel_decoder
+            projector = self.pixel_to_pixels
+        else:
             return None
 
         b = tokens.shape[0]
@@ -819,21 +831,20 @@ class LatentActionModel(nn.Module):
             tokens = rearrange(tokens, "b (t h w) d -> b t h w d", h=h, w=w)
 
         video_shape = tuple(tokens.shape[:-1])
-
-        tokens = rearrange(tokens, "b t h w d -> (b t) (h w) d")
-        actions = rearrange(actions, "b t h w d -> (b t) (h w) d")
-
-        attn_bias = self.spatial_rel_pos_bias(h, w, device=tokens.device)
-
-        # Use AUX decoder for pixel reconstruction
-        tokens = self.aux_decoder(
-            tokens, attn_bias=attn_bias, video_shape=video_shape, context=actions
+        tokens = _decode_spatial_tokens(
+            decoder=decoder,
+            context_tokens=tokens,
+            action_tokens=decoder_actions,
+            attn_bias=self.spatial_rel_pos_bias(h, w, device=tokens.device),
+            batch_size=b,
+            h_dec=h,
+            w_dec=w,
         )
-
-        tokens = rearrange(tokens, "(b t) (h w) d -> b t h w d", b=b, h=h, w=w)
-
-        # Use AUX projector
-        recon_video = self.aux_to_pixels(tokens)
+        if tuple(tokens.shape[:-1]) != video_shape:
+            raise RuntimeError(
+                "Decoded reconstruction tokens do not match the expected video shape"
+            )
+        recon_video = projector(tokens)
 
         return recon_video
 
@@ -1133,6 +1144,10 @@ class LatentActionModel(nn.Module):
             metrics=metrics,
         )
         if return_recons_only:
+            if recon_frames is None and pixel_context is not None:
+                recon_video = self.decode(pixel_context, action_tokens)
+                if recon_video is not None:
+                    recon_frames = rearrange(recon_video, "b c 1 h w -> b c h w")
             return recon_frames
         if aux_loss is not None:
             total_loss = total_loss + aux_loss
@@ -1168,7 +1183,8 @@ class LatentActionModel(nn.Module):
 
         Returns:
             If return_only_codebook_ids: codebook indices [B, code_seq_len]
-            Otherwise: reconstructed frames [B, C, H, W], or None if aux_decoder disabled
+            Otherwise: reconstructed frames [B, C, H, W], or None if no
+            reconstruction decoder is enabled
         """
         video = self._normalize_video_input(video)
         first_frame, tokens, indices = self._inference_vq_outputs(
@@ -1179,8 +1195,7 @@ class LatentActionModel(nn.Module):
         if return_only_codebook_ids:
             return indices
 
-        # Aux decoder required for pixel reconstruction
-        if self.aux_decoder is None:
+        if self.decoder_context_projection is None:
             return None
 
         action_h, action_w = self.action_shape
@@ -1190,6 +1205,8 @@ class LatentActionModel(nn.Module):
         dec_first_frame_tokens = self.decoder_context_projection(first_frame)
 
         recon_video = self.decode(dec_first_frame_tokens, actions=tokens)
+        if recon_video is None:
+            return None
         recon_frames = rearrange(recon_video, "b c 1 h w -> b c h w")
 
         return recon_frames

@@ -11,7 +11,7 @@ for path in (LAM_SRC, LEROBOT_SRC):
         sys.path.insert(0, str(path))
 
 from lerobot.datasets.factory import resolve_delta_timestamps
-from lerobot_policy_lam.configuration_lam import LAMConfig
+from lerobot_policy_lapa_lam.configuration_lam import LAMConfig
 
 
 class _FakeMeta:

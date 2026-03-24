@@ -153,6 +153,22 @@ class TestLAMInference:
 
         print("✓ Inference mode works")
 
+    def test_inference_falls_back_to_pixel_decoder_without_aux(
+        self, lam_model_config, device
+    ):
+        """Pixel decoder should provide reconstructions when aux is disabled."""
+        lam_model_config.pop("device")
+        lam_model_config["use_aux_decoder"] = False
+        lam_model_config["use_pixel_decoder"] = True
+        model = LatentActionModel(**lam_model_config).to(device)
+        video = torch.randn(2, 3, 2, 256, 256, device=device)
+
+        with torch.no_grad():
+            recon = model.inference(video)
+
+        assert recon is not None
+        assert recon.shape == (2, 3, 256, 256)
+
     def test_inference_with_codebook_ids(self, lam_model, device):
         """Test inference returns codebook IDs."""
         batch_size = 2
@@ -401,10 +417,13 @@ class TestCodeOnlyPath:
 class TestInferenceCompatibility:
     """Regression tests for inference-only compatibility semantics."""
 
-    def test_inference_returns_none_without_aux_decoder(self, lam_model_config, device):
-        """Aux-disabled inference must keep returning None."""
+    def test_inference_returns_none_without_reconstruction_decoder(
+        self, lam_model_config, device
+    ):
+        """Inference must return None when both reconstruction decoders are disabled."""
         lam_model_config.pop("device")
         lam_model_config["use_aux_decoder"] = False
+        lam_model_config["use_pixel_decoder"] = False
         model = LatentActionModel(**lam_model_config).to(device)
         video = torch.randn(2, 3, 2, 256, 256, device=device)
 

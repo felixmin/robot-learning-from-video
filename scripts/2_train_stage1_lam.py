@@ -44,7 +44,7 @@ from common.callbacks import (
 )
 from common.run_context import setup_run_context
 from stage2.callbacks import ThroughputLoggingCallback, ThroughputLoggingConfig
-from common.logging import set_seed, count_parameters
+from common.utils import set_seed, count_parameters
 from common.unified_logging import setup_wandb_with_unified_paths
 from lam import (
     LAMTask,
@@ -322,7 +322,6 @@ def main(cfg: DictConfig):
             group=cfg.experiment.name,
             tags=cfg.logging.tags,
             use_wandb=True,
-            settings=wandb.Settings(start_method="thread", reinit=True),
         )
     else:
         wandb_logger = None
@@ -386,6 +385,8 @@ def main(cfg: DictConfig):
     log_every_n_steps = int(training_config.log_every_n_steps)
     num_sanity_val_steps = OmegaConf.select(training_config, "num_sanity_val_steps")
     trainer_strategy = OmegaConf.select(training_config, "strategy", default="auto")
+    trainer_devices = OmegaConf.select(training_config, "devices", default="auto")
+    trainer_num_nodes = int(OmegaConf.select(training_config, "num_nodes", default=1))
 
     model_summary_cfg = training_config.model_summary
 
@@ -399,7 +400,8 @@ def main(cfg: DictConfig):
         max_epochs=training_config.epochs,
         max_steps=int(training_config.max_steps),
         accelerator="auto",
-        devices="auto",
+        devices=trainer_devices,
+        num_nodes=trainer_num_nodes,
         strategy=trainer_strategy,
         plugins=trainer_plugins,
         precision=cfg.precision,
@@ -428,7 +430,8 @@ def main(cfg: DictConfig):
     logger.info(f"  - Num sanity val steps: {num_sanity_val_steps}")
     logger.info(f"  - Precision: {cfg.precision}")
     logger.info("  - Accelerator: auto")
-    logger.info("  - Devices: auto")
+    logger.info(f"  - Devices: {trainer_devices}")
+    logger.info(f"  - Num nodes: {trainer_num_nodes}")
     logger.info(f"  - Strategy: {trainer_strategy}")
     logger.info(f"  - Profiler: {profiler_type if profiler else 'disabled'}")
 

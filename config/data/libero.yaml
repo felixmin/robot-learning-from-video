@@ -14,5 +14,4 @@ dataset:
           primary: observation.images.image
         state_key: observation.state
         action_key: action
-        video_backend: pyav
         val_episode_count: 2

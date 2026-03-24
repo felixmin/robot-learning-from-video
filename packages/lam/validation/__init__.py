@@ -16,6 +16,8 @@ from .factory import create_validation_strategies, STRATEGY_REGISTRY
 from .visualization import BasicVisualizationStrategy
 from .analysis import (
     LatentTransferStrategy,
+    PermutedLatentVisualizationStrategy,
+    TopSequenceApplicationStrategy,
     CodebookHistogramStrategy,
     LatentSequenceHistogramStrategy,
     AllSequencesHistogramStrategy,
@@ -46,6 +48,8 @@ __all__ = [
     # Strategies
     "BasicVisualizationStrategy",
     "LatentTransferStrategy",
+    "PermutedLatentVisualizationStrategy",
+    "TopSequenceApplicationStrategy",
     "CodebookHistogramStrategy",
     "LatentSequenceHistogramStrategy",
     "AllSequencesHistogramStrategy",

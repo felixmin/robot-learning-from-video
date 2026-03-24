@@ -255,7 +255,6 @@ class LeRobotSingleSource:
         camera_map: dict[str, str],
         state_key: str | None,
         action_key: str | None,
-        video_backend: str | None,
         tolerance_s: float | None = None,
     ) -> None:
         self.repo_id = str(repo_id)
@@ -265,7 +264,6 @@ class LeRobotSingleSource:
         self.camera_map = dict(camera_map)
         self.state_key = state_key
         self.action_key = action_key
-        self.video_backend = video_backend
         self.tolerance_s = tolerance_s
         self.meta = load_lerobot_meta(self.repo_id, root, revision)
         self.request: DatasetRequest | None = None
@@ -353,7 +351,6 @@ class LeRobotSingleSource:
             root=str(self._resolved_root()),
             revision=self.revision,
             delta_timestamps=delta_timestamps,
-            video_backend=self.video_backend,
             tolerance_s=self.tolerance_s if self.tolerance_s is not None else 1e-4,
         )
 

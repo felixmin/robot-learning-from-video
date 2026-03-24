@@ -34,6 +34,18 @@ strategies:
     visualize_val: true
     visualize_per_bucket: true
 
+  permuted_latent_visualization:
+    type: permuted_latent_visualization
+    enabled: true
+    every_n_validations: 1
+    num_samples: 4
+
+  top_sequence_applications:
+    type: top_sequence_applications
+    enabled: true
+    every_n_validations: 1
+    top_k_sequences: 12
+
   flow_visualization:
     type: flow_visualization
     enabled: true

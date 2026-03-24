@@ -24,7 +24,6 @@ def _source_cfg(
         "camera_map": camera_map,
         "state_key": "observation.state",
         "action_key": "action",
-        "video_backend": "pyav",
         "val_episode_count": val_episode_count,
     }
 

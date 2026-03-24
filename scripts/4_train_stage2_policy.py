@@ -31,7 +31,7 @@ from common.callbacks import (
     ProgressLoggerCallback,
 )
 from common.data_factory import create_datamodule
-from common.logging import set_seed
+from common.utils import set_seed
 from common.run_context import setup_run_context
 from common.unified_logging import setup_wandb_with_unified_paths
 from stage2.action_tokens import ActionTokenConfig
@@ -122,7 +122,6 @@ def main(cfg: DictConfig):
         group=cfg.experiment.name,
         tags=cfg.logging.tags,
         use_wandb=bool(cfg.logging.use_wandb),
-        settings=wandb.Settings(start_method="thread", reinit=True),
     )
 
     # Data: frame pairs + language.

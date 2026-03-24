@@ -12,3 +12,7 @@ experiment:
 
 logging:
   tags: ["stage1", "lerobot_v3", "octo24", "local"]
+
+training:
+  strategy: auto
+  devices: 1

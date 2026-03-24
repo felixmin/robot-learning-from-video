@@ -77,7 +77,7 @@ class _FakeCustomActionKeyLeRobotDataset(_FakeLeRobotDataset):
         return item
 
 
-def test_single_source_passes_video_backend_to_lerobot_dataset(monkeypatch) -> None:
+def test_single_source_uses_lerobot_default_video_backend(monkeypatch) -> None:
     monkeypatch.setattr(
         "common.lerobot_v3_source.load_lerobot_meta",
         lambda repo_id, root, revision: make_test_meta(repo_id=repo_id),
@@ -92,7 +92,6 @@ def test_single_source_passes_video_backend_to_lerobot_dataset(monkeypatch) -> N
         camera_map={"primary": "observation.images.image"},
         state_key="observation.state",
         action_key="action",
-        video_backend="pyav",
     )
     source.compile(
         make_test_request(image_requests={"primary": (0, 1)}, action_deltas=(0, 1)),
@@ -105,7 +104,7 @@ def test_single_source_passes_video_backend_to_lerobot_dataset(monkeypatch) -> N
 
     assert _FakeLeRobotDataset.init_kwargs is not None
     assert _FakeLeRobotDataset.last_instance is not None
-    assert _FakeLeRobotDataset.init_kwargs["video_backend"] == "pyav"
+    assert "video_backend" not in _FakeLeRobotDataset.init_kwargs
     assert set(_FakeLeRobotDataset.last_instance.meta.info["features"]) == {
         "observation.images.image",
         "observation.state",
@@ -134,7 +133,6 @@ def test_single_source_get_sample_shapes_images_masks_and_metadata(monkeypatch) 
         camera_map={"primary": "observation.images.image"},
         state_key="observation.state",
         action_key="action",
-        video_backend="pyav",
     )
     source.compile(
         make_test_request(
@@ -194,7 +192,6 @@ def test_single_source_get_sample_accepts_float_image_streams(monkeypatch) -> No
         camera_map={"primary": "observation.images.image"},
         state_key="observation.state",
         action_key="action",
-        video_backend="pyav",
     )
     source.compile(
         make_test_request(
@@ -233,7 +230,6 @@ def test_single_source_uses_custom_action_key_pad_mask(monkeypatch) -> None:
         camera_map={"primary": "observation.images.image"},
         state_key="observation.state",
         action_key="actions",
-        video_backend="pyav",
     )
     source.compile(
         make_test_request(
@@ -274,7 +270,6 @@ def test_single_source_dataset_short_uses_repo_suffix_without_alias_mapping(
         camera_map={"primary": "observation.images.image"},
         state_key="observation.state",
         action_key="action",
-        video_backend="pyav",
     )
     source.compile(
         make_test_request(

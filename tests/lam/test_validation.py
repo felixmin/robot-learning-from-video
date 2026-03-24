@@ -14,6 +14,8 @@ from lam.validation import (
     BasicVisualizationStrategy,
     FlowVisualizationStrategy,
     LatentTransferStrategy,
+    PermutedLatentVisualizationStrategy,
+    TopSequenceApplicationStrategy,
     AllSequencesHistogramStrategy,
     CodebookEmbeddingStrategy,
     SequenceExamplesStrategy,
@@ -152,6 +154,14 @@ class TestCreateValidationStrategies:
                 "enabled": True,
                 "every_n_validations": 5,
             },
+            "permuted_latent_visualization": {
+                "type": "permuted_latent_visualization",
+                "enabled": True,
+            },
+            "top_sequence_applications": {
+                "type": "top_sequence_applications",
+                "enabled": True,
+            },
             "sequence_examples": {
                 "type": "sequence_examples",
                 "enabled": True,
@@ -160,11 +170,13 @@ class TestCreateValidationStrategies:
         }
         strategies = create_validation_strategies(config)
 
-        assert len(strategies) == 3
+        assert len(strategies) == 5
         # Names come from instance keys, not default strategy names
         names = {s.name for s in strategies}
         assert "basic" in names
         assert "latent_transfer" in names
+        assert "permuted_latent_visualization" in names
+        assert "top_sequence_applications" in names
         assert "sequence_examples" in names
 
     def test_create_only_basic(self):
@@ -206,6 +218,79 @@ class TestBasicVisualizationStrategy:
         metrics = strategy.run(cache, pl_module, trainer)
         assert metrics.get("_produced") == 0
         assert metrics.get("_reason") == "wandb_logger_unavailable"
+
+
+class TestPermutedLatentVisualizationStrategy:
+    def test_run_logs_metrics_without_wandb(self):
+        strategy = PermutedLatentVisualizationStrategy(num_samples=4)
+        cache = ValidationCache()
+        frames = torch.rand(4, 3, 2, 8, 8)
+        cache.add_batch(frames, metadata_list=[{} for _ in range(4)])
+
+        model = MagicMock()
+        model.aux_decoder = None
+        model.pixel_decoder = object()
+        model.return_value = torch.rand(4, 3, 8, 8)
+
+        pl_module = MagicMock()
+        pl_module.model = model
+        pl_module.device = torch.device("cpu")
+        pl_module.training = True
+        pl_module.encode_latents.return_value = (
+            torch.rand(4, 4, 16),
+            torch.randint(0, 8, (4, 4)),
+        )
+        pl_module.decode_with_latents.return_value = torch.rand(4, 3, 1, 8, 8)
+
+        trainer = MagicMock()
+        trainer.loggers = []
+        trainer.global_step = 12
+
+        metrics = strategy.run(cache, pl_module, trainer)
+
+        assert metrics["_produced"] == 4
+        assert "val/permuted_latent_mse" in metrics
+        assert "val/permuted_latent_self_recon_mse" in metrics
+        assert "val/permuted_latent_ratio" in metrics
+        pl_module.log_dict.assert_called_once()
+
+
+class TestTopSequenceApplicationStrategy:
+    def test_run_logs_metrics_without_wandb(self):
+        strategy = TopSequenceApplicationStrategy(top_k_sequences=3, min_samples=3)
+        cache = ValidationCache()
+        frames = torch.rand(4, 3, 2, 8, 8)
+        codes = torch.tensor(
+            [
+                [1, 2, 3, 4],
+                [1, 2, 3, 4],
+                [4, 3, 2, 1],
+                [7, 7, 7, 7],
+            ]
+        )
+        cache.add_batch(frames, metadata_list=[{} for _ in range(4)], codes=codes)
+
+        model = MagicMock()
+        model.aux_decoder = None
+        model.pixel_decoder = object()
+        model.vq.codebooks = torch.rand(8, 16)
+        model.vq.project_out.side_effect = lambda x: x
+
+        pl_module = MagicMock()
+        pl_module.model = model
+        pl_module.device = torch.device("cpu")
+        pl_module.decode_with_latents.return_value = torch.rand(3, 3, 1, 8, 8)
+
+        trainer = MagicMock()
+        trainer.loggers = []
+        trainer.global_step = 12
+
+        metrics = strategy.run(cache, pl_module, trainer)
+
+        assert metrics["_produced"] == 3
+        assert metrics["val/top_sequence_application_count"] == 3
+        pl_module.decode_with_latents.assert_called_once()
+        pl_module.log_dict.assert_called_once()
 
     def test_train_visualization_uses_preview_buffer_callback(self):
         strategy = BasicVisualizationStrategy(
@@ -820,6 +905,8 @@ class TestCompositionPattern:
             "basic",
             "basic_visualization",
             "latent_transfer",
+            "permuted_latent_visualization",
+            "top_sequence_applications",
             "codebook_histogram",
             "sequence_histogram",
             "all_sequences_histogram",

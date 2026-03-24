@@ -8,6 +8,8 @@ from .core import ValidationStrategy
 from .visualization import BasicVisualizationStrategy
 from .analysis import (
     LatentTransferStrategy,
+    PermutedLatentVisualizationStrategy,
+    TopSequenceApplicationStrategy,
     CodebookHistogramStrategy,
     LatentSequenceHistogramStrategy,
     AllSequencesHistogramStrategy,
@@ -28,6 +30,8 @@ STRATEGY_REGISTRY: Dict[str, Type[ValidationStrategy]] = {
     "basic": BasicVisualizationStrategy,
     "basic_visualization": BasicVisualizationStrategy,
     "latent_transfer": LatentTransferStrategy,
+    "permuted_latent_visualization": PermutedLatentVisualizationStrategy,
+    "top_sequence_applications": TopSequenceApplicationStrategy,
     "codebook_histogram": CodebookHistogramStrategy,
     "sequence_histogram": LatentSequenceHistogramStrategy,
     "all_sequences_histogram": AllSequencesHistogramStrategy,

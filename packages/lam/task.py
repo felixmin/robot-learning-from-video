@@ -170,6 +170,21 @@ class LAMTask(pl.LightningModule):
             expected_time_steps=2,
         )
 
+    @staticmethod
+    def _batch_size_from_stage1_batch(batch: Stage1Batch) -> int:
+        return int(select_primary_image_stream(batch.image_streams).shape[0])
+
+    @staticmethod
+    def _metric_value_for_log(value: Any) -> Any:
+        if isinstance(value, torch.Tensor):
+            value = value.detach()
+            if value.ndim == 0 and not torch.is_floating_point(value):
+                return value.to(torch.float32)
+            return value
+        if isinstance(value, (bool, int)):
+            return float(value)
+        return value
+
     def forward(
         self,
         video: torch.Tensor,
@@ -226,6 +241,7 @@ class LAMTask(pl.LightningModule):
         """
         if isinstance(batch, Stage1Batch):
             frames = self._extract_frames_from_stage1_batch(batch)
+            batch_size = self._batch_size_from_stage1_batch(batch)
         else:
             raise TypeError(f"Stage 1 expects Stage1Batch, got {type(batch)}")
 
@@ -239,7 +255,13 @@ class LAMTask(pl.LightningModule):
 
         # Log metrics (skip if no trainer attached, e.g., in unit tests)
         if self._trainer is not None:
-            self.log("train/loss", loss, prog_bar=True, sync_dist=True)
+            self.log(
+                "train/loss",
+                loss.detach(),
+                prog_bar=True,
+                sync_dist=True,
+                batch_size=batch_size,
+            )
 
             metrics_cfg = self.training_config.metrics
             log_every = int(metrics_cfg.log_every_n_steps)
@@ -250,11 +272,18 @@ class LAMTask(pl.LightningModule):
                     "train/lr",
                     self.optimizers().param_groups[0]["lr"],
                     prog_bar=False,
+                    batch_size=batch_size,
                 )
 
                 # Dynamic logging of model metrics (avoid progress-bar GPU sync)
                 for k, v in metrics.items():
-                    self.log(f"train/{k}", v, prog_bar=False, sync_dist=True)
+                    self.log(
+                        f"train/{k}",
+                        self._metric_value_for_log(v),
+                        prog_bar=False,
+                        sync_dist=True,
+                        batch_size=batch_size,
+                    )
 
         return loss
 
@@ -297,6 +326,7 @@ class LAMTask(pl.LightningModule):
         """
         if isinstance(batch, Stage1Batch):
             frames = self._extract_frames_from_stage1_batch(batch)
+            batch_size = self._batch_size_from_stage1_batch(batch)
         else:
             raise TypeError(f"Stage 1 expects Stage1Batch, got {type(batch)}")
 
@@ -305,11 +335,22 @@ class LAMTask(pl.LightningModule):
 
         # Log metrics (skip if no trainer attached, e.g., in unit tests)
         if self._trainer is not None:
-            self.log("val/loss", loss, prog_bar=True, sync_dist=True)
+            self.log(
+                "val/loss",
+                loss.detach(),
+                prog_bar=True,
+                sync_dist=True,
+                batch_size=batch_size,
+            )
 
             # Dynamic logging of model metrics
             for k, v in metrics.items():
-                self.log(f"val/{k}", v, sync_dist=True)
+                self.log(
+                    f"val/{k}",
+                    self._metric_value_for_log(v),
+                    sync_dist=True,
+                    batch_size=batch_size,
+                )
 
         return loss
 
@@ -465,14 +506,15 @@ class LAMTask(pl.LightningModule):
         Decode first frames with given latent actions.
 
         This enables latent transfer: apply action from one pair to another scene.
-        Returns None if aux_decoder is disabled.
+        Returns None if no reconstruction decoder is enabled.
 
         Args:
             first_frames: First frames [B, C, 1, H, W] or [B, C, H, W]
             latent_actions: Latent actions from encoder
 
         Returns:
-            Reconstructed next frames [B, C, 1, H, W], or None if aux_decoder disabled
+            Reconstructed next frames [B, C, 1, H, W], or None if no
+                reconstruction decoder is enabled
         """
         import math
         from einops import rearrange

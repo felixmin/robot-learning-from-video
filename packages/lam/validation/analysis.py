@@ -18,6 +18,14 @@ from .core import ValidationStrategy, ValidationCache
 from .metrics import compute_entropy
 
 
+def _has_reconstruction_decoder(pl_module: pl.LightningModule) -> bool:
+    model = getattr(pl_module, "model", None)
+    return bool(
+        getattr(model, "aux_decoder", None) is not None
+        or getattr(model, "pixel_decoder", None) is not None
+    )
+
+
 class LatentTransferStrategy(ValidationStrategy):
     """
     Test if latent actions transfer between different scenes.
@@ -63,9 +71,8 @@ class LatentTransferStrategy(ValidationStrategy):
         """Run latent transfer analysis."""
         metrics = {}
 
-        # Skip if aux_decoder is disabled (required for decoding)
-        if pl_module.model.aux_decoder is None:
-            return self.no_output("aux_decoder_unavailable")
+        if not _has_reconstruction_decoder(pl_module):
+            return self.no_output("reconstruction_decoder_unavailable")
 
         all_frames = cache.get_all_frames()
         if all_frames is None or len(all_frames) < 4:
@@ -253,6 +260,175 @@ class LatentTransferStrategy(ValidationStrategy):
 
         wandb_logger.log_image(
             key=f"val/latent_transfer{metric_suffix}",
+            images=[img],
+            caption=[f"Step {global_step}"],
+        )
+        plt.close(fig)
+
+
+class PermutedLatentVisualizationStrategy(ValidationStrategy):
+    """Compare self reconstruction with a reconstruction from batch-permuted latents."""
+
+    def __init__(
+        self,
+        name: str = "permuted_latent_visualization",
+        enabled: bool = True,
+        every_n_validations: int = 1,
+        num_samples: int = 8,
+        min_samples: int = 2,
+        **kwargs,
+    ):
+        super().__init__(
+            name=name,
+            enabled=enabled,
+            every_n_validations=every_n_validations,
+            min_samples=min_samples,
+            **kwargs,
+        )
+        self.num_samples = num_samples
+
+    def needs_caching(self) -> bool:
+        return True
+
+    def run(
+        self,
+        cache: ValidationCache,
+        pl_module: pl.LightningModule,
+        trainer: pl.Trainer,
+        metric_suffix: str = "",
+    ) -> Dict[str, Any]:
+        if not _has_reconstruction_decoder(pl_module):
+            return self.no_output("reconstruction_decoder_unavailable")
+
+        all_frames = cache.get_all_frames()
+        if all_frames is None or len(all_frames) < 2:
+            return self.no_output("insufficient_frames")
+
+        n = min(int(self.num_samples), len(all_frames))
+        indices = torch.randperm(len(all_frames))[:n]
+        frames = all_frames[indices]
+
+        was_training = pl_module.training
+        pl_module.eval()
+        with torch.no_grad():
+            device = pl_module.device
+            frames = frames.to(device)
+            self_recons = pl_module.model(frames, return_recons_only=True)
+            if self_recons is None:
+                pl_module.train(was_training)
+                return self.no_output("reconstruction_unavailable")
+
+            latents, latent_indices = pl_module.encode_latents(frames)
+            if n == 2:
+                perm = torch.tensor([1, 0], device=latents.device)
+            else:
+                shift = int(torch.randint(1, n, size=(1,), device=latents.device).item())
+                perm = torch.roll(torch.arange(n, device=latents.device), shifts=shift)
+            permuted_recons = pl_module.decode_with_latents(
+                frames[:, :, 0:1],
+                latents[perm],
+            )
+            if permuted_recons is None:
+                pl_module.train(was_training)
+                return self.no_output("reconstruction_unavailable")
+            if permuted_recons.ndim == 5:
+                permuted_recons = permuted_recons.squeeze(2)
+        pl_module.train(was_training)
+
+        target_frames = frames[:, :, 1]
+        self_mse = F.mse_loss(self_recons, target_frames)
+        permuted_mse = F.mse_loss(permuted_recons, target_frames)
+        metrics = {
+            f"val/permuted_latent_self_recon_mse{metric_suffix}": self_mse.item(),
+            f"val/permuted_latent_mse{metric_suffix}": permuted_mse.item(),
+            f"val/permuted_latent_ratio{metric_suffix}": permuted_mse.item()
+            / (self_mse.item() + 1e-8),
+        }
+        pl_module.log_dict(metrics, sync_dist=True)
+
+        wandb_logger = self._get_wandb_logger(trainer)
+        if wandb_logger is not None:
+            self._visualize_permuted_latents(
+                frames=frames.cpu(),
+                self_recons=self_recons.cpu(),
+                permuted_recons=permuted_recons.cpu(),
+                latent_indices=latent_indices.cpu(),
+                perm=perm.cpu(),
+                wandb_logger=wandb_logger,
+                global_step=trainer.global_step,
+                metric_suffix=metric_suffix,
+            )
+
+        return self.success(produced=int(n), metrics=metrics)
+
+    def _visualize_permuted_latents(
+        self,
+        *,
+        frames: torch.Tensor,
+        self_recons: torch.Tensor,
+        permuted_recons: torch.Tensor,
+        latent_indices: torch.Tensor,
+        perm: torch.Tensor,
+        wandb_logger,
+        global_step: int,
+        metric_suffix: str = "",
+    ) -> None:
+        num_samples = len(frames)
+        if num_samples == 0:
+            return
+
+        fig, axes = plt.subplots(
+            num_samples, 4, figsize=(14, 3.5 * num_samples), squeeze=False
+        )
+        col_titles = [
+            "s_t",
+            "s_t+1",
+            "D(s_t, z_self)",
+            "D(s_t, z_perm)",
+        ]
+
+        for i in range(num_samples):
+            imgs = [
+                frames[i, :, 0],
+                frames[i, :, 1],
+                self_recons[i],
+                permuted_recons[i],
+            ]
+            perm_source = int(perm[i].item())
+
+            for j, img in enumerate(imgs):
+                ax = axes[i, j]
+                img_np = img.permute(1, 2, 0).clamp(0.0, 1.0).numpy()
+                ax.imshow(img_np)
+                ax.axis("off")
+                if i == 0:
+                    ax.set_title(col_titles[j], fontsize=12)
+                if j == 0:
+                    ax.text(
+                        -0.15,
+                        0.5,
+                        "\n".join(
+                            [
+                                f"perm<-{perm_source}",
+                                f"self: {latent_indices[i].tolist()}",
+                                f"perm: {latent_indices[perm_source].tolist()}",
+                            ]
+                        ),
+                        transform=ax.transAxes,
+                        va="center",
+                        ha="right",
+                        fontsize=9,
+                        family="monospace",
+                    )
+
+        plt.tight_layout()
+        buf = io.BytesIO()
+        plt.savefig(buf, format="png", dpi=100, bbox_inches="tight")
+        buf.seek(0)
+        img = Image.open(buf)
+
+        wandb_logger.log_image(
+            key=f"val/permuted_latent_visualization{metric_suffix}",
             images=[img],
             caption=[f"Step {global_step}"],
         )
@@ -1057,3 +1233,156 @@ class SequenceExamplesStrategy(ValidationStrategy):
             plt.close(fig)
         except Exception as e:
             print(f"Warning: sequence_examples visualization failed: {e}")
+
+
+class TopSequenceApplicationStrategy(ValidationStrategy):
+    """Apply the most frequent latent token sequences to one anchor frame."""
+
+    def __init__(
+        self,
+        name: str = "top_sequence_applications",
+        enabled: bool = True,
+        every_n_validations: int = 1,
+        top_k_sequences: int = 12,
+        min_samples: int = 16,
+        anchor_index: int = 0,
+        **kwargs,
+    ):
+        super().__init__(
+            name=name,
+            enabled=enabled,
+            every_n_validations=every_n_validations,
+            min_samples=min_samples,
+            **kwargs,
+        )
+        self.top_k_sequences = top_k_sequences
+        self.anchor_index = anchor_index
+
+    def needs_caching(self) -> bool:
+        return True
+
+    def needs_codes(self) -> bool:
+        return True
+
+    def run(
+        self,
+        cache: ValidationCache,
+        pl_module: pl.LightningModule,
+        trainer: pl.Trainer,
+        metric_suffix: str = "",
+    ) -> Dict[str, Any]:
+        if not _has_reconstruction_decoder(pl_module):
+            return self.no_output("reconstruction_decoder_unavailable")
+
+        all_codes = cache.get_all_codes()
+        frames = cache.get_all_frames()
+        if all_codes is None or frames is None:
+            return self.no_output("missing_codes_or_frames")
+        if len(all_codes) < self.min_samples or len(frames) == 0:
+            return self.no_output("insufficient_samples")
+
+        sequences = [tuple(c.tolist()) for c in all_codes]
+        counter = Counter(sequences)
+        top_sequences = counter.most_common(self.top_k_sequences)
+        if not top_sequences:
+            return self.no_output("no_top_sequences")
+
+        anchor_idx = min(max(int(self.anchor_index), 0), len(frames) - 1)
+        anchor_pair = frames[anchor_idx : anchor_idx + 1]
+        anchor_first = anchor_pair[:, :, 0:1]
+
+        with torch.no_grad():
+            device = pl_module.device
+            seq_tensor = torch.tensor(
+                [list(seq) for seq, _count in top_sequences],
+                device=device,
+                dtype=torch.long,
+            )
+            raw_latents = pl_module.model.vq.codebooks[seq_tensor]
+            action_latents = pl_module.model.vq.project_out(raw_latents)
+            repeated_anchor = anchor_first.to(device).repeat(len(top_sequences), 1, 1, 1, 1)
+            decoded = pl_module.decode_with_latents(repeated_anchor, action_latents)
+            if decoded is None:
+                return self.no_output("reconstruction_unavailable")
+            if decoded.ndim == 5:
+                decoded = decoded.squeeze(2)
+
+        wandb_logger = self._get_wandb_logger(trainer)
+        if wandb_logger is not None:
+            self._visualize_top_sequence_applications(
+                anchor_pair=anchor_pair.cpu(),
+                decoded=decoded.cpu(),
+                top_sequences=top_sequences,
+                wandb_logger=wandb_logger,
+                global_step=trainer.global_step,
+                metric_suffix=metric_suffix,
+            )
+
+        metrics = {
+            f"val/top_sequence_application_count{metric_suffix}": int(len(top_sequences))
+        }
+        pl_module.log_dict(metrics, sync_dist=True)
+        return self.success(produced=int(len(top_sequences)), metrics=metrics)
+
+    def _visualize_top_sequence_applications(
+        self,
+        *,
+        anchor_pair: torch.Tensor,
+        decoded: torch.Tensor,
+        top_sequences: List[tuple],
+        wandb_logger,
+        global_step: int,
+        metric_suffix: str = "",
+    ) -> None:
+        num_rows = len(top_sequences)
+        if num_rows == 0:
+            return
+
+        anchor_frame = anchor_pair[0, :, 0]
+        true_next = anchor_pair[0, :, 1]
+
+        fig, axes = plt.subplots(
+            num_rows,
+            3,
+            figsize=(10, 3.2 * num_rows),
+            squeeze=False,
+        )
+        col_titles = ["anchor", "true_next", "applied_sequence"]
+
+        for row, ((seq, count), pred) in enumerate(zip(top_sequences, decoded)):
+            imgs = [anchor_frame, true_next, pred]
+            for col, img in enumerate(imgs):
+                ax = axes[row, col]
+                ax.imshow(img.permute(1, 2, 0).clamp(0.0, 1.0).numpy())
+                ax.axis("off")
+                if row == 0:
+                    ax.set_title(col_titles[col], fontsize=11)
+                if col == 0:
+                    ax.set_ylabel(
+                        f"{list(seq)}\ncount={count}",
+                        fontsize=9,
+                        family="monospace",
+                        rotation=0,
+                        labelpad=40,
+                        va="center",
+                    )
+
+        plt.suptitle(
+            f"Top {num_rows} latent sequences on one anchor frame (Step {global_step})",
+            fontsize=12,
+        )
+        plt.tight_layout()
+
+        buf = io.BytesIO()
+        plt.savefig(buf, format="png", dpi=100, bbox_inches="tight")
+        buf.seek(0)
+        img = Image.open(buf)
+
+        wandb_logger.log_image(
+            key=f"val/top_sequence_applications{metric_suffix}",
+            images=[img],
+            caption=[
+                f"Step {global_step}: one row per exact latent token sequence, applied to a shared anchor frame"
+            ],
+        )
+        plt.close(fig)
