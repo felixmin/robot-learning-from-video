@@ -213,10 +213,18 @@ def main() -> None:
         help="FPS used to convert anchor index to seconds for x-axis labels.",
     )
     parser.add_argument(
+        "--save-plot",
+        action="store_true",
+        help=(
+            "Save the plot to disk. If --save-path is not provided, uses "
+            "runs/debug/action_frame_filtering_ep<episode_row>.png."
+        ),
+    )
+    parser.add_argument(
         "--save-path",
         type=Path,
         default=None,
-        help="Optional path to save the plot image (png/pdf/etc).",
+        help="Optional full output path for the plot image (png/pdf/etc). Overrides default path.",
     )
     args = parser.parse_args()
 
@@ -261,10 +269,16 @@ def main() -> None:
         _plot_one_cache(axes_pair, data, title=title, fps=float(args.fps))
 
     fig.set_constrained_layout_pads(h_pad=0.25, w_pad=0.1, hspace=0.2, wspace=0.1)
+    output_path: Path | None = None
     if args.save_path is not None:
-        args.save_path.parent.mkdir(parents=True, exist_ok=True)
-        fig.savefig(args.save_path, dpi=160)
-        print(f"Saved plot to: {args.save_path}")
+        output_path = args.save_path
+    elif bool(args.save_plot):
+        output_path = Path(f"runs/debug/action_frame_filtering_ep{int(args.episode_row)}.png")
+
+    if output_path is not None:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        fig.savefig(output_path, dpi=160)
+        print(f"Saved plot to: {output_path}")
     plt.show()
 
 

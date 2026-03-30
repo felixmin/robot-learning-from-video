@@ -33,7 +33,7 @@ Motion section (`data.filtering.motion`):
 
 Action section (`data.filtering.action`):
 
-- `enabled`, `threshold`, `exclude_dims`
+- `enabled`, `threshold`, `exclude_dims`, `delta_dims`
 - `chunk_size`, `chunk_reduce` (`max | mean`)
 - `min_nonzero_ratio`
 - Time spacing: action score uses consecutive dataset steps (`anchor+0, +1, ...`), so spacing is 1 dataset step between points.
@@ -42,6 +42,8 @@ Action section (`data.filtering.action`):
 Semantics:
 - `exclude_dims` removes those action vector dimensions before L2 norm scoring.
 - Example: with `exclude_dims=[6]`, action dim index 6 (7th component, often gripper) is ignored in action score computation.
+- `delta_dims` scores selected action dimensions by temporal change (`x[t]-x[t-1]`) inside the chunk instead of absolute value.
+- Example: with `delta_dims=[6]` and `chunk_size>=2`, a binary gripper channel (0/1) contributes mainly when it toggles, not when it stays open/closed.
 - `chunk_size` is the number of consecutive action steps scored per anchor.
 - Example: `chunk_size=3` means score is computed from actions at `anchor+0`, `anchor+1`, `anchor+2`.
 - Implementation detail: action scoring is computed on contiguous indices in `_action_scores_for_episode_batched` (`packages/common/anchor_filtering.py`), not on sparse custom action deltas.
@@ -227,8 +229,11 @@ python scripts/plot_action_frame_filter_cache.py <path/to/cache_file.npz> --epis
 4. Save a plot image while tuning:
 
 ```bash
-python scripts/plot_action_frame_filter_cache.py <path/to/cache_file.npz> --episode-row 0 --save-path runs/debug/action_frame_filtering_ep0.png
+python scripts/plot_action_frame_filter_cache.py <path/to/cache_file.npz> --episode-row 0 --save-plot
 ```
+
+Default output path with `--save-plot` is:
+- `runs/debug/action_frame_filtering_ep<episode_row>.png`
 
 5. Compare all cache files for one split in one figure:
 
@@ -237,8 +242,8 @@ python scripts/plot_action_frame_filter_cache.py \
   --cache-dir <dataset_root>/meta/hlrp_action_frame_filter_cache \
   --split train \
   --all-files \
-  --episode-row 0 \
   --fps 15 \
+  --episode-row 0 \
   --save-path runs/debug/action_frame_filtering_all_train_ep0.png
 ```
 
@@ -251,7 +256,7 @@ The plot shows:
 - final `keep_mask` on a separate right y-axis (0/1)
 - x-axis labels as `anchor_index` and `time_seconds`
 
-Saved plots go exactly to the `--save-path` you pass.
+If `--save-path` is provided, the plot is saved exactly there. Otherwise, use `--save-plot` to save to the default path.
 
 ### Recommended tuning order
 
@@ -263,6 +268,7 @@ Saved plots go exactly to the `--save-path` you pass.
 - switch to `mode=both`
 - tune `threshold`, `chunk_size`, `chunk_reduce`, `min_nonzero_ratio`
 - for this teleop dataset, `exclude_dims=[6]` is typically useful because gripper dominates norm scale
+- if a channel should matter only on transitions (for example binary open/close), use `action.delta_dims=[<dim>]` with `chunk_size>=2`
 
 3. Lock deployment values in dataset config:
 - keep `force_recompute=false`
@@ -295,7 +301,7 @@ conda run -n hlrp python scripts/2_train_stage1_lam.py \
   data=lsy_teleop_only \
   training.max_steps=50 \
   logging.use_wandb=false \
-  data.adapter.lerobot_v3.steps_per_epoch=500
+  data.adapter.lerobot_v3.steps_per_epoch=20
 ```
 
 Expected:
@@ -394,7 +400,7 @@ conda run -n hlrp python scripts/2_train_stage1_lam.py \
   training.max_steps=50 \
   logging.use_wandb=false \
   data.loader.batch_size=16 \
-  data.adapter.lerobot_v3.steps_per_epoch=500
+  data.adapter.lerobot_v3.steps_per_epoch=20
 ```
 
 Threshold sweep example:
@@ -467,7 +473,11 @@ for rank, (drop_frac, dropped, total, episode_id, filename) in enumerate(rows[:1
     f"episode={episode_id:4d} file={filename}"
   )
 PY
+
 ```
+
+cache/huggingface/lerobot/LSY-lab/simple_tasks_human_rec_v0/meta/hlrp_action_frame_filter_cache
+cache/huggingface/lerobot/LSY-lab/simple_tasks_teleop_v1/meta/hlrp_action_frame_filter_cache
 
 Rank episodes by absolute dropped anchors (top-10):
 
@@ -507,12 +517,18 @@ conda run -n hlrp python scripts/2_train_stage1_lam.py \
   training.max_steps=1 \
   logging.use_wandb=false \
   data.adapter.lerobot_v3.steps_per_epoch=20 \
-  2>&1 | rg "cache=hit|cache=miss|Action-frame filtering source|train_episodes|val_episodes"
+  2>&1 | rg "cache=hit|cache=score-hit|cache=miss|Action-frame filtering source|train_episodes|val_episodes"
 ```
 
 Interpretation:
 - `cache=hit` means the exact fingerprint file already exists and was reused.
+- `cache=score-hit` means scores were reused and only keep/drop decisions were recomputed (for example threshold-only changes).
 - `cache=miss` means no exact match existed, so a new fingerprinted file was generated.
+
+Timing expectations (rough):
+- `cache=hit`: filtering phase should usually be quick (often seconds to low tens of seconds).
+- `cache=score-hit`: can still take noticeable time on large episode sets because decisions are recomputed across all candidate anchors.
+- `cache=miss`: slowest path (rescoring/decoding), often minutes.
 
 Dataset viz command pattern:
 
@@ -524,15 +540,17 @@ python -m lerobot.scripts.lerobot_dataset_viz \
   --mode local \
   --save 1 \
   --output-dir /tmp/lerobot_viz_simple_tasks_teleop_v1 \
-  --episode-index 
+  --episode-index 3
 
-rerun /tmp/lerobot_viz_simple_tasks_teleop_v1/LSY-lab_simple_tasks_teleop_v1_episode_128.rrd
+rerun /tmp/lerobot_viz_simple_tasks_teleop_v1/LSY-lab_simple_tasks_teleop_v1_episode_0.rrd
+
+rerun /tmp/lerobot_viz_simple_tasks_human_v0/LSY-lab_simple_tasks_human_rec_v0_episode_0.rrd
 ```
 
 Inspect a few episodes quickly:
 
 ```bash
-for ep in 0 130 123 74; do
+for ep in 9 11 7 3; do
   python -m lerobot.scripts.lerobot_dataset_viz \
     --repo-id LSY-lab/simple_tasks_teleop_v1 \
     --root cache/huggingface/lerobot \
@@ -540,6 +558,18 @@ for ep in 0 130 123 74; do
     --mode local \
     --save 1 \
     --output-dir /tmp/lerobot_viz_simple_tasks_teleop_v1 \
+    --episode-index "${ep}"
+done
+
+
+for ep in 3; do
+  python -m lerobot.scripts.lerobot_dataset_viz \
+  --repo-id LSY-lab/simple_tasks_human_rec_v0 \
+  --root cache/huggingface/lerobot/LSY-lab/simple_tasks_human_rec_v0 \
+  --display-compressed-images False \
+  --mode local \
+  --save 1 \
+  --output-dir /tmp/lerobot_viz_simple_tasks_human_v0 \
     --episode-index "${ep}"
 done
 

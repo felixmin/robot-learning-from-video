@@ -150,6 +150,7 @@ def normalize_filtering_config(
             "method": str(action_cfg.get("method", "norm")),
             "threshold": _to_float(action_cfg.get("threshold"), 0.02),
             "exclude_dims": _as_list_of_int(action_cfg.get("exclude_dims")),
+            "delta_dims": _as_list_of_int(action_cfg.get("delta_dims")),
             "chunk_size": _to_int(action_cfg.get("chunk_size"), 1),
             "chunk_reduce": str(action_cfg.get("chunk_reduce", "max")),
             "min_nonzero_ratio": _to_float(action_cfg.get("min_nonzero_ratio"), 0.0),
@@ -437,6 +438,7 @@ def _action_scores_for_episode_batched(
     action_key: str,
     action_chunk_size: int,
     exclude_dims: list[int],
+    delta_dims: list[int],
     reduce: str,
 ) -> tuple[np.ndarray, np.ndarray]:
     n = int(anchors.shape[0])
@@ -454,6 +456,17 @@ def _action_scores_for_episode_batched(
     action = torch.stack(action_series, dim=1)  # [N, T, A]
     if action.ndim != 3:
         raise ValueError(f"Expected action tensor [N,T,A], got {tuple(action.shape)}")
+
+    # For selected dimensions, score temporal change within the chunk rather
+    # than absolute level (useful for binary open/close channels).
+    if len(delta_dims) > 0:
+        valid_delta_dims = [
+            int(idx) for idx in delta_dims if 0 <= int(idx) < int(action.shape[2])
+        ]
+        if len(valid_delta_dims) > 0 and int(action.shape[1]) > 1:
+            delta = action[:, 1:, valid_delta_dims] - action[:, :-1, valid_delta_dims]
+            action[:, 0, valid_delta_dims] = 0.0
+            action[:, 1:, valid_delta_dims] = delta
 
     keep_dims = [idx for idx in range(int(action.shape[2])) if idx not in set(exclude_dims)]
     vec = action if len(keep_dims) == 0 else action[:, :, keep_dims]
@@ -850,6 +863,7 @@ def _score_fingerprint_payload_from_full_payload(full_payload: Mapping[str, Any]
                 "enabled": action.get("enabled"),
                 "method": action.get("method"),
                 "exclude_dims": action.get("exclude_dims"),
+                "delta_dims": action.get("delta_dims"),
                 "chunk_size": action.get("chunk_size"),
                 "chunk_reduce": action.get("chunk_reduce"),
             },
@@ -1354,6 +1368,7 @@ def build_anchor_filter(
                 action_key=action_key,
                 action_chunk_size=action_chunk_size,
                 exclude_dims=list(action_cfg.get("exclude_dims", [])),
+                delta_dims=list(action_cfg.get("delta_dims", [])),
                 reduce=str(action_cfg.get("chunk_reduce", "max")),
             )
             action_score[:] = batched_score

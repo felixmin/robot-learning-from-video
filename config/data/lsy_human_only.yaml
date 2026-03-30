@@ -28,7 +28,7 @@ filtering:
     prefetch_chunk_size: 64
     aggregate_all_cameras: true
     aggregate_reduce: mean
-    low_threshold: 0.01
+    low_threshold: 0.015
     high_threshold: 0.02
     use_hysteresis: true
 
@@ -38,7 +38,6 @@ filtering:
     threshold: 0.015
     exclude_dims: [6]
     chunk_size: 10
-    
     chunk_reduce: max
     min_nonzero_ratio: 0.2
 
