@@ -17,6 +17,7 @@ from common.lerobot_v3_types import DatasetSample
 
 from lerobot.datasets.lerobot_dataset import LeRobotDataset, LeRobotDatasetMetadata
 from lerobot.utils.constants import HF_LEROBOT_HOME
+
 logger = logging.getLogger(__name__)
 
 
@@ -310,7 +311,9 @@ class LeRobotSingleSource:
         self._runtime: LeRobotSourceRuntime | None = None
 
     def _resolved_root(self) -> Path:
-        return Path(self.root) if self.root is not None else HF_LEROBOT_HOME / self.repo_id
+        return (
+            Path(self.root) if self.root is not None else HF_LEROBOT_HOME / self.repo_id
+        )
 
     def _resolved_request(self) -> dict[str, list[float]]:
         if self.request is None:
@@ -390,14 +393,20 @@ class LeRobotSingleSource:
         motion_cfg = dict(filtering_cfg.get("motion", {}))
         use_all_cameras = bool(motion_cfg.get("aggregate_all_cameras", False))
         if use_all_cameras:
-            camera_keys_from_map = [str(v) for v in self.camera_map.values() if v is not None]
+            camera_keys_from_map = [
+                str(v) for v in self.camera_map.values() if v is not None
+            ]
             camera_dataset_keys = tuple(dict.fromkeys(camera_keys_from_map))
             if len(camera_dataset_keys) == 0:
-                camera_dataset_keys = tuple(sorted(str(key) for key in self.meta.camera_keys))
+                camera_dataset_keys = tuple(
+                    sorted(str(key) for key in self.meta.camera_keys)
+                )
         else:
             camera_dataset_keys = (str(primary_camera_dataset_key),)
         camera_aggregate_reduce = str(motion_cfg.get("aggregate_reduce", "mean"))
-        request_deltas = tuple(int(x) for x in self.request.image_requests[role].deltas_steps)
+        request_deltas = tuple(
+            int(x) for x in self.request.image_requests[role].deltas_steps
+        )
 
         logger.info(
             "Action-frame filtering source=%s split=%s start cameras=%s mode=%s candidate_episodes=%d",
@@ -428,7 +437,9 @@ class LeRobotSingleSource:
         counts = result.kept_counts.astype(np.int32)
         range_start = result.kept_range_start.astype(np.int64)
         range_end = result.kept_range_end.astype(np.int64)
-        sampleable_episode_ids = compiled.episodes.episode_index[counts > 0].astype(np.int32)
+        sampleable_episode_ids = compiled.episodes.episode_index[counts > 0].astype(
+            np.int32
+        )
         sampleable_episode_weights = counts[counts > 0].astype(np.float64)
 
         logger.info(
@@ -502,7 +513,9 @@ class LeRobotSingleSource:
             resolved_delta_timestamps=resolved,
         )
 
-    def _create_dataset(self, delta_timestamps: dict[str, list[float]]) -> LeRobotDataset:
+    def _create_dataset(
+        self, delta_timestamps: dict[str, list[float]]
+    ) -> LeRobotDataset:
         return LeRobotDataset(
             repo_id=self.repo_id,
             root=str(self._resolved_root()),

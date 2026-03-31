@@ -46,7 +46,7 @@ Semantics:
 - Example: with `delta_dims=[6]` and `chunk_size>=2`, a binary gripper channel (0/1) contributes mainly when it toggles, not when it stays open/closed.
 - `chunk_size` is the number of consecutive action steps scored per anchor.
 - Example: `chunk_size=3` means score is computed from actions at `anchor+0`, `anchor+1`, `anchor+2`.
-- Implementation detail: action scoring is computed on contiguous indices in `_action_scores_for_episode_batched` (`packages/common/anchor_filtering.py`), not on sparse custom action deltas.
+- Implementation detail: action scoring is computed on contiguous indices in `_action_scores_for_episode_batched` (`packages/common/action_frame_filtering.py`), not on sparse custom action deltas.
 - `action.chunk_reduce` operates on the action chunk only (time/chunk dimension), not cameras.
 - `chunk_reduce=max`: keep if any step in the chunk has high action norm (less aggressive drop).
 - `chunk_reduce=mean`: keep only if sustained action across the chunk (more aggressive drop).
@@ -196,7 +196,7 @@ Use temporary CLI overrides only for:
 - `training.max_steps` / debug runtime controls
 - `data.filtering.cache.force_recompute=true` when intentionally regenerating caches
 
-### Commands
+### Unified debug + tuning commands
 
 1. Run a short job to create/update cache files:
 
@@ -258,6 +258,92 @@ The plot shows:
 
 If `--save-path` is provided, the plot is saved exactly there. Otherwise, use `--save-plot` to save to the default path.
 
+6. Rank episodes by filtered anchors (fraction + absolute) to target tuning:
+
+```bash
+python - <<'PY'
+from pathlib import Path
+import numpy as np
+
+cache_dir = Path("cache/huggingface/lerobot/LSY-lab/simple_tasks_teleop_v1/meta/hlrp_action_frame_filter_cache")
+rows = []
+
+for cache_path in sorted(cache_dir.glob("train_*.npz")):
+  payload = np.load(cache_path, allow_pickle=False)
+  episode_ids = payload["episode_ids"].astype(int)
+  starts = payload["candidate_offsets_start"].astype(int)
+  ends = payload["candidate_offsets_end"].astype(int)
+  keep = payload["keep_mask"].astype(bool)
+  for row_idx, episode_id in enumerate(episode_ids.tolist()):
+    sl = slice(int(starts[row_idx]), int(ends[row_idx]))
+    total = int(ends[row_idx] - starts[row_idx])
+    kept = int(keep[sl].sum())
+    dropped = total - kept
+    drop_frac = float(dropped) / float(max(1, total))
+    rows.append((drop_frac, dropped, total, int(episode_id), cache_path.name))
+
+print("Top-10 by drop fraction:")
+for rank, (drop_frac, dropped, total, episode_id, filename) in enumerate(
+  sorted(rows, key=lambda x: x[0], reverse=True)[:10],
+  start=1,
+):
+  print(
+    f"{rank:2d}. drop_frac={drop_frac:.3f} dropped={dropped:4d}/{total:4d} "
+    f"episode={episode_id:4d} file={filename}"
+  )
+
+print("\nTop-10 by absolute dropped anchors:")
+for rank, (drop_frac, dropped, total, episode_id, filename) in enumerate(
+  sorted(rows, key=lambda x: x[1], reverse=True)[:10],
+  start=1,
+):
+  print(
+    f"{rank:2d}. dropped={dropped:4d}/{total:4d} "
+    f"drop_frac={drop_frac:.3f} episode={episode_id:4d} file={filename}"
+  )
+PY
+```
+
+7. Visualize the top-ranked episodes from step 6:
+
+```bash
+# Single episode (teleop example)
+python -m lerobot.scripts.lerobot_dataset_viz \
+  --repo-id LSY-lab/simple_tasks_teleop_v1 \
+  --root cache/huggingface/lerobot \
+  --display-compressed-images 0 \
+  --mode local \
+  --save 1 \
+  --output-dir /tmp/lerobot_viz_simple_tasks_teleop_v1 \
+  --episode-index <EPISODE_ID_FROM_RANKING>
+
+# Batch inspect several ranked episodes quickly (teleop example)
+for ep in 9 11 7 3; do
+  python -m lerobot.scripts.lerobot_dataset_viz \
+    --repo-id LSY-lab/simple_tasks_teleop_v1 \
+    --root cache/huggingface/lerobot \
+    --display-compressed-images 0 \
+    --mode local \
+    --save 1 \
+    --output-dir /tmp/lerobot_viz_simple_tasks_teleop_v1 \
+    --episode-index "${ep}"
+done
+```
+
+
+8. Useful `rerun` examples to look at actual dataset to verify what scores have been calculated and visualizend in the plots:
+
+```bash
+rerun /tmp/lerobot_viz_simple_tasks_teleop_v1/LSY-lab_simple_tasks_teleop_v1_episode_0.rrd
+rerun /tmp/lerobot_viz_simple_tasks_human_v0/LSY-lab_simple_tasks_human_rec_v0_episode_0.rrd
+```
+
+Notes:
+- Your original command is valid; the improvements are using fully qualified repo id and the LeRobot cache root as `--root`.
+- If your local root has a different folder layout, adjust `--root` only.
+- Use fully qualified repo id (`LSY-lab/...`) to avoid resolution mismatch.
+
+
 ### Recommended tuning order
 
 1. Tune motion first:
@@ -267,8 +353,8 @@ If `--save-path` is provided, the plot is saved exactly there. Otherwise, use `-
 2. Tune action second:
 - switch to `mode=both`
 - tune `threshold`, `chunk_size`, `chunk_reduce`, `min_nonzero_ratio`
-- for this teleop dataset, `exclude_dims=[6]` is typically useful because gripper dominates norm scale
-- if a channel should matter only on transitions (for example binary open/close), use `action.delta_dims=[<dim>]` with `chunk_size>=2`
+- for this teleop dataset, handle gripper dominance either by excluding it (`exclude_dims=[6]`) or by transition-aware scoring (`delta_dims=[6]`)
+- current tuned teleop config uses `exclude_dims=[]` with `delta_dims=[6]`
 
 3. Lock deployment values in dataset config:
 - keep `force_recompute=false`
@@ -285,7 +371,7 @@ If `--save-path` is provided, the plot is saved exactly there. Otherwise, use `-
 ## Suggested quick validation commands
 
 ```bash
-conda run -n hlrp ruff check packages/common/anchor_filtering.py packages/common/action_frame_filtering.py packages/common/lerobot_v3_source.py packages/common/lerobot_v3_sampler.py scripts/plot_action_frame_filter_cache.py
+conda run -n hlrp ruff check packages/common/action_frame_filtering.py packages/common/lerobot_v3_source.py packages/common/lerobot_v3_sampler.py scripts/plot_action_frame_filter_cache.py
 conda run -n hlrp pytest -q tests/test_common.py
 ```
 
@@ -314,21 +400,7 @@ Expected:
 conda run -n hlrp python scripts/2_train_stage1_lam.py \
   experiment=stage1_local \
   data=lsy_teleop_only \
-  training.max_steps=50 \### Filtering Config Locations
-
-Action-frame filtering is configured separately for Stage 1/2 and Stage 3.
-
-- Stage 1/2 filtering lives in data configs under `config/data/*.yaml`.
-- Example: `config/data/lsy_teleop_only.yaml` -> `data.filtering`.
-- Stage 3 filtering lives in stage-3 dataset configs under `config/stage3_dataset/*.yaml`.
-- Example: `config/stage3_dataset/lsy_teleop_full_multitask.yaml` -> `lerobot.dataset.filtering`.
-- Stage 3 source list lives in `config/stage3_dataset_mix/*.yaml` and can optionally override filtering per source via `sources[i].filtering`.
-- Merge order at runtime is: Stage 3 global dataset filtering, then per-source override (if present).
-
-Implication: Stage 3 does not automatically inherit Stage 1 filtering values unless you set matching values explicitly.
-
-For filtering semantics and cache/debugging details, see `docs/action_frame_filtering.md`.
-
+  training.max_steps=50 \
   logging.use_wandb=false \
   data.filtering.cache.force_recompute=true
 ```
@@ -339,7 +411,7 @@ Expected:
 ### 3) Stage 3 teleop smoke with shared filtering backend
 
 ```bash
-conda run -n lerobot python scripts/6_train_lerobot.py \
+conda run -n hlrp python scripts/6_train_lerobot.py \
   experiment=stage3_local_teleop_stage1 \
   artifacts.lam_checkpoint_path=<path/to/stage1_checkpoint.ckpt> \
   lerobot.steps=20 \
@@ -354,7 +426,7 @@ conda run -n lerobot python scripts/6_train_lerobot.py \
 Checkpoint-free action-only smoke variant:
 
 ```bash
-conda run -n lerobot python scripts/6_train_lerobot.py \
+conda run -n hlrp python scripts/6_train_lerobot.py \
   experiment=stage3_local_teleop_stage1 \
   lerobot.policy.stage3_training_mode=action \
   lerobot.policy.lam_checkpoint_path=null \
@@ -378,7 +450,7 @@ Expected logs per source:
 ### 4) Stage 3 forced regeneration override
 
 ```bash
-conda run -n lerobot python scripts/6_train_lerobot.py \
+conda run -n hlrp python scripts/6_train_lerobot.py \
   experiment=stage3_local_teleop_stage1 \
   lerobot.steps=50 \
   lerobot.eval.freq=0 \
@@ -415,171 +487,6 @@ conda run -n hlrp python scripts/2_train_stage1_lam.py \
   data.filtering.motion.high_threshold=0.012 \
   data.filtering.cache.force_recompute=true
 ```
-
-### 6) Visual debugging
-
-Find cache files:
-
-```bash
-find cache/huggingface/lerobot -name "train_*.npz" -path "*hlrp_action_frame_filter_cache*" 2>/dev/null
-find ~/.cache -name "train_*.npz" -path "*hlrp_action_frame_filter_cache*" 2>/dev/null
-```
-
-Plot one cache file:
-
-```bash
-python scripts/plot_action_frame_filter_cache.py <path/to/cache_file.npz> --episode-row 0
-```
-
-Plot all train cache files:
-
-```bash
-python scripts/plot_action_frame_filter_cache.py \
-  --cache-dir <dataset_root>/meta/hlrp_action_frame_filter_cache \
-  --split train \
-  --all-files \
-  --episode-row 0 \
-  --fps 15
-```
-
-Rank episodes by filtered fraction (top-10, train split):
-
-```bash
-python - <<'PY'
-from pathlib import Path
-import numpy as np
-
-cache_dir = Path("cache/huggingface/lerobot/LSY-lab/simple_tasks_teleop_v1/meta/hlrp_action_frame_filter_cache")
-rows = []
-
-for cache_path in sorted(cache_dir.glob("train_*.npz")):
-  payload = np.load(cache_path, allow_pickle=False)
-  episode_ids = payload["episode_ids"].astype(int)
-  starts = payload["candidate_offsets_start"].astype(int)
-  ends = payload["candidate_offsets_end"].astype(int)
-  keep = payload["keep_mask"].astype(bool)
-  for row_idx, episode_id in enumerate(episode_ids.tolist()):
-    sl = slice(int(starts[row_idx]), int(ends[row_idx]))
-    total = int(ends[row_idx] - starts[row_idx])
-    kept = int(keep[sl].sum())
-    dropped = total - kept
-    drop_frac = float(dropped) / float(max(1, total))
-    rows.append((drop_frac, dropped, total, int(episode_id), cache_path.name))
-
-rows.sort(key=lambda x: x[0], reverse=True)
-for rank, (drop_frac, dropped, total, episode_id, filename) in enumerate(rows[:10], start=1):
-  print(
-    f"{rank:2d}. drop_frac={drop_frac:.3f} dropped={dropped:4d}/{total:4d} "
-    f"episode={episode_id:4d} file={filename}"
-  )
-PY
-
-```
-
-cache/huggingface/lerobot/LSY-lab/simple_tasks_human_rec_v0/meta/hlrp_action_frame_filter_cache
-cache/huggingface/lerobot/LSY-lab/simple_tasks_teleop_v1/meta/hlrp_action_frame_filter_cache
-
-Rank episodes by absolute dropped anchors (top-10):
-
-```bash
-python - <<'PY'
-from pathlib import Path
-import numpy as np
-
-cache_dir = Path("cache/huggingface/lerobot/LSY-lab/simple_tasks_teleop_v1/meta/hlrp_action_frame_filter_cache")
-rows = []
-
-for cache_path in sorted(cache_dir.glob("train_*.npz")):
-  payload = np.load(cache_path, allow_pickle=False)
-  episode_ids = payload["episode_ids"].astype(int)
-  starts = payload["candidate_offsets_start"].astype(int)
-  ends = payload["candidate_offsets_end"].astype(int)
-  keep = payload["keep_mask"].astype(bool)
-  for row_idx, episode_id in enumerate(episode_ids.tolist()):
-    sl = slice(int(starts[row_idx]), int(ends[row_idx]))
-    total = int(ends[row_idx] - starts[row_idx])
-    kept = int(keep[sl].sum())
-    dropped = total - kept
-    rows.append((dropped, total, int(episode_id), cache_path.name))
-
-rows.sort(key=lambda x: x[0], reverse=True)
-for rank, (dropped, total, episode_id, filename) in enumerate(rows[:10], start=1):
-  print(f"{rank:2d}. dropped={dropped:4d}/{total:4d} episode={episode_id:4d} file={filename}")
-PY
-```
-
-Check which cache file the current config actually uses:
-
-```bash
-conda run -n hlrp python scripts/2_train_stage1_lam.py \
-  experiment=stage1_local \
-  data=lsy_teleop_only \
-  training.max_steps=1 \
-  logging.use_wandb=false \
-  data.adapter.lerobot_v3.steps_per_epoch=20 \
-  2>&1 | rg "cache=hit|cache=score-hit|cache=miss|Action-frame filtering source|train_episodes|val_episodes"
-```
-
-Interpretation:
-- `cache=hit` means the exact fingerprint file already exists and was reused.
-- `cache=score-hit` means scores were reused and only keep/drop decisions were recomputed (for example threshold-only changes).
-- `cache=miss` means no exact match existed, so a new fingerprinted file was generated.
-
-Timing expectations (rough):
-- `cache=hit`: filtering phase should usually be quick (often seconds to low tens of seconds).
-- `cache=score-hit`: can still take noticeable time on large episode sets because decisions are recomputed across all candidate anchors.
-- `cache=miss`: slowest path (rescoring/decoding), often minutes.
-
-Dataset viz command pattern:
-
-```bash
-python -m lerobot.scripts.lerobot_dataset_viz \
-  --repo-id LSY-lab/simple_tasks_teleop_v1 \
-  --root cache/huggingface/lerobot \
-  --display-compressed-images 0 \
-  --mode local \
-  --save 1 \
-  --output-dir /tmp/lerobot_viz_simple_tasks_teleop_v1 \
-  --episode-index 3
-
-rerun /tmp/lerobot_viz_simple_tasks_teleop_v1/LSY-lab_simple_tasks_teleop_v1_episode_0.rrd
-
-rerun /tmp/lerobot_viz_simple_tasks_human_v0/LSY-lab_simple_tasks_human_rec_v0_episode_0.rrd
-```
-
-Inspect a few episodes quickly:
-
-```bash
-for ep in 9 11 7 3; do
-  python -m lerobot.scripts.lerobot_dataset_viz \
-    --repo-id LSY-lab/simple_tasks_teleop_v1 \
-    --root cache/huggingface/lerobot \
-    --display-compressed-images 0 \
-    --mode local \
-    --save 1 \
-    --output-dir /tmp/lerobot_viz_simple_tasks_teleop_v1 \
-    --episode-index "${ep}"
-done
-
-
-for ep in 3; do
-  python -m lerobot.scripts.lerobot_dataset_viz \
-  --repo-id LSY-lab/simple_tasks_human_rec_v0 \
-  --root cache/huggingface/lerobot/LSY-lab/simple_tasks_human_rec_v0 \
-  --display-compressed-images False \
-  --mode local \
-  --save 1 \
-  --output-dir /tmp/lerobot_viz_simple_tasks_human_v0 \
-    --episode-index "${ep}"
-done
-
-rerun /tmp/lerobot_viz_simple_tasks_teleop_v1/simple_tasks_teleop_v1_episode_0.rrd
-```
-
-Notes:
-- Your original command is valid; the improvements are using fully qualified repo id and the LeRobot cache root as `--root`.
-- If your local root has a different folder layout, adjust `--root` only.
-- Use fully qualified repo id (`LSY-lab/...`) to avoid resolution mismatch.
 
 ## Disable entirely
 

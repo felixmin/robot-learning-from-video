@@ -1,0 +1,127 @@
+{
+  "policy": {
+    "type": "hlrp_smolvla_shared",
+    "repo_id": "felixmin/hlrp_smolvla_shared_teleop_stage1_baseline",
+    "push_to_hub": false,
+    "init_mode": "scratch",
+    "stage2_artifact": null,
+    "device": "cuda",
+    "action_loss_weight": 1.0,
+    "latent_loss_weight": 0.1,
+    "model_name": "HuggingFaceTB/SmolVLM2-500M-Video-Instruct",
+    "load_vlm_weights": true,
+    "train_expert_only": true,
+    "freeze_vision_encoder": true,
+    "attention_mode": "cross_attn",
+    "num_expert_layers": -1,
+    "num_vlm_layers": 16,
+    "self_attn_every_n_layers": 2,
+    "expert_width_multiplier": 0.75,
+    "add_image_special_tokens": false,
+    "max_state_dim": 32,
+    "prefix_length": -1,
+    "use_gpu_preprocessing": true,
+    "image_size": [
+      512,
+      512
+    ],
+    "empty_cameras": 0,
+    "latent_vector_dim": 32,
+    "max_action_dim": 32,
+    "flow_hidden_dim": 1024,
+    "flow_steps": 10,
+    "chunk_size": 50,
+    "tokenizer_max_length": 48,
+    "pad_language_to": "longest",
+    "n_action_steps": 50,
+    "min_period": 0.004,
+    "max_period": 4.0,
+    "time_beta_alpha": 1.5,
+    "time_beta_beta": 1.0,
+    "stage3_training_mode": "multitask",
+    "lam_checkpoint_path": "home/maxchr/repos/robot-learning-from-video/runs/2026-03-14_14-59-59_stage1_local/checkpoints/last.ckpt",
+    "lam_future_frames": 5,
+    "lam_camera_keys": [
+      "observation.images.fpv"
+    ],
+    "camera_keys": [
+      "observation.images.fpv",
+      "observation.images.orth",
+      "observation.images.person_view_3rd_1st",
+      "observation.images.eagles_view"
+    ]
+  },
+  "dataset": {
+    "repo_id": "hlrp/lsy_teleop_full_multitask",
+    "mix_path": "/home/maxchr/repos/robot-learning-from-video/config/stage3_dataset_mix/lsy_teleop_full_multitask.yaml",
+    "root": null,
+    "revision": null,
+    "use_imagenet_stats": false,
+    "video_backend": "pyav",
+    "filtering": {
+      "enabled": true,
+      "mode": "both",
+      "apply_at_sampling": true,
+      "trim_episode_ends": true,
+      "motion": {
+        "enabled": true,
+        "method": "frame_diff",
+        "frame_gap": null,
+        "device": "cuda",
+        "decode_chunk_size": 64,
+        "prefetch_next_episode": true,
+        "prefetch_chunk_size": 64,
+        "aggregate_all_cameras": true,
+        "aggregate_reduce": "mean",
+        "low_threshold": 0.01,
+        "high_threshold": 0.02,
+        "use_hysteresis": true
+      },
+      "action": {
+        "enabled": true,
+        "threshold": 0.001,
+        "exclude_dims": [],
+        "chunk_size": 3,
+        "chunk_reduce": "max",
+        "min_nonzero_ratio": 0.2
+      },
+      "cache": {
+        "enabled": true,
+        "reuse_if_config_unchanged": true,
+        "force_recompute": false
+      }
+    }
+  },
+  "output_dir": "./runs/2026-03-31_13-33-50_stage3_local_teleop_stage1",
+  "job_name": "stage3_local_teleop_stage1",
+  "resume": false,
+  "steps": 20,
+  "batch_size": 4,
+  "num_workers": 2,
+  "eval_freq": 0,
+  "log_freq": 10,
+  "save_freq": 20000,
+  "wandb": {
+    "enable": false
+  },
+  "grad_accum_steps": 1,
+  "eval": {
+    "batch_size": 2,
+    "n_episodes": 10
+  },
+  "optimizer": {
+    "type": "adamw",
+    "betas": [
+      0.9,
+      0.95
+    ]
+  },
+  "scheduler": {
+    "type": "cosine_decay_with_warmup",
+    "num_warmup_steps": 100,
+    "num_decay_steps": 99900,
+    "peak_lr": 0.0001,
+    "decay_lr": 2.5e-06
+  },
+  "use_policy_training_preset": false
+}
