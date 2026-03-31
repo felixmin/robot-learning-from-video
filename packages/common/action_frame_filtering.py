@@ -1084,6 +1084,27 @@ def build_action_frame_filter(
         tolerance_s=(1.0e-4 if tolerance_s is None else float(tolerance_s)),
     )
 
+    max_anchor_end_exclusive = max(0, int(len(ds.hf_dataset)) - int(frame_gap))
+    raw_candidate_start = candidate_start.astype(np.int64, copy=False)
+    raw_candidate_end = candidate_end.astype(np.int64, copy=False)
+    candidate_start = np.clip(raw_candidate_start, 0, max_anchor_end_exclusive).astype(
+        np.int64
+    )
+    candidate_end = np.clip(raw_candidate_end, 0, max_anchor_end_exclusive).astype(
+        np.int64
+    )
+    candidate_end = np.maximum(candidate_end, candidate_start).astype(np.int64)
+    if not (
+        np.array_equal(candidate_start, raw_candidate_start)
+        and np.array_equal(candidate_end, raw_candidate_end)
+    ):
+        logger.warning(
+            "Action-frame filtering clamped candidate ranges split=%s source=%s max_anchor_end=%d",
+            split,
+            repo_id,
+            max_anchor_end_exclusive,
+        )
+
     logger.info(
         "Action-frame filtering dataset resolved source=%s split=%s root=%s total_episodes=%d",
         repo_id,

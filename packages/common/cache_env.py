@@ -26,7 +26,14 @@ def resolve_cache_dir(*, cfg: Any, workspace_root: Path) -> Path | None:
         return None
 
     logging_root = _as_path(getattr(getattr(cfg, "logging", None), "root_dir", None))
-    base_root = logging_root if logging_root is not None else workspace_root
+    if logging_root is None:
+        base_root = workspace_root
+    elif logging_root.is_absolute():
+        base_root = logging_root
+    else:
+        # Anchor relative logging roots to the repository root, not process CWD.
+        base_root = workspace_root / logging_root
+
     return cache_dir if cache_dir.is_absolute() else (base_root / cache_dir)
 
 

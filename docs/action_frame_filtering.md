@@ -260,6 +260,10 @@ If `--save-path` is provided, the plot is saved exactly there. Otherwise, use `-
 
 6. Rank episodes by filtered anchors (fraction + absolute) to target tuning:
 
+Use a stable shared cache location across runs. By default, relative cache paths
+resolve under the repository root (`./cache`); override with an absolute
+`paths.cache_dir=...` if you want a different shared location.
+
 ```bash
 python - <<'PY'
 from pathlib import Path
